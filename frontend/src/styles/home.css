@@ -295,7 +295,8 @@
 }
 
 .primary-btn-scanner {
-  width: 100%;
+  width: calc(100% - 24px);
+  max-width: 420px;
   min-height: 54px;
   border-radius: 18px;
   background:
@@ -311,9 +312,11 @@
 }
 
 .primary-btn-scanner .primary-btn-icon {
-  width: 17px;
-  height: 17px;
-  color: #bdf2cd;
+  width: 20px;
+  height: 20px;
+  color: #d9ffe7;
+  filter: drop-shadow(0 0 10px rgba(131, 237, 178, 0.28));
+  opacity: 0.98;
 }
 
 .signal-panel {
@@ -955,7 +958,8 @@
 }
 
 :root[data-theme="light"] .primary-btn-scanner .primary-btn-icon {
-  color: #e8fff1;
+  color: #f2fff7;
+  filter: drop-shadow(0 0 8px rgba(189, 255, 215, 0.24));
 }
 
 .ref-form-card {

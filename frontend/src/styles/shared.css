@@ -588,6 +588,7 @@ textarea {
   }
 
   .primary-btn-scanner {
+    width: calc(100% - 18px);
     min-height: 52px;
   }
 

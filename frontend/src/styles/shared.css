@@ -121,9 +121,8 @@ textarea {
 .brand-pill-button {
   appearance: none;
   cursor: pointer;
-  border: 0;
-  padding: 0;
   color: var(--text-main);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .brand-pill-button:focus-visible {
@@ -414,16 +413,18 @@ textarea {
   }
 
   .brand-pill {
-    min-height: 35px;
-    padding: 6px 14px 7px;
+    min-height: 38px;
+    padding: 7px 18px 8px;
+    gap: 3px;
   }
 
   .brand-main {
-    font-size: 21px;
+    font-size: 23px;
   }
 
   .brand-fx {
     font-size: 10px;
+    margin-top: 1px;
   }
 
   .home-title {

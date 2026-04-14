@@ -1,4 +1,5 @@
 import aiBrainIcon from "../assets/ai-brain.png";
+import scannerScanIcon from "../assets/scanner-scan.gif";
 
 export function SparkIcon(props) {
   return (
@@ -54,16 +55,7 @@ export function LinkIcon(props) {
 }
 
 export function ScannerModeIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M7.2 4.8H5.4V6.6" />
-      <path d="M16.8 4.8h1.8V6.6" />
-      <path d="M7.2 19.2H5.4v-1.8" />
-      <path d="M16.8 19.2h1.8v-1.8" />
-      <circle cx="12" cy="12" r="3.15" />
-      <circle cx="12" cy="12" r="0.7" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  return <img src={scannerScanIcon} alt="" loading="lazy" {...props} />;
 }
 
 export function AutoModeIcon(props) {

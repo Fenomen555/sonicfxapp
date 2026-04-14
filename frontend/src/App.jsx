@@ -195,9 +195,13 @@ export default function App() {
     { id: "profile", label: t.nav.profile || "Профиль" }
   ];
 
-  const topPadding = isDesktop
-    ? Math.max(contentAreaTop + 14, 78)
-    : Math.max(contentAreaTop + (device.isCompactPhone ? 10 : 14), safeAreaTop + 62);
+  const headerTopOffset = isDesktop
+    ? 8
+    : Math.max(contentAreaTop - (device.isCompactPhone ? 34 : 36), safeAreaTop + 8);
+  const topPadding = Math.max(
+    headerTopOffset + (isDesktop ? 56 : 60),
+    isDesktop ? 78 : safeAreaTop + 64
+  );
   const stableViewportHeight = Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
 
   return (
@@ -205,10 +209,11 @@ export default function App() {
       className={`app-shell ${isDesktop ? "app-shell-desktop" : "app-shell-mobile"} ${device.isCompactPhone ? "app-shell-compact-phone" : ""}`}
       style={{
         "--top-padding": `${topPadding}px`,
-        "--app-stable-height": `${stableViewportHeight}px`
+        "--app-stable-height": `${stableViewportHeight}px`,
+        "--app-header-top": `${headerTopOffset}px`
       }}
     >
-      <header className={`app-header ${isDesktop ? "app-header-desktop" : "app-header-mobile"}`}>
+      <header className="app-header">
         <div className="brand-pill">
           <span className="brand-main">Sonic</span>
           <span className="brand-fx">fx</span>

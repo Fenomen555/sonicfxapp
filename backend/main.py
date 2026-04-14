@@ -114,6 +114,7 @@ WELCOME_TEXTS = {
             "Нажми кнопку ниже, чтобы открыть Mini App."
         ),
         "open_app": "Open SonicFX",
+        "admin_panel": "Admin Panel",
         "lang_title": "Language",
         "lang_saved": "Язык сохранен",
     },
@@ -124,6 +125,7 @@ WELCOME_TEXTS = {
             "Tap the button below to open the Mini App."
         ),
         "open_app": "Open SonicFX",
+        "admin_panel": "Admin Panel",
         "lang_title": "Language",
         "lang_saved": "Language saved",
     },
@@ -134,6 +136,7 @@ WELCOME_TEXTS = {
             "Натисни кнопку нижче, щоб вiдкрити Mini App."
         ),
         "open_app": "Open SonicFX",
+        "admin_panel": "Admin Panel",
         "lang_title": "Мова",
         "lang_saved": "Мову збережено",
     },
@@ -306,24 +309,32 @@ async def get_user_lang(user_id: int, fallback: str = "ru") -> str:
     return normalize_user_lang(str(row.get("lang") or fallback))
 
 
-def build_main_menu_keyboard(current_lang: str) -> InlineKeyboardMarkup:
+async def build_main_menu_keyboard(current_lang: str, user_id: Optional[int] = None) -> InlineKeyboardMarkup:
     lang = normalize_user_lang(current_lang)
     labels = WELCOME_TEXTS[lang]
     lang_btns = []
     for item in ("ru", "en", "uk"):
         mark = " " + ("*" if item == lang else "")
         lang_btns.append(InlineKeyboardButton(text=f"{item.upper()}{mark}", callback_data=f"lang:{item}"))
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
+    inline_keyboard = [
+        [
+            InlineKeyboardButton(
+                text=labels["open_app"],
+                web_app=WebAppInfo(url=build_main_webapp_url()),
+            )
+        ]
+    ]
+    if user_id is not None and await is_admin_user(int(user_id)):
+        inline_keyboard.append(
             [
                 InlineKeyboardButton(
-                    text=labels["open_app"],
-                    web_app=WebAppInfo(url=build_main_webapp_url()),
+                    text=labels["admin_panel"],
+                    web_app=WebAppInfo(url=build_admin_webapp_url()),
                 )
-            ],
-            lang_btns,
-        ]
-    )
+            ]
+        )
+    inline_keyboard.append(lang_btns)
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
 def build_welcome_message(lang: str, name: str) -> str:
@@ -1067,7 +1078,7 @@ async def cmd_start(message: types.Message):
         welcome_text,
         parse_mode="HTML",
         disable_web_page_preview=True,
-        reply_markup=build_main_menu_keyboard(lang),
+        reply_markup=await build_main_menu_keyboard(lang, int(from_user.id)),
     )
 
 
@@ -1089,7 +1100,7 @@ async def on_language_change(callback: types.CallbackQuery):
                 welcome_text,
                 parse_mode="HTML",
                 disable_web_page_preview=True,
-                reply_markup=build_main_menu_keyboard(lang),
+                reply_markup=await build_main_menu_keyboard(lang, int(callback.from_user.id)),
             )
         except Exception:
             pass

@@ -705,6 +705,7 @@
 }
 
 .action-sheet-close {
+  display: block;
   width: calc(100% - 34px);
   max-width: 260px;
   min-height: 48px;

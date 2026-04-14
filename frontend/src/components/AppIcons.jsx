@@ -53,43 +53,36 @@ export function LinkIcon(props) {
 
 export function ScannerModeIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M8 5.2H6.7A1.5 1.5 0 0 0 5.2 6.7V8" />
-      <path d="M16 5.2h1.3a1.5 1.5 0 0 1 1.5 1.5V8" />
-      <path d="M8 18.8H6.7a1.5 1.5 0 0 1-1.5-1.5V16" />
-      <path d="M16 18.8h1.3a1.5 1.5 0 0 0 1.5-1.5V16" />
-      <rect x="8.2" y="8.2" width="7.6" height="7.6" rx="2.2" />
-      <circle cx="12" cy="12" r="1.4" />
-      <path d="M9.4 6.9h5.2" opacity="0.5" />
-      <path d="M9.4 17.1h5.2" opacity="0.5" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M8 5.5H6.8A1.3 1.3 0 0 0 5.5 6.8V8" />
+      <path d="M16 5.5h1.2a1.3 1.3 0 0 1 1.3 1.3V8" />
+      <path d="M8 18.5H6.8a1.3 1.3 0 0 1-1.3-1.3V16" />
+      <path d="M16 18.5h1.2a1.3 1.3 0 0 0 1.3-1.3V16" />
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 10.9v2.2" />
+      <path d="M10.9 12h2.2" />
     </svg>
   );
 }
 
 export function AutoModeIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <circle cx="12" cy="12" r="7.4" opacity="0.24" />
-      <path d="M8 9.2A4.9 4.9 0 1 1 8.4 16" />
-      <path d="M7.1 8.1h3.8v3.7" />
-      <path d="M12 9.2v3.1l2.4 1.7" />
-      <path d="M15.8 7.6 17 6.4" opacity="0.52" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M7.2 9.1A5.4 5.4 0 1 1 7.9 15.7" />
+      <path d="M7 6.9h3.8v3.8" />
+      <path d="M12 9.2v3.3l2.3 1.5" />
     </svg>
   );
 }
 
 export function IndicatorModeIcon(props) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M5.2 18.5h13.6" />
-      <path d="M8 15.9v-4.7" />
-      <path d="M8 10.2V8.6" opacity="0.5" />
-      <path d="M12 15.9v-7" />
-      <path d="M12 8V6.5" opacity="0.5" />
-      <path d="M16 15.9v-5.4" />
-      <path d="M16 9.7V8.2" opacity="0.5" />
-      <path d="m6.7 13.2 3-1.9 2.5 1.4 4.9-3.1" />
-      <path d="M15.8 8.2h2.5v2.5" opacity="0.5" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M5.5 18.5h13" />
+      <path d="M8 16v-5.2" />
+      <path d="M12 16V8" />
+      <path d="M16 16v-3.6" />
+      <path d="m6.7 11.9 3-2 2.3 1.4 4.3-2.8" />
     </svg>
   );
 }

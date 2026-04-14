@@ -214,10 +214,15 @@ export default function App() {
       }}
     >
       <header className="app-header">
-        <div className="brand-pill">
+        <button
+          type="button"
+          className="brand-pill brand-pill-button"
+          onClick={() => setTab("home")}
+          aria-label={t.nav.home || "Главная"}
+        >
           <span className="brand-main">Sonic</span>
           <span className="brand-fx">fx</span>
-        </div>
+        </button>
       </header>
 
       <main className="app-main">

@@ -68,6 +68,7 @@ function FlagBadge({ countryCode, fallback = "🌐", title = "Global" }) {
       aria-label={title}
       title={title}
       className="news-flag-svg"
+      style={{ width: "100%", height: "100%", display: "block" }}
     />
   );
 }

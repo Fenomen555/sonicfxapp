@@ -680,9 +680,12 @@
   flex: 0 0 auto;
 }
 
-.action-sheet-option-icon svg {
+.action-sheet-option-icon svg,
+.action-sheet-option-icon img {
   width: 18px;
   height: 18px;
+  object-fit: contain;
+  display: block;
 }
 
 .action-sheet-option-copy {

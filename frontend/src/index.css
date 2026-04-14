@@ -941,6 +941,65 @@ textarea {
   cursor: pointer;
 }
 
+.picker-sheet {
+  max-width: 440px;
+}
+
+.picker-search-wrap {
+  margin-bottom: 10px;
+}
+
+.picker-search-input {
+  min-height: 48px;
+}
+
+.picker-sheet-list {
+  display: grid;
+  gap: 10px;
+  max-height: min(46dvh, 380px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.picker-sheet-option {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.picker-sheet-option.active {
+  border-color: rgba(143, 184, 255, 0.34);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(143, 184, 255, 0.08), transparent 40%),
+    linear-gradient(180deg, rgba(18, 27, 41, 0.96), rgba(13, 20, 31, 0.98));
+  box-shadow:
+    inset 0 0 0 1px rgba(143, 184, 255, 0.06),
+    0 12px 24px rgba(0, 0, 0, 0.16);
+}
+
+.picker-sheet-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(143, 184, 255, 0.14);
+  border: 1px solid rgba(143, 184, 255, 0.28);
+  color: #eff5ff;
+  font-size: 11px;
+  font-weight: 800;
+  flex: 0 0 auto;
+}
+
+.picker-sheet-empty {
+  border-radius: 16px;
+  border: 1px dashed rgba(94, 114, 146, 0.34);
+  padding: 16px 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
 :root[data-theme="light"] .signal-panel-toggle {
   border-color: rgba(101, 125, 165, 0.2);
   background:
@@ -976,6 +1035,10 @@ textarea {
   border-color: rgba(101, 125, 165, 0.24);
   background: rgba(236, 242, 252, 0.92);
   color: #274bc4;
+}
+
+:root[data-theme="light"] .field-picker-chevron {
+  border-color: #5570a7;
 }
 
 :root[data-theme="light"] .signal-panel-chevron {
@@ -1052,6 +1115,24 @@ textarea {
   border-color: rgba(106, 129, 168, 0.18);
   background: rgba(244, 247, 253, 0.96);
   color: #233551;
+}
+
+:root[data-theme="light"] .picker-sheet-option.active {
+  border-color: rgba(56, 104, 246, 0.2);
+  background:
+    radial-gradient(circle at 8% 0%, rgba(56, 104, 246, 0.08), transparent 40%),
+    linear-gradient(180deg, rgba(250, 252, 255, 0.99), rgba(243, 247, 255, 0.99));
+}
+
+:root[data-theme="light"] .picker-sheet-check {
+  background: rgba(56, 104, 246, 0.08);
+  border-color: rgba(56, 104, 246, 0.16);
+  color: #21438c;
+}
+
+:root[data-theme="light"] .picker-sheet-empty {
+  border-color: rgba(109, 131, 168, 0.24);
+  color: #637691;
 }
 
 :root[data-theme="light"] .generator-panel-head {
@@ -1256,6 +1337,55 @@ textarea {
   background: var(--bg-elevated);
   color: var(--text-main);
   padding: 10px 12px;
+}
+
+.field-picker-trigger {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.field-picker-trigger-mini {
+  min-height: 54px;
+}
+
+.field-picker-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.field-picker-copy strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.1;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.field-picker-copy small {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.25;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.field-picker-chevron {
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(214, 225, 245, 0.9);
+  border-bottom: 2px solid rgba(214, 225, 245, 0.9);
+  transform: rotate(45deg) translateY(-1px);
+  flex: 0 0 auto;
 }
 
 .field-grid {
@@ -2281,6 +2411,18 @@ textarea {
   .action-sheet {
     left: calc(8px + var(--tg-content-safe-area-inset-left, 0px));
     right: calc(8px + var(--tg-content-safe-area-inset-right, 0px));
+  }
+
+  .picker-sheet-list {
+    max-height: min(42dvh, 330px);
+  }
+
+  .picker-sheet-option {
+    padding: 14px 12px;
+  }
+
+  .picker-sheet-check {
+    padding: 0 10px;
   }
 
   .primary-btn-scanner {

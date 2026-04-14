@@ -66,6 +66,8 @@ export default function HomePage({ t }) {
   const [errorText, setErrorText] = useState("");
   const [availableMarkets, setAvailableMarkets] = useState([]);
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
+  const [pickerSheet, setPickerSheet] = useState(null);
+  const [pickerSearch, setPickerSearch] = useState("");
 
   const quickActions = [
     { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
@@ -151,6 +153,8 @@ export default function HomePage({ t }) {
   const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
   const selectedMode = SIGNAL_MODES.find((item) => item.id === signalMode) || SIGNAL_MODES[0];
   const SelectedModeIcon = selectedMode.icon;
+  const selectedPairMeta = pairs.find((item) => item?.pair === asset) || null;
+  const selectedExpirationMeta = expirations.find((item) => item?.value === expiration) || null;
   const actionLabel = signalMode === "automatic"
     ? "Запустить авто режим"
     : signalMode === "indicators"
@@ -168,6 +172,24 @@ export default function HomePage({ t }) {
     : signalMode === "indicators"
       ? "Выберите рынок, тикер и экспирацию для ручного сигнала."
       : "Сканер остается главным режимом и работает вместе с загрузкой графика.";
+
+  const pairSearchValue = pickerSearch.trim().toLowerCase();
+  const filteredPairs = pairSearchValue
+    ? pairs.filter((item) => {
+        const label = `${item?.pair || ""} ${typeof item?.payout === "number" ? `${item.payout}` : ""}`.toLowerCase();
+        return label.includes(pairSearchValue);
+      })
+    : pairs;
+
+  function openPickerSheet(type) {
+    setPickerSearch("");
+    setPickerSheet(type);
+  }
+
+  function closePickerSheet() {
+    setPickerSearch("");
+    setPickerSheet(null);
+  }
 
   return (
     <section className="page page-home-ref">
@@ -281,36 +303,39 @@ export default function HomePage({ t }) {
         <div className={`field-row ${signalMode === "indicators" ? "field-row-indicators" : ""}`}>
           <div className="field-grow">
             <label className="field-label">{t.home.asset || "Symbol"}</label>
-            <select
-              value={asset}
-              onChange={(e) => setAsset(e.target.value)}
-              className="field-input ref-input"
+            <button
+              type="button"
+              className="field-input ref-input field-picker-trigger"
+              onClick={() => openPickerSheet("asset")}
               disabled={isLoading || pairs.length === 0}
             >
-              {pairs.length === 0 && (
-                <option value="">
-                  {isLoading ? (t.home.loading || "Loading...") : (t.home.emptyPairs || "No pairs available")}
-                </option>
-              )}
-              {pairs.map((item) => (
-                <option key={item.pair} value={item.pair}>
-                  {item.pair}{typeof item.payout === "number" ? ` (${item.payout}%)` : ""}
-                </option>
-              ))}
-            </select>
+              <span className="field-picker-copy">
+                <strong>
+                  {selectedPairMeta
+                    ? `${selectedPairMeta.pair}${typeof selectedPairMeta.payout === "number" ? ` (${selectedPairMeta.payout}%)` : ""}`
+                    : isLoading
+                      ? (t.home.loading || "Loading...")
+                      : (t.home.emptyPairs || "No pairs available")}
+                </strong>
+                <small>{t.home.assetPickerHint || "Нажмите, чтобы выбрать валютную пару"}</small>
+              </span>
+              <span className="field-picker-chevron" aria-hidden="true" />
+            </button>
           </div>
 
           <div className="field-mini">
             <label className="field-label">{t.home.expiration || "Expiration"}</label>
-            <select
-              value={expiration}
-              onChange={(e) => setExpiration(e.target.value)}
-              className="field-input ref-input"
+            <button
+              type="button"
+              className="field-input ref-input field-picker-trigger field-picker-trigger-mini"
+              onClick={() => openPickerSheet("expiration")}
             >
-              {expirations.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+              <span className="field-picker-copy">
+                <strong>{selectedExpirationMeta?.label || expiration || "5m"}</strong>
+                <small>{t.home.expirationPickerHint || "Выбрать время"}</small>
+              </span>
+              <span className="field-picker-chevron" aria-hidden="true" />
+            </button>
           </div>
         </div>
 
@@ -361,6 +386,91 @@ export default function HomePage({ t }) {
             </div>
 
             <button className="action-sheet-close" type="button" onClick={() => setIsActionSheetOpen(false)}>
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
+      {pickerSheet && (
+        <div className="action-sheet-layer" role="presentation">
+          <button
+            className="action-sheet-backdrop"
+            type="button"
+            aria-label="Закрыть выбор"
+            onClick={closePickerSheet}
+          />
+          <div
+            className="action-sheet picker-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label={pickerSheet === "asset" ? "Выбор валютной пары" : "Выбор экспирации"}
+          >
+            <div className="action-sheet-handle" aria-hidden="true" />
+            <div className="action-sheet-head">
+              <div className="action-sheet-title">
+                {pickerSheet === "asset" ? (t.home.assetSheetTitle || "Валютные пары") : (t.home.expirationSheetTitle || "Время экспирации")}
+              </div>
+              <div className="action-sheet-copy">
+                {pickerSheet === "asset"
+                  ? (t.home.assetSheetHint || "Выберите активную пару из локально синхронизированного списка.")
+                  : (t.home.expirationSheetHint || "Выберите время, которое будем использовать для сигнала.")}
+              </div>
+            </div>
+
+            {pickerSheet === "asset" && (
+              <div className="picker-search-wrap">
+                <input
+                  className="field-input ref-input picker-search-input"
+                  type="text"
+                  value={pickerSearch}
+                  onChange={(e) => setPickerSearch(e.target.value)}
+                  placeholder={t.home.assetSearchPlaceholder || "Поиск пары, например AUD или EUR/USD"}
+                />
+              </div>
+            )}
+
+            <div className="picker-sheet-list">
+              {(pickerSheet === "asset" ? filteredPairs : expirations).map((item) => {
+                const isPair = pickerSheet === "asset";
+                const isActive = isPair ? asset === item.pair : expiration === item.value;
+                const title = isPair
+                  ? `${item.pair}${typeof item.payout === "number" ? ` (${item.payout}%)` : ""}`
+                  : item.label;
+                const subtitle = isPair
+                  ? (typeof item.payout === "number" ? "Текущая выплата доступна для выбора" : "Актив доступен для анализа")
+                  : "Доступное время экспирации";
+                return (
+                  <button
+                    key={isPair ? item.pair : item.value}
+                    className={`action-sheet-option picker-sheet-option ${isActive ? "active" : ""}`}
+                    type="button"
+                    onClick={() => {
+                      if (isPair) {
+                        setAsset(item.pair);
+                      } else {
+                        setExpiration(item.value);
+                      }
+                      closePickerSheet();
+                    }}
+                  >
+                    <span className="action-sheet-option-copy">
+                      <strong>{title}</strong>
+                      <small>{subtitle}</small>
+                    </span>
+                    {isActive && <span className="picker-sheet-check" aria-hidden="true">Выбрано</span>}
+                  </button>
+                );
+              })}
+
+              {pickerSheet === "asset" && filteredPairs.length === 0 && (
+                <div className="picker-sheet-empty">
+                  {t.home.assetSearchEmpty || "Ничего не найдено по этому запросу."}
+                </div>
+              )}
+            </div>
+
+            <button className="action-sheet-close" type="button" onClick={closePickerSheet}>
               Закрыть
             </button>
           </div>

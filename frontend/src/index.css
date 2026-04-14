@@ -102,19 +102,20 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  padding: 7px 16px;
+  min-height: 40px;
+  padding: 7px 18px 8px;
   border-radius: 999px;
   border: 1px solid var(--border-strong);
   background:
     linear-gradient(135deg, rgba(20, 29, 44, 0.96), rgba(16, 23, 35, 0.94)),
     var(--bg-card);
   box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.38),
+    0 14px 30px rgba(0, 0, 0, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   line-height: 1;
-  gap: 3px;
+  gap: 2px;
   backdrop-filter: blur(12px);
+  width: fit-content;
 }
 
 .brand-pill-button {
@@ -133,17 +134,20 @@ textarea {
 .brand-main {
   font-family: "Unbounded", "Onest", sans-serif;
   font-size: 24px;
-  letter-spacing: -1px;
+  letter-spacing: -1.25px;
   font-weight: 700;
+  color: #f5f7fb;
+  transform: translateY(1px);
 }
 
 .brand-fx {
   font-family: "Unbounded", "Onest", sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   align-self: flex-start;
-  margin-top: 1px;
+  margin-top: 2px;
   font-weight: 700;
   color: var(--accent-warm);
+  letter-spacing: -0.2px;
 }
 
 :root[data-theme="light"] .brand-pill {
@@ -151,6 +155,10 @@ textarea {
   box-shadow:
     0 14px 32px rgba(81, 107, 154, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+:root[data-theme="light"] .brand-main {
+  color: #1b2842;
 }
 
 .app-main {
@@ -2119,8 +2127,8 @@ textarea {
   }
 
   .brand-pill {
-    min-height: 34px;
-    padding: 6px 13px;
+    min-height: 35px;
+    padding: 6px 14px 7px;
   }
 
   .brand-main {
@@ -2128,7 +2136,7 @@ textarea {
   }
 
   .brand-fx {
-    font-size: 11px;
+    font-size: 10px;
   }
 
   .home-title {
@@ -2186,12 +2194,17 @@ textarea {
   }
 
   .brand-pill {
-    min-height: 36px;
-    padding: 6px 14px;
+    min-height: 37px;
+    padding: 6px 15px 7px;
   }
 
   .brand-main {
     font-size: 22px;
+  }
+
+  .brand-fx {
+    font-size: 10px;
+    margin-top: 2px;
   }
 
   .upload-zone {

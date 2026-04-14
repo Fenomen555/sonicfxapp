@@ -6,7 +6,6 @@ Project scaffold:
 - `frontend/` - React Mini App + Admin route (`/admin/:token`)
 
 ## Included from reference approach
-
 - Telegram WebApp `initData` validation (`X-TG-Init-Data`)
 - `/start` bot menu with welcome + WebApp button + language switch
 - Auto create/update DB schema on startup

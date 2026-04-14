@@ -959,11 +959,25 @@ textarea {
   max-height: min(46dvh, 380px);
   overflow-y: auto;
   padding-right: 2px;
+  grid-template-columns: 1fr;
+}
+
+.picker-sheet-list.cards-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.picker-sheet-list.cards-grid.compact-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .picker-sheet-option {
+  min-height: 116px;
+  padding: 14px;
+  align-items: flex-start;
   justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .picker-sheet-option.active {
@@ -989,6 +1003,32 @@ textarea {
   font-size: 11px;
   font-weight: 800;
   flex: 0 0 auto;
+}
+
+.picker-sheet-option .action-sheet-option-copy {
+  width: 100%;
+  gap: 6px;
+}
+
+.picker-sheet-option .action-sheet-option-copy strong {
+  font-size: 15px;
+  line-height: 1.16;
+}
+
+.picker-sheet-option .action-sheet-option-copy small {
+  line-height: 1.35;
+}
+
+.picker-sheet-expirations .picker-sheet-option {
+  min-height: 96px;
+}
+
+.picker-sheet-expirations .picker-sheet-option .action-sheet-option-copy strong {
+  font-size: 18px;
+}
+
+.picker-sheet-expirations .picker-sheet-option .action-sheet-option-copy small {
+  font-size: 11px;
 }
 
 .picker-sheet-empty {
@@ -2418,11 +2458,23 @@ textarea {
   }
 
   .picker-sheet-option {
+    min-height: 104px;
     padding: 14px 12px;
   }
 
   .picker-sheet-check {
     padding: 0 10px;
+  }
+
+  .picker-sheet-option .action-sheet-option-copy strong {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .picker-sheet-list.cards-grid,
+  .picker-sheet-list.cards-grid.compact-grid {
+    grid-template-columns: 1fr;
   }
 
   .primary-btn-scanner {

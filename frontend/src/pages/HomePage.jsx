@@ -401,7 +401,7 @@ export default function HomePage({ t }) {
             onClick={closePickerSheet}
           />
           <div
-            className="action-sheet picker-sheet"
+            className={`action-sheet picker-sheet ${pickerSheet === "asset" ? "picker-sheet-assets" : "picker-sheet-expirations"}`}
             role="dialog"
             aria-modal="true"
             aria-label={pickerSheet === "asset" ? "Выбор валютной пары" : "Выбор экспирации"}
@@ -430,7 +430,7 @@ export default function HomePage({ t }) {
               </div>
             )}
 
-            <div className="picker-sheet-list">
+            <div className={`picker-sheet-list ${pickerSheet === "asset" ? "cards-grid" : "cards-grid compact-grid"}`}>
               {(pickerSheet === "asset" ? filteredPairs : expirations).map((item) => {
                 const isPair = pickerSheet === "asset";
                 const isActive = isPair ? asset === item.pair : expiration === item.value;

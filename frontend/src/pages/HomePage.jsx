@@ -64,6 +64,7 @@ export default function HomePage({ t }) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
   const [availableMarkets, setAvailableMarkets] = useState([]);
+  const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
 
   const quickActions = [
     { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
@@ -181,7 +182,7 @@ export default function HomePage({ t }) {
 
       <h1 className="home-title">{t.home.title || "Upload chart screenshot"}</h1>
 
-      <button className="upload-zone" type="button">
+      <button className="upload-zone" type="button" onClick={() => setIsActionSheetOpen(true)}>
         <span className="frame-corner tl" />
         <span className="frame-corner tr" />
         <span className="frame-corner bl" />
@@ -192,23 +193,10 @@ export default function HomePage({ t }) {
         </div>
         <div className="upload-title">{t.home.upload || "Upload chart"}</div>
         <div className="upload-hint">{t.home.uploadHint || "JPG, PNG or HEIC"}</div>
+        <div className="upload-subhint">{t.home.sourceHint || "Выберите источник загрузки"}</div>
       </button>
 
-      <div className="quick-actions">
-        {quickActions.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button key={item.id} className="quick-action" type="button">
-              <span className="quick-action-icon" aria-hidden="true">
-                <Icon />
-              </span>
-              <span className="quick-action-label">{item.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <button className="primary-btn ref-primary primary-btn-top" type="button">
+      <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
         <SparkIcon className="primary-btn-icon" aria-hidden="true" />
         <span>{actionLabel}</span>
       </button>
@@ -237,6 +225,9 @@ export default function HomePage({ t }) {
                 </span>
                 <span className="signal-mode-text">
                   <small>{item.hint}</small>
+                </span>
+                <span className={`signal-mode-cta ${isActive ? "active" : ""}`}>
+                  {isActive ? "Выбрано" : "Выбрать"}
                 </span>
               </button>
             );
@@ -305,6 +296,56 @@ export default function HomePage({ t }) {
 
         {errorText && <div className="form-error">{errorText}</div>}
       </div>
+
+      {isActionSheetOpen && (
+        <div className="action-sheet-layer" role="presentation">
+          <button
+            className="action-sheet-backdrop"
+            type="button"
+            aria-label="Закрыть выбор источника"
+            onClick={() => setIsActionSheetOpen(false)}
+          />
+          <div className="action-sheet" role="dialog" aria-modal="true" aria-label="Выбор источника">
+            <div className="action-sheet-handle" aria-hidden="true" />
+            <div className="action-sheet-head">
+              <div className="action-sheet-title">Источник загрузки</div>
+              <div className="action-sheet-copy">Откройте график из галереи, камеры или вставьте ссылку.</div>
+            </div>
+
+            <div className="action-sheet-grid">
+              {quickActions.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    className="action-sheet-option"
+                    type="button"
+                    onClick={() => setIsActionSheetOpen(false)}
+                  >
+                    <span className="action-sheet-option-icon" aria-hidden="true">
+                      <Icon />
+                    </span>
+                    <span className="action-sheet-option-copy">
+                      <strong>{item.label}</strong>
+                      <small>
+                        {item.id === "gallery"
+                          ? "Выбрать файл"
+                          : item.id === "camera"
+                            ? "Сделать снимок"
+                            : "Вставить URL"}
+                      </small>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <button className="action-sheet-close" type="button" onClick={() => setIsActionSheetOpen(false)}>
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

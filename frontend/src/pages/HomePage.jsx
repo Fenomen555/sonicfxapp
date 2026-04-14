@@ -56,6 +56,7 @@ const SIGNAL_MODES = [
 
 export default function HomePage({ t }) {
   const [signalMode, setSignalMode] = useState("scanner");
+  const [isSignalModeExpanded, setIsSignalModeExpanded] = useState(false);
   const [marketKind, setMarketKind] = useState("otc");
   const [pairs, setPairs] = useState([]);
   const [expirations, setExpirations] = useState(FALLBACK_EXPIRATIONS);
@@ -138,9 +139,7 @@ export default function HomePage({ t }) {
 
   const indicatorMarkets = useMemo(() => {
     if (!availableMarkets.length) return INDICATOR_MARKETS;
-    const labels = new Map(
-      INDICATOR_MARKETS.map((item) => [item.key, item.label])
-    );
+    const labels = new Map(INDICATOR_MARKETS.map((item) => [item.key, item.label]));
     return availableMarkets
       .filter((item) => labels.has(item.key))
       .map((item) => ({
@@ -150,6 +149,8 @@ export default function HomePage({ t }) {
   }, [availableMarkets]);
 
   const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
+  const selectedMode = SIGNAL_MODES.find((item) => item.id === signalMode) || SIGNAL_MODES[0];
+  const SelectedModeIcon = selectedMode.icon;
   const actionLabel = signalMode === "automatic"
     ? "Запустить авто режим"
     : signalMode === "indicators"
@@ -197,37 +198,56 @@ export default function HomePage({ t }) {
       </button>
 
       <div className="signal-panel">
-        <div className="signal-panel-label">
-          {t.home.signalModeLabel || "Режим генерации сигнала"}
-        </div>
+        <button
+          className={`signal-panel-toggle ${isSignalModeExpanded ? "expanded" : ""}`}
+          type="button"
+          onClick={() => setIsSignalModeExpanded((prev) => !prev)}
+        >
+          <span className="signal-panel-toggle-copy">
+            <span className="signal-panel-label">{t.home.signalModeLabel || "Режим генерации сигнала"}</span>
+            <span className="signal-panel-selected">
+              <span className="signal-panel-selected-icon" aria-hidden="true">
+                <SelectedModeIcon />
+              </span>
+              <span className="signal-panel-selected-text">
+                <strong>{selectedMode.label}</strong>
+                <small>{selectedMode.hint}</small>
+              </span>
+            </span>
+          </span>
+          <span className="signal-panel-toggle-meta">
+            <span className="signal-panel-state">{isSignalModeExpanded ? "Свернуть" : "Выбрать"}</span>
+            <span className={`signal-panel-chevron ${isSignalModeExpanded ? "expanded" : ""}`} aria-hidden="true" />
+          </span>
+        </button>
 
-        <div className="signal-mode-grid">
-          {SIGNAL_MODES.map((item) => {
-            const Icon = item.icon;
-            const isActive = signalMode === item.id;
-            return (
-              <button
-                key={item.id}
-                className={`signal-mode-card ${isActive ? "active" : ""}`}
-                onClick={() => setSignalMode(item.id)}
-                type="button"
-              >
-                <span className="signal-mode-head">
+        {isSignalModeExpanded && (
+          <div className="signal-mode-grid">
+            {SIGNAL_MODES.map((item) => {
+              const Icon = item.icon;
+              const isActive = signalMode === item.id;
+              return (
+                <button
+                  key={item.id}
+                  className={`signal-mode-card ${isActive ? "active" : ""}`}
+                  onClick={() => { setSignalMode(item.id); setIsSignalModeExpanded(false); }}
+                  type="button"
+                >
                   <span className="signal-mode-icon" aria-hidden="true">
                     <Icon />
                   </span>
-                  <strong>{item.label}</strong>
-                </span>
-                <span className="signal-mode-text">
-                  <small>{item.hint}</small>
-                </span>
-                <span className={`signal-mode-cta ${isActive ? "active" : ""}`}>
-                  {isActive ? "Выбрано" : "Выбрать"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  <span className="signal-mode-text">
+                    <strong>{item.label}</strong>
+                    <small>{item.hint}</small>
+                  </span>
+                  <span className={`signal-mode-cta ${isActive ? "active" : ""}`}>
+                    {isActive ? "Выбрано" : "Выбрать"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
@@ -241,7 +261,7 @@ export default function HomePage({ t }) {
             <strong>{configTitle}</strong>
             <span>{configHint}</span>
           </div>
-          <span className="generator-panel-badge">{SIGNAL_MODES.find((item) => item.id === signalMode)?.label}</span>
+          <span className="generator-panel-badge">{selectedMode.label}</span>
         </div>
 
         <label className="field-label">{t.home.marketLabel || "Рынок"}</label>

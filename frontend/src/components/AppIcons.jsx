@@ -54,10 +54,12 @@ export function LinkIcon(props) {
 export function ScannerModeIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <rect x="4.5" y="4.5" width="15" height="15" rx="4.4" />
-      <path d="M8 4.5v3.6M16 4.5v3.6M4.5 8h3.6M15.9 8h3.6M8 19.5v-3.6M16 19.5v-3.6M4.5 16h3.6M15.9 16h3.6" />
-      <circle cx="12" cy="12" r="2.75" />
-      <path d="M12 8.1v7.8M8.1 12h7.8" opacity="0.4" />
+      <path d="M7 4.5H5.8A1.3 1.3 0 0 0 4.5 5.8V7" />
+      <path d="M17 4.5h1.2a1.3 1.3 0 0 1 1.3 1.3V7" />
+      <path d="M7 19.5H5.8a1.3 1.3 0 0 1-1.3-1.3V17" />
+      <path d="M17 19.5h1.2a1.3 1.3 0 0 0 1.3-1.3V17" />
+      <rect x="7.6" y="7.6" width="8.8" height="8.8" rx="2.3" />
+      <path d="M10 12h4M12 10v4" opacity="0.55" />
     </svg>
   );
 }
@@ -65,10 +67,10 @@ export function ScannerModeIcon(props) {
 export function AutoModeIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M6.1 12.8a5.9 5.9 0 1 0 2.1-4.5" />
-      <path d="M5.1 7H9v3.9" />
-      <path d="M12 8.4v3.9l2.8 1.9" />
-      <circle cx="12" cy="12" r="7.6" opacity="0.22" />
+      <circle cx="12" cy="12" r="7.5" opacity="0.28" />
+      <path d="M8.2 9.4A4.6 4.6 0 1 1 7.8 15" />
+      <path d="M7.2 8.2h3.5v3.4" />
+      <path d="M12 9.5v2.9l2.2 1.5" />
     </svg>
   );
 }
@@ -77,11 +79,10 @@ export function IndicatorModeIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M5 18.5h14" />
-      <path d="M7.4 16.2v-3.8" />
-      <path d="M12 16.2V7.8" />
-      <path d="M16.6 16.2v-5.1" />
-      <path d="m6.1 10.3 3-2.4 2.9 1.8 5-4" />
-      <path d="M17 5.7h1.9v1.9" />
+      <rect x="6.6" y="11.8" width="2.2" height="4.7" rx="1.1" />
+      <rect x="10.9" y="9.3" width="2.2" height="7.2" rx="1.1" />
+      <rect x="15.2" y="7" width="2.2" height="9.5" rx="1.1" />
+      <path d="m6.2 9.3 3.4-2.1 2.7 1.5 5.3-3.3" opacity="0.55" />
     </svg>
   );
 }

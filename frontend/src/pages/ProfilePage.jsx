@@ -51,7 +51,6 @@ function getStatusMeta(status, t) {
 export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onLangPreview }) {
   const [lang, setLang] = useState(user?.lang || "ru");
   const [theme, setTheme] = useState(user?.theme || "dark");
-  const [miniUsername, setMiniUsername] = useState(user?.mini_username || "");
   const [timezone, setTimezone] = useState(user?.timezone || "Europe/Kiev");
   const [statusMessage, setStatusMessage] = useState("");
   const [statusTone, setStatusTone] = useState("success");
@@ -61,14 +60,13 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   useEffect(() => {
     setLang(user?.lang || "ru");
     setTheme(user?.theme || "dark");
-    setMiniUsername(user?.mini_username || "");
     setTimezone(user?.timezone || "Europe/Kiev");
     setAvatarFailed(false);
   }, [user]);
 
   const profileName = useMemo(() => {
     const full = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
-    return full || user?.mini_username || user?.tg_username || t.profile.nameFallback || "Trader";
+    return full || user?.tg_username || t.profile.nameFallback || "Trader";
   }, [t.profile.nameFallback, user]);
 
   const statusMeta = useMemo(
@@ -92,11 +90,6 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         key: "joined",
         label: t.profile.joined || "Регистрация",
         value: formatProfileDate(user?.created_at, lang)
-      },
-      {
-        key: "lastSeen",
-        label: t.profile.lastSeen || "Последняя активность",
-        value: formatProfileDate(user?.last_active_at, lang)
       }
     ],
     [lang, t, user]
@@ -111,7 +104,6 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         body: JSON.stringify({
           lang,
           theme,
-          mini_username: miniUsername,
           timezone
         })
       });
@@ -154,14 +146,10 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           <div className={`profile-status-chip ${statusMeta.tone}`}>{statusMeta.label}</div>
         </div>
 
-        <div className="profile-identity-list">
+        <div className="profile-identity-list compact">
           <div>
             <span>{t.profile.userId}</span>
             <strong>{user?.user_id || "-"}</strong>
-          </div>
-          <div>
-            <span>{t.profile.miniUsername}</span>
-            <strong>{user?.mini_username || "—"}</strong>
           </div>
           <div>
             <span>{t.profile.username}</span>
@@ -169,7 +157,7 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           </div>
         </div>
 
-        <div className="profile-summary-grid">
+        <div className="profile-summary-grid compact">
           {summaryCards.map((item) => (
             <article className="profile-summary-card" key={item.key}>
               <span>{item.label}</span>
@@ -177,23 +165,13 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
             </article>
           ))}
         </div>
-
-        <div className="profile-note">{t.profile.avatarHint || "Аватар и данные Telegram автоматически обновляются при открытии Mini App."}</div>
       </div>
 
       <div className="card profile-section">
         <div className="profile-section-head">
           <strong>{t.profile.accountCardTitle || "Профиль в приложении"}</strong>
-          <span>{t.profile.profileHint || "Управляй отображением профиля и визуальным стилем приложения."}</span>
+          <span>{t.profile.profileHint || "Управляй основными данными аккаунта и внешним видом приложения."}</span>
         </div>
-
-        <label className="field-label">{t.profile.miniUsername}</label>
-        <input
-          className="field-input"
-          value={miniUsername}
-          onChange={(e) => setMiniUsername(e.target.value)}
-          maxLength={64}
-        />
 
         <label className="field-label">{t.profile.timezone}</label>
         <input className="field-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} />

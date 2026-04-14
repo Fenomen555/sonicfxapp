@@ -47,6 +47,46 @@ const EMPTY_MARKET_SETTINGS = {
   items: []
 };
 
+function TabGlyph({ kind }) {
+  if (kind === "stats") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 19h14" />
+        <path d="M7.5 15.5v-4" />
+        <path d="M12 15.5V8.5" />
+        <path d="M16.5 15.5v-6" />
+      </svg>
+    );
+  }
+  if (kind === "users") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="9" r="2.5" />
+        <path d="M4.8 17.2a4.8 4.8 0 0 1 8.4 0" />
+        <circle cx="16.8" cy="10.2" r="2" />
+        <path d="M14.3 17.2a4.1 4.1 0 0 1 5-.8" />
+      </svg>
+    );
+  }
+  if (kind === "flags") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 6.5h10l-2.4 3.2L17 13H7V6.5Z" />
+        <path d="M7 5v14" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4.8 18.5h14.4" />
+      <path d="M8 16v-4.8" />
+      <path d="M12 16V8.5" />
+      <path d="M16 16v-6.2" />
+      <path d="m6.8 11.7 2.6-1.8 2.4 1.4 5-3.3" />
+    </svg>
+  );
+}
+
 function formatDateTime(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -419,16 +459,21 @@ export default function AdminApp({ authError }) {
           {tabCards.map((item) => (
             <button
               className={`admin-section-card ${tab === item.id ? "active" : ""}`}
+              data-tab={item.id}
               key={item.id}
               onClick={() => setTab(item.id)}
               type="button"
             >
-              <span className="admin-section-accent">{item.accent}</span>
+              <span className="admin-section-card-head">
+                <span className="admin-section-accent" aria-hidden="true">
+                  <TabGlyph kind={item.id} />
+                </span>
+                <span className="admin-section-metric">{item.metric}</span>
+              </span>
               <span className="admin-section-content">
                 <strong>{item.label}</strong>
                 <small>{item.subtitle}</small>
               </span>
-              <span className="admin-section-metric">{item.metric}</span>
             </button>
           ))}
         </nav>

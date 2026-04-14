@@ -14,7 +14,6 @@ Project scaffold:
 - Theme tokens: `:root[data-theme="dark"]` and `:root[data-theme="light"]`
 
 ## Backend setup
-
 1. Copy env:
    - `backend/.env.example` -> `backend/.env`
 2. Fill required values:

@@ -47,28 +47,6 @@
   box-shadow: 0 8px 18px rgba(219, 188, 126, 0.18);
 }
 
-.home-title {
-  margin: 6px 0 0;
-  font-size: 34px;
-  line-height: 1.03;
-  letter-spacing: -0.05em;
-  font-weight: 800;
-  color: var(--text-main);
-  background: linear-gradient(180deg, #ffffff 0%, #dbe3f5 88%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: riseIn 0.4s ease both;
-}
-
-.home-subtitle {
-  margin: 7px 0 12px;
-  color: var(--text-muted);
-  font-size: 15px;
-  font-weight: 500;
-  animation: riseIn 0.42s ease both;
-}
-
 :root[data-theme="light"] .home-quota {
   border-color: rgba(112, 132, 168, 0.18);
   background:
@@ -93,19 +71,6 @@
   background: linear-gradient(180deg, #fff9ee, #f2e0ba);
   color: #44341b;
   box-shadow: 0 12px 24px rgba(185, 140, 69, 0.16);
-}
-
-:root[data-theme="light"] .home-title {
-  color: #172338;
-  background: none;
-  -webkit-background-clip: initial;
-  background-clip: border-box;
-  -webkit-text-fill-color: initial;
-  text-shadow: 0 10px 24px rgba(132, 154, 194, 0.16);
-}
-
-:root[data-theme="light"] .home-subtitle {
-  color: #647791;
 }
 
 .upload-zone {

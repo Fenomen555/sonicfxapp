@@ -203,8 +203,6 @@ export default function HomePage({ t }) {
         </button>
       </div>
 
-      <h1 className="home-title">{t.home.title || "Upload chart screenshot"}</h1>
-
       <button className="upload-zone" type="button" onClick={() => setIsActionSheetOpen(true)}>
         <span className="frame-corner tl" />
         <span className="frame-corner tr" />

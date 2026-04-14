@@ -2,6 +2,7 @@
 import AdminApp from "./admin/AdminApp";
 import BottomNav from "./components/BottomNav";
 import { apiAdminFetchJson, apiFetchJson, isAdminRoute, isTelegramWebAppAvailable } from "./lib/api";
+import { getDeviceProfile } from "./lib/device";
 import { initTelegramApp } from "./lib/tgSetup";
 import { texts } from "./locales/texts";
 import HomePage from "./pages/HomePage";
@@ -29,6 +30,7 @@ export default function App() {
   const [botUsername, setBotUsername] = useState("");
   const [safeAreaTop, setSafeAreaTop] = useState(0);
   const [contentAreaTop, setContentAreaTop] = useState(56);
+  const [device, setDevice] = useState(() => getDeviceProfile());
   const [adminInitDone, setAdminInitDone] = useState(false);
   const [adminUser, setAdminUser] = useState(null);
   const [adminAuthError, setAdminAuthError] = useState("");
@@ -36,10 +38,23 @@ export default function App() {
   const adminMode = useMemo(() => isAdminRoute(), []);
   const lang = useMemo(() => (texts[user.lang] ? user.lang : "ru"), [user.lang]);
   const t = texts[lang];
-  const isDesktop = useMemo(() => {
+  const isDesktop = device.isDesktop;
+
+  useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    const platform = (tg?.platform || "").toLowerCase();
-    return platform === "tdesktop" || platform === "web" || platform === "macos";
+
+    const updateDevice = () => {
+      setDevice(getDeviceProfile());
+    };
+
+    updateDevice();
+    window.addEventListener("resize", updateDevice);
+    if (tg?.onEvent) tg.onEvent("viewportChanged", updateDevice);
+
+    return () => {
+      window.removeEventListener("resize", updateDevice);
+      if (tg?.offEvent) tg.offEvent("viewportChanged", updateDevice);
+    };
   }, []);
 
   useEffect(() => {
@@ -180,11 +195,20 @@ export default function App() {
     { id: "profile", label: t.nav.profile || "Профиль" }
   ];
 
-  const topPadding = isDesktop ? 124 : Math.max(contentAreaTop + 66, safeAreaTop + 108);
+  const topPadding = isDesktop
+    ? Math.max(contentAreaTop + 14, 78)
+    : Math.max(contentAreaTop + (device.isCompactPhone ? 10 : 14), safeAreaTop + 62);
+  const stableViewportHeight = Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
 
   return (
-    <div className="app-shell" style={{ "--top-padding": `${topPadding}px` }}>
-      <header className="app-header">
+    <div
+      className={`app-shell ${isDesktop ? "app-shell-desktop" : "app-shell-mobile"} ${device.isCompactPhone ? "app-shell-compact-phone" : ""}`}
+      style={{
+        "--top-padding": `${topPadding}px`,
+        "--app-stable-height": `${stableViewportHeight}px`
+      }}
+    >
+      <header className={`app-header ${isDesktop ? "app-header-desktop" : "app-header-mobile"}`}>
         <div className="brand-pill">
           <span className="brand-main">Sonic</span>
           <span className="brand-fx">fx</span>

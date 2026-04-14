@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { CameraIcon, GalleryIcon, LinkIcon, SparkIcon, UploadIcon } from "../components/AppIcons";
+import { CameraIcon, GalleryIcon, LinkIcon, SparkIcon } from "../components/AppIcons";
+import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetchJson } from "../lib/api";
 
 const MODE_OPTIONS = [
@@ -99,7 +100,7 @@ export default function HomePage({ t }) {
         <span className="frame-corner br" />
 
         <div className="upload-icon" aria-hidden="true">
-          <UploadIcon />
+          <UploadScanAnimation />
         </div>
         <div className="upload-title">{t.home.upload || "Upload chart"}</div>
         <div className="upload-hint">{t.home.uploadHint || "JPG, PNG or HEIC"}</div>

@@ -1043,9 +1043,19 @@ async def _resolve_cached_news_image_path(news_item_id: int, source_url: str) ->
     if existing and existing.is_file():
         return existing
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36",
+                "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            },
+        ) as client:
             response = await client.get(source_url, timeout=12.0)
         if response.status_code != 200 or not response.content:
+            return None
+        content_type = (response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+        if content_type in {"text/html", "application/json", "text/plain"}:
             return None
         suffix = _resolve_news_image_suffix(source_url, response.headers.get("content-type", ""))
         target = news_media_dir / f"{news_item_id}-{source_hash}{suffix}"

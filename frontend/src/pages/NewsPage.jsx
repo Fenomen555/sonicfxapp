@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import ReactCountryFlag from "react-country-flag";
 import { apiFetchJson } from "../lib/api";
 
@@ -73,12 +73,19 @@ function FlagBadge({ countryCode, fallback = "🌐", title = "Global" }) {
   );
 }
 
-function SummaryCard({ label, value, accent }) {
+function MarketNewsMedia({ src, alt }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
+  if (!src || failed) return null;
+
   return (
-    <article className={`news-mini-stat news-mini-stat-${accent || "default"}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
+    <div className="news-market-media">
+      <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} />
+    </div>
   );
 }
 
@@ -167,11 +174,7 @@ function MarketSection({ items, categories, selectedCategory, onSelectCategory, 
               <span className="news-time-chip">{formatUpdateTime(item.published_at, lang).split(", ").pop() || item.time_label || "--:--"}</span>
             </div>
 
-            {!!item.image_url && (
-              <div className="news-market-media">
-                <img src={item.image_url} alt={item.title} loading="lazy" />
-              </div>
-            )}
+            <MarketNewsMedia src={item.image_url} alt={item.title} />
 
             <div className="news-card-copy compact-copy market-copy">
               <h3>{item.title}</h3>
@@ -191,12 +194,7 @@ function MarketSection({ items, categories, selectedCategory, onSelectCategory, 
               </div>
             )}
 
-            {!!item.summary && (
-              <details className="news-market-summary-card">
-                <summary>{t.news.showSummary || "Кратко"}</summary>
-                <p className="news-market-summary">{item.summary}</p>
-              </details>
-            )}
+            {!!item.summary && <p className="news-market-summary">{item.summary}</p>}
 
             {!!item.source_url && (
               <a className="news-open-link" href={item.source_url} target="_blank" rel="noreferrer">
@@ -268,22 +266,6 @@ export default function NewsPage({ t, lang = "ru" }) {
     };
   }, [feed, marketCategory]);
 
-  const summaryCards = useMemo(() => {
-    if (feed === "market") {
-      const categoryCount = Math.max((newsData.categories || []).filter((item) => item.key !== "all").length, 0);
-      return [
-        { key: "market-total", label: t.news.totalEvents || "Событий", value: newsData.items.length, accent: "primary" },
-        { key: "market-category", label: t.news.marketCategories || "Категорий", value: categoryCount, accent: "secondary" },
-        { key: "market-selected", label: t.news.selectedCategory || "Выбор", value: getMarketCategoryLabel(marketCategory, t), accent: "neutral" }
-      ];
-    }
-    return [
-      { key: "today", label: t.news.today || "Сегодня", value: newsData.today_items.length, accent: "primary" },
-      { key: "tomorrow", label: t.news.tomorrow || "Завтра", value: newsData.tomorrow_items.length, accent: "secondary" },
-      { key: "total", label: t.news.totalEvents || "Событий", value: newsData.items.length, accent: "neutral" }
-    ];
-  }, [feed, marketCategory, newsData.categories, newsData.items.length, newsData.today_items.length, newsData.tomorrow_items.length, t]);
-
   const hasItems = newsData.items.length > 0;
 
   return (
@@ -304,12 +286,6 @@ export default function NewsPage({ t, lang = "ru" }) {
           >
             {t.news.switchMarket || "Общерыночные новости"}
           </button>
-        </div>
-
-        <div className="news-summary-grid compact-grid">
-          {summaryCards.map((item) => (
-            <SummaryCard key={item.key} label={item.label} value={item.value} accent={item.accent} />
-          ))}
         </div>
       </div>
 

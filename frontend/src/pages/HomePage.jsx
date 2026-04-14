@@ -437,9 +437,6 @@ export default function HomePage({ t }) {
                 const title = isPair
                   ? `${item.pair}${typeof item.payout === "number" ? ` (${item.payout}%)` : ""}`
                   : item.label;
-                const subtitle = isPair
-                  ? (typeof item.payout === "number" ? "Текущая выплата доступна для выбора" : "Актив доступен для анализа")
-                  : "Доступное время экспирации";
                 return (
                   <button
                     key={isPair ? item.pair : item.value}
@@ -456,9 +453,7 @@ export default function HomePage({ t }) {
                   >
                     <span className="action-sheet-option-copy">
                       <strong>{title}</strong>
-                      <small>{subtitle}</small>
                     </span>
-                    {isActive && <span className="picker-sheet-check" aria-hidden="true">Выбрано</span>}
                   </button>
                 );
               })}

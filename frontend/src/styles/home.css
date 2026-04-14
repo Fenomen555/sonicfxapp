@@ -739,12 +739,12 @@
 }
 
 .picker-sheet-option {
-  min-height: 116px;
+  min-height: 88px;
   padding: 14px;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: center;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .picker-sheet-option.active {
@@ -757,24 +757,9 @@
     0 12px 24px rgba(0, 0, 0, 0.16);
 }
 
-.picker-sheet-check {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 30px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(143, 184, 255, 0.14);
-  border: 1px solid rgba(143, 184, 255, 0.28);
-  color: #eff5ff;
-  font-size: 11px;
-  font-weight: 800;
-  flex: 0 0 auto;
-}
-
 .picker-sheet-option .action-sheet-option-copy {
   width: 100%;
-  gap: 6px;
+  gap: 0;
 }
 
 .picker-sheet-option .action-sheet-option-copy strong {
@@ -782,20 +767,12 @@
   line-height: 1.16;
 }
 
-.picker-sheet-option .action-sheet-option-copy small {
-  line-height: 1.35;
-}
-
 .picker-sheet-expirations .picker-sheet-option {
-  min-height: 96px;
+  min-height: 84px;
 }
 
 .picker-sheet-expirations .picker-sheet-option .action-sheet-option-copy strong {
   font-size: 18px;
-}
-
-.picker-sheet-expirations .picker-sheet-option .action-sheet-option-copy small {
-  font-size: 11px;
 }
 
 .picker-sheet-empty {

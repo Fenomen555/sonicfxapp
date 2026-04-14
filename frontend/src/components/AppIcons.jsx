@@ -1,6 +1,6 @@
 import aiBrainIcon from "../assets/ai-brain.png";
 import indicatorCandlesIcon from "../assets/indicator-candles.png";
-import scannerScanIcon from "../assets/scanner-scan.gif";
+import scannerPortraitIcon from "../assets/scanner-portrait.png";
 
 export function SparkIcon(props) {
   return (
@@ -56,7 +56,7 @@ export function LinkIcon(props) {
 }
 
 export function ScannerModeIcon(props) {
-  return <img src={scannerScanIcon} alt="" loading="lazy" {...props} />;
+  return <img src={scannerPortraitIcon} alt="" loading="lazy" {...props} />;
 }
 
 export function AutoModeIcon(props) {

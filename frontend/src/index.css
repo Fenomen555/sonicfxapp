@@ -321,7 +321,6 @@ textarea {
   width: 30px;
   height: 30px;
   border: 3px solid rgba(239, 244, 255, 0.92);
-  box-shadow: 0 0 16px rgba(143, 184, 255, 0.08);
 }
 
 .frame-corner.tl {

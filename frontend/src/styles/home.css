@@ -294,7 +294,7 @@
   margin: 18px auto 24px;
 }
 
-.primary-btn-scanner {
+.primary-btn.primary-btn-scanner {
   position: relative;
   display: flex;
   margin-inline: auto;
@@ -310,14 +310,13 @@
   color: #effff6;
   overflow: hidden;
   box-shadow:
-    0 22px 34px rgba(20, 54, 42, 0.28),
-    0 10px 0 rgba(9, 24, 19, 0.26),
+    0 20px 30px rgba(20, 54, 42, 0.24),
     0 0 0 1px rgba(130, 219, 171, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -8px 16px rgba(7, 22, 17, 0.22);
+    inset 0 -6px 12px rgba(7, 22, 17, 0.16);
 }
 
-.primary-btn-scanner::before {
+.primary-btn.primary-btn-scanner::before {
   content: "";
   position: absolute;
   inset: 1px 1px auto;
@@ -327,19 +326,7 @@
   pointer-events: none;
 }
 
-.primary-btn-scanner::after {
-  content: "";
-  position: absolute;
-  left: 14%;
-  right: 14%;
-  bottom: 8px;
-  height: 12px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(7, 19, 15, 0.28), transparent 72%);
-  pointer-events: none;
-}
-
-.primary-btn-scanner .primary-btn-icon {
+.primary-btn.primary-btn-scanner .primary-btn-icon {
   position: relative;
   z-index: 1;
   width: 20px;
@@ -349,7 +336,7 @@
   opacity: 0.98;
 }
 
-.primary-btn-scanner span:last-child {
+.primary-btn.primary-btn-scanner span:last-child {
   position: relative;
   z-index: 1;
 }
@@ -979,7 +966,7 @@
   color: #667a96;
 }
 
-:root[data-theme="light"] .primary-btn-scanner {
+:root[data-theme="light"] .primary-btn.primary-btn-scanner {
   background:
     radial-gradient(circle at 14% 18%, rgba(104, 210, 145, 0.28), transparent 34%),
     radial-gradient(circle at 88% 88%, rgba(43, 121, 83, 0.18), transparent 30%),
@@ -987,14 +974,13 @@
   border-color: rgba(44, 137, 93, 0.36);
   color: #f5fff8;
   box-shadow:
-    0 20px 30px rgba(42, 117, 80, 0.2),
-    0 9px 0 rgba(29, 82, 56, 0.18),
+    0 18px 28px rgba(42, 117, 80, 0.18),
     0 0 0 1px rgba(98, 208, 143, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -8px 14px rgba(20, 71, 46, 0.14);
+    inset 0 -6px 12px rgba(20, 71, 46, 0.12);
 }
 
-:root[data-theme="light"] .primary-btn-scanner .primary-btn-icon {
+:root[data-theme="light"] .primary-btn.primary-btn-scanner .primary-btn-icon {
   color: #f2fff7;
   filter: drop-shadow(0 0 8px rgba(189, 255, 215, 0.24));
 }

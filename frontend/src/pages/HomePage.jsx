@@ -180,7 +180,6 @@ export default function HomePage({ t }) {
       </div>
 
       <h1 className="home-title">{t.home.title || "Upload chart screenshot"}</h1>
-      <p className="home-subtitle">{t.home.sub || "AI analysis in 30 seconds"}</p>
 
       <button className="upload-zone" type="button">
         <span className="frame-corner tl" />
@@ -203,11 +202,16 @@ export default function HomePage({ t }) {
               <span className="quick-action-icon" aria-hidden="true">
                 <Icon />
               </span>
-              <em>{item.label}</em>
+              <span className="quick-action-label">{item.label}</span>
             </button>
           );
         })}
       </div>
+
+      <button className="primary-btn ref-primary primary-btn-top" type="button">
+        <SparkIcon className="primary-btn-icon" aria-hidden="true" />
+        <span>{actionLabel}</span>
+      </button>
 
       <div className="signal-panel">
         <div className="signal-panel-label">
@@ -225,11 +229,13 @@ export default function HomePage({ t }) {
                 onClick={() => setSignalMode(item.id)}
                 type="button"
               >
-                <span className="signal-mode-icon" aria-hidden="true">
-                  <Icon />
+                <span className="signal-mode-head">
+                  <span className="signal-mode-icon" aria-hidden="true">
+                    <Icon />
+                  </span>
+                  <strong>{item.label}</strong>
                 </span>
                 <span className="signal-mode-text">
-                  <strong>{item.label}</strong>
                   <small>{item.hint}</small>
                 </span>
               </button>
@@ -298,11 +304,6 @@ export default function HomePage({ t }) {
         </div>
 
         {errorText && <div className="form-error">{errorText}</div>}
-
-        <button className="primary-btn ref-primary" type="button">
-          <SparkIcon className="primary-btn-icon" aria-hidden="true" />
-          <span>{actionLabel}</span>
-        </button>
       </div>
     </section>
   );

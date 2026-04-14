@@ -49,6 +49,11 @@
   gap: 10px;
 }
 
+.admin-section-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
 .table-wrap {
   overflow: auto;
 }
@@ -80,4 +85,45 @@
   background: var(--bg-elevated);
   color: var(--text-main);
   cursor: pointer;
+}
+
+.market-settings-row {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.market-settings-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.admin-select {
+  min-width: 140px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  color: var(--text-main);
+}
+
+.admin-action {
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--accent-soft);
+  color: var(--text-main);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.admin-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
 }

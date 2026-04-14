@@ -5,7 +5,8 @@ import "./admin.css";
 const TABS = [
   { id: "stats", label: "Stats" },
   { id: "users", label: "Users" },
-  { id: "flags", label: "Flags" }
+  { id: "flags", label: "Flags" },
+  { id: "market", label: "Market" }
 ];
 
 export default function AdminApp({ authError, adminUser }) {
@@ -13,11 +14,15 @@ export default function AdminApp({ authError, adminUser }) {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [flags, setFlags] = useState([]);
+  const [marketSettings, setMarketSettings] = useState({ market_pairs_sync_interval_min: 5, interval_options: [], items: [] });
+  const [marketInterval, setMarketInterval] = useState("5");
+  const [marketSaving, setMarketSaving] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (authError) return;
     let isActive = true;
+
     async function load() {
       setLoading(true);
       try {
@@ -33,10 +38,18 @@ export default function AdminApp({ authError, adminUser }) {
           const data = await apiAdminFetchJson("/api/admin/feature-flags");
           if (isActive) setFlags(data?.items || []);
         }
+        if (tab === "market") {
+          const data = await apiAdminFetchJson("/api/admin/market-settings");
+          if (isActive) {
+            setMarketSettings(data || { market_pairs_sync_interval_min: 5, interval_options: [], items: [] });
+            setMarketInterval(String(data?.market_pairs_sync_interval_min || 5));
+          }
+        }
       } finally {
         if (isActive) setLoading(false);
       }
     }
+
     load();
     return () => {
       isActive = false;
@@ -53,6 +66,24 @@ export default function AdminApp({ authError, adminUser }) {
     });
     const data = await apiAdminFetchJson("/api/admin/feature-flags");
     setFlags(data?.items || []);
+  };
+
+  const saveMarketSettings = async () => {
+    setMarketSaving(true);
+    try {
+      const nextValue = Number(marketInterval || 5);
+      await apiAdminFetchJson("/api/admin/market-settings", {
+        method: "POST",
+        body: JSON.stringify({
+          market_pairs_sync_interval_min: nextValue
+        })
+      });
+      const data = await apiAdminFetchJson("/api/admin/market-settings");
+      setMarketSettings(data || { market_pairs_sync_interval_min: 5, interval_options: [], items: [] });
+      setMarketInterval(String(data?.market_pairs_sync_interval_min || nextValue));
+    } finally {
+      setMarketSaving(false);
+    }
   };
 
   if (authError) {
@@ -132,6 +163,57 @@ export default function AdminApp({ authError, adminUser }) {
                 <button onClick={() => toggleFlag(item)}>{item.is_enabled ? "Enabled" : "Disabled"}</button>
               </div>
             ))}
+          </div>
+        )}
+
+        {!loading && tab === "market" && (
+          <div className="stack">
+            <div className="admin-card stack">
+              <div className="admin-section-title">Market Sync</div>
+              <div className="market-settings-row">
+                <label className="admin-label" htmlFor="market-sync-interval">Pair refresh interval</label>
+                <div className="market-settings-controls">
+                  <select
+                    id="market-sync-interval"
+                    className="admin-select"
+                    value={marketInterval}
+                    onChange={(e) => setMarketInterval(e.target.value)}
+                    disabled={marketSaving}
+                  >
+                    {(marketSettings.interval_options || []).map((item) => (
+                      <option key={item} value={item}>{item} min</option>
+                    ))}
+                  </select>
+                  <button className="admin-action" onClick={saveMarketSettings} disabled={marketSaving}>
+                    {marketSaving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </div>
+              <div className="admin-note">Pairs are synced from DevsBite, stored locally, and deactivated when they disappear from upstream.</div>
+            </div>
+
+            <div className="admin-card table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Market</th>
+                    <th>Active</th>
+                    <th>Total</th>
+                    <th>Last seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(marketSettings.items || []).map((item) => (
+                    <tr key={item.key}>
+                      <td>{item.title}</td>
+                      <td>{item.active_count}</td>
+                      <td>{item.total_count}</td>
+                      <td>{item.last_seen_at ? new Date(item.last_seen_at).toLocaleString() : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>

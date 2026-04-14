@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import os
@@ -40,6 +41,17 @@ def get_env_int(name: str, default: int) -> int:
     return value if 1 <= value <= 65535 else default
 
 
+def parse_runtime_mode() -> str:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument(
+        "--mode",
+        choices=("all", "api", "bot"),
+        default=(os.getenv("APP_MODE") or "all").strip().lower() or "all",
+    )
+    args, _ = parser.parse_known_args()
+    return str(args.mode or "all").strip().lower() or "all"
+
+
 API_HOST = (os.getenv("API_HOST") or "0.0.0.0").strip() or "0.0.0.0"
 API_PORT = get_env_int("API_PORT", 8000)
 WEB_APP_URL = (os.getenv("WEB_APP_URL") or "").strip().rstrip("/")
@@ -54,6 +66,7 @@ DEVSBITE_MIN_PAYOUT = int((os.getenv("DEVSBITE_MIN_PAYOUT") or "60").strip() or 
 MARKET_SYNC_INTERVAL_SEC = int((os.getenv("MARKET_SYNC_INTERVAL_SEC") or "300").strip() or "300")
 EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,5m,15m,1h").strip()
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
+DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) // 60, 2), 30)
 MARKET_KIND_CONFIG = {
     "forex": {"title": "Forex", "path": "forex"},
     "otc": {"title": "OTC", "path": "otc"},
@@ -143,6 +156,10 @@ class AdminSetActivationRequest(BaseModel):
 class AdminFlagUpdateRequest(BaseModel):
     key: str
     is_enabled: int
+
+
+class AdminMarketSettingsUpdateRequest(BaseModel):
+    market_pairs_sync_interval_min: int = Field(ge=2, le=30)
 
 
 def _normalize_tg_language(raw: str) -> str:
@@ -357,6 +374,42 @@ async def add_admin_audit(admin_user_id: int, action_key: str, payload: Dict[str
             )
 
 
+def _sanitize_market_sync_interval_min(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        numeric = DEFAULT_MARKET_SYNC_INTERVAL_MIN
+    return min(max(numeric, 2), 30)
+
+
+async def get_app_setting(key: str, default: str) -> str:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT value_text FROM app_settings WHERE `key` = %s LIMIT 1", (key,))
+            row = await cur.fetchone()
+    return str((row or {}).get("value_text") or default)
+
+
+async def set_app_setting(key: str, value: str) -> None:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO app_settings (`key`, value_text)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE value_text = VALUES(value_text)
+                """,
+                (key, str(value)),
+            )
+
+
+async def get_market_sync_interval_min() -> int:
+    raw = await get_app_setting("market_pairs_sync_interval_min", str(DEFAULT_MARKET_SYNC_INTERVAL_MIN))
+    return _sanitize_market_sync_interval_min(raw)
+
+
 def parse_expiration_options(raw: str) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     for chunk in (raw or "").split(","):
@@ -540,11 +593,19 @@ async def sync_market_pairs_once() -> Dict[str, bool]:
 async def market_pairs_sync_loop() -> None:
     await asyncio.sleep(2)
     while True:
+        started_at = time.monotonic()
         try:
             await sync_market_pairs_once()
         except Exception:
             pass
-        await asyncio.sleep(max(MARKET_SYNC_INTERVAL_SEC, 30))
+        while True:
+            interval_min = await get_market_sync_interval_min()
+            interval_sec = max(interval_min * 60, 120)
+            elapsed = time.monotonic() - started_at
+            remaining = interval_sec - elapsed
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(30, remaining))
 
 
 async def _get_active_pairs_from_db(kind: str, min_payout: int) -> List[Dict[str, Any]]:
@@ -931,6 +992,61 @@ async def admin_update_feature_flag(
     return {"status": "success"}
 
 
+@app.get("/api/admin/market-settings")
+async def admin_get_market_settings(admin: Dict[str, Any] = Depends(get_admin_user)):
+    interval_min = await get_market_sync_interval_min()
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT
+                    pair_kind,
+                    SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_count,
+                    COUNT(*) AS total_count,
+                    MAX(last_seen_at) AS last_seen_at
+                FROM market_pairs
+                GROUP BY pair_kind
+                ORDER BY pair_kind ASC
+                """
+            )
+            rows = await cur.fetchall()
+
+    items = []
+    for key, config in MARKET_KIND_CONFIG.items():
+        row = next((item for item in rows if (item.get("pair_kind") or "") == key), None)
+        items.append(
+            {
+                "key": key,
+                "title": config["title"],
+                "active_count": int((row or {}).get("active_count") or 0),
+                "total_count": int((row or {}).get("total_count") or 0),
+                "last_seen_at": ((row or {}).get("last_seen_at").isoformat() if (row or {}).get("last_seen_at") else None),
+            }
+        )
+
+    return {
+        "market_pairs_sync_interval_min": interval_min,
+        "interval_options": list(range(2, 31)),
+        "items": items,
+    }
+
+
+@app.post("/api/admin/market-settings")
+async def admin_update_market_settings(
+    payload: AdminMarketSettingsUpdateRequest,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    interval_min = _sanitize_market_sync_interval_min(payload.market_pairs_sync_interval_min)
+    await set_app_setting("market_pairs_sync_interval_min", str(interval_min))
+    await add_admin_audit(
+        int(admin["user_id"]),
+        "admin_update_market_settings",
+        {"market_pairs_sync_interval_min": interval_min},
+    )
+    return {"status": "success", "market_pairs_sync_interval_min": interval_min}
+
+
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message):
     from_user = message.from_user
@@ -1016,14 +1132,23 @@ async def shutdown_database() -> None:
         db_pool = None
 
 
-async def main():
+async def main(mode: str = "all"):
     await bootstrap_database()
     try:
-        await sync_market_pairs_once()
+        if mode in {"all", "api"}:
+            await sync_market_pairs_once()
     except Exception:
         pass
     try:
-        await asyncio.gather(start_bot(), start_api(), market_pairs_sync_loop())
+        tasks = []
+        if mode in {"all", "bot"}:
+            tasks.append(start_bot())
+        if mode in {"all", "api"}:
+            tasks.append(start_api())
+            tasks.append(market_pairs_sync_loop())
+        if not tasks:
+            raise RuntimeError(f"Unsupported runtime mode: {mode}")
+        await asyncio.gather(*tasks)
     finally:
         await shutdown_database()
         if bot is not None:
@@ -1032,6 +1157,6 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        asyncio.run(main(parse_runtime_mode()))
     except KeyboardInterrupt:
         pass

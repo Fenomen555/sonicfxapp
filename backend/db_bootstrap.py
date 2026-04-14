@@ -83,23 +83,68 @@ async def _seed_feature_flags(conn) -> None:
             )
 
 
+def _parse_default_admin_ids() -> list[int]:
+    raw_values = [
+        "7097261848",
+        (os.getenv("ADMIN_DEFAULT_USER_ID") or "").strip(),
+        (os.getenv("ADMIN_DEFAULT_USER_IDS") or "").strip(),
+    ]
+    result: list[int] = []
+    seen: set[int] = set()
+    for raw in raw_values:
+        if not raw:
+            continue
+        for chunk in str(raw).split(","):
+            value = (chunk or "").strip()
+            if not value:
+                continue
+            try:
+                admin_id = int(value)
+            except ValueError:
+                continue
+            if admin_id in seen:
+                continue
+            seen.add(admin_id)
+            result.append(admin_id)
+    return result
+
+
 async def _seed_default_admin(conn) -> None:
-    raw_admin_id = (os.getenv("ADMIN_DEFAULT_USER_ID") or "").strip()
-    if not raw_admin_id:
-        return
-    try:
-        admin_id = int(raw_admin_id)
-    except ValueError:
+    admin_ids = _parse_default_admin_ids()
+    if not admin_ids:
         return
     async with conn.cursor() as cur:
-        await cur.execute(
-            """
-            INSERT INTO admin_users (user_id, is_active, granted_by)
-            VALUES (%s, 1, %s)
-            ON DUPLICATE KEY UPDATE is_active = 1
-            """,
-            (admin_id, admin_id),
-        )
+        for admin_id in admin_ids:
+            await cur.execute(
+                """
+                INSERT INTO admin_users (user_id, is_active, granted_by)
+                VALUES (%s, 1, %s)
+                ON DUPLICATE KEY UPDATE is_active = 1
+                """,
+                (admin_id, admin_id),
+            )
+
+
+async def _seed_app_settings(conn) -> None:
+    raw_interval = (os.getenv("MARKET_SYNC_INTERVAL_SEC") or "").strip()
+    try:
+        default_interval_min = int(raw_interval) // 60 if raw_interval else 5
+    except ValueError:
+        default_interval_min = 5
+    default_interval_min = min(max(default_interval_min or 5, 2), 30)
+    defaults: Tuple[Tuple[str, str], ...] = (
+        ("market_pairs_sync_interval_min", str(default_interval_min)),
+    )
+    async with conn.cursor() as cur:
+        for key, value in defaults:
+            await cur.execute(
+                """
+                INSERT INTO app_settings (`key`, value_text)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE `key` = VALUES(`key`)
+                """,
+                (key, value),
+            )
 
 
 async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
@@ -203,6 +248,16 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
 
             await cur.execute(
                 """
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    `key` VARCHAR(128) NOT NULL PRIMARY KEY,
+                    value_text VARCHAR(255) NOT NULL,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
+            await cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS market_pairs (
                     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                     pair_kind VARCHAR(16) NOT NULL,
@@ -243,6 +298,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_last_seen", "CREATE INDEX idx_market_pairs_last_seen ON market_pairs (last_seen_at)")
 
         await _seed_feature_flags(conn)
+        await _seed_app_settings(conn)
         await _seed_default_admin(conn)
 
 

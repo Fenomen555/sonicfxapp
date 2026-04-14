@@ -350,7 +350,7 @@ export default function HomePage({ t }) {
             <div className="action-sheet-handle" aria-hidden="true" />
             <div className="action-sheet-head">
               <div className="action-sheet-title">Источник загрузки</div>
-              <div className="action-sheet-copy">Откройте график из галереи, камеры или вставьте ссылку.</div>
+              <div className="action-sheet-copy">Выберите способ загрузки графика.</div>
             </div>
 
             <div className="action-sheet-grid">

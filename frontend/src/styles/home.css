@@ -705,9 +705,11 @@
 }
 
 .action-sheet-close {
-  width: 100%;
+  width: calc(100% - 34px);
+  max-width: 260px;
   min-height: 48px;
   margin-top: 12px;
+  margin-inline: auto;
   border-radius: 16px;
   border: 1px solid rgba(73, 92, 122, 0.42);
   background: rgba(12, 18, 30, 0.78);

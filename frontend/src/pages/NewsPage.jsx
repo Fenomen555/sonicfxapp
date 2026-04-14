@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import ReactCountryFlag from "react-country-flag";
 import { apiFetchJson } from "../lib/api";
 
 function getImpactLabel(impact, t) {
@@ -61,12 +62,12 @@ function FlagBadge({ countryCode, fallback = "🌐", title = "Global" }) {
     return <span className="news-flag-fallback">{fallback}</span>;
   }
   return (
-    <img
-      src={`https://flagcdn.com/${code.toLowerCase()}.svg`}
-      alt={title}
+    <ReactCountryFlag
+      countryCode={code}
+      svg
+      aria-label={title}
       title={title}
       className="news-flag-svg"
-      loading="lazy"
     />
   );
 }

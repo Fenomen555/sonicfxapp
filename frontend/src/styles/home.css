@@ -295,6 +295,9 @@
 }
 
 .primary-btn-scanner {
+  position: relative;
+  display: flex;
+  margin-inline: auto;
   width: calc(100% - 24px);
   max-width: 420px;
   min-height: 54px;
@@ -305,18 +308,50 @@
     linear-gradient(180deg, rgba(23, 58, 47, 0.98), rgba(14, 37, 30, 0.98));
   border-color: rgba(118, 199, 156, 0.34);
   color: #effff6;
+  overflow: hidden;
   box-shadow:
-    0 18px 30px rgba(20, 54, 42, 0.26),
-    0 0 0 1px rgba(130, 219, 171, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 22px 34px rgba(20, 54, 42, 0.28),
+    0 10px 0 rgba(9, 24, 19, 0.26),
+    0 0 0 1px rgba(130, 219, 171, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -8px 16px rgba(7, 22, 17, 0.22);
+}
+
+.primary-btn-scanner::before {
+  content: "";
+  position: absolute;
+  inset: 1px 1px auto;
+  height: 48%;
+  border-radius: 16px 16px 12px 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.02));
+  pointer-events: none;
+}
+
+.primary-btn-scanner::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 8px;
+  height: 12px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(7, 19, 15, 0.28), transparent 72%);
+  pointer-events: none;
 }
 
 .primary-btn-scanner .primary-btn-icon {
+  position: relative;
+  z-index: 1;
   width: 20px;
   height: 20px;
   color: #d9ffe7;
   filter: drop-shadow(0 0 10px rgba(131, 237, 178, 0.28));
   opacity: 0.98;
+}
+
+.primary-btn-scanner span:last-child {
+  position: relative;
+  z-index: 1;
 }
 
 .signal-panel {
@@ -952,9 +987,11 @@
   border-color: rgba(44, 137, 93, 0.36);
   color: #f5fff8;
   box-shadow:
-    0 18px 30px rgba(42, 117, 80, 0.2),
+    0 20px 30px rgba(42, 117, 80, 0.2),
+    0 9px 0 rgba(29, 82, 56, 0.18),
     0 0 0 1px rgba(98, 208, 143, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -8px 14px rgba(20, 71, 46, 0.14);
 }
 
 :root[data-theme="light"] .primary-btn-scanner .primary-btn-icon {

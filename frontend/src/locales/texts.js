@@ -15,7 +15,16 @@ export const texts = {
       asset: "Тикер",
       timeframe: "Таймфрейм",
       expiration: "Экспирация",
-      analyze: "Анализировать"
+      analyze: "Анализировать",
+      upload: "Загрузите график",
+      uploadHint: "JPG, PNG или HEIC",
+      gallery: "Галерея",
+      camera: "Камера",
+      link: "Ссылка",
+      quota: "Анализов: 3 / 3",
+      pro: "Получить PRO",
+      loading: "Загрузка...",
+      emptyPairs: "Нет доступных пар"
     },
     profile: {
       title: "Профиль",
@@ -47,7 +56,7 @@ export const texts = {
   en: {
     appName: "SonicFX",
     openViaBotTitle: "Open app via Telegram bot",
-    openViaBotHint: "Open the bot and tap Mini App button.",
+    openViaBotHint: "Open the bot and tap the Mini App button.",
     nav: {
       news: "News",
       home: "Home",
@@ -60,7 +69,16 @@ export const texts = {
       asset: "Symbol",
       timeframe: "Timeframe",
       expiration: "Expiration",
-      analyze: "Analyze"
+      analyze: "Analyze",
+      upload: "Upload chart",
+      uploadHint: "JPG, PNG or HEIC",
+      gallery: "Gallery",
+      camera: "Camera",
+      link: "Link",
+      quota: "Analyses: 3 / 3",
+      pro: "Get PRO",
+      loading: "Loading...",
+      emptyPairs: "No pairs available"
     },
     profile: {
       title: "Profile",
@@ -92,7 +110,7 @@ export const texts = {
   uk: {
     appName: "SonicFX",
     openViaBotTitle: "Відкрийте застосунок через Telegram-бота",
-    openViaBotHint: "Перейдіть у бота та натисніть кнопку Mini App.",
+    openViaBotHint: "Перейдіть у бота та натисніть кнопку запуску Mini App.",
     nav: {
       news: "Новини",
       home: "Головна",
@@ -105,7 +123,16 @@ export const texts = {
       asset: "Тікер",
       timeframe: "Таймфрейм",
       expiration: "Експірація",
-      analyze: "Аналізувати"
+      analyze: "Аналізувати",
+      upload: "Завантажте графік",
+      uploadHint: "JPG, PNG або HEIC",
+      gallery: "Галерея",
+      camera: "Камера",
+      link: "Посилання",
+      quota: "Аналізів: 3 / 3",
+      pro: "Отримати PRO",
+      loading: "Завантаження...",
+      emptyPairs: "Немає доступних пар"
     },
     profile: {
       title: "Профіль",

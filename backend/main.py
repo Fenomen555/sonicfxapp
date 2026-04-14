@@ -4,7 +4,7 @@ import json
 import os
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -66,6 +66,7 @@ DEVSBITE_MIN_PAYOUT = int((os.getenv("DEVSBITE_MIN_PAYOUT") or "60").strip() or 
 MARKET_SYNC_INTERVAL_SEC = int((os.getenv("MARKET_SYNC_INTERVAL_SEC") or "300").strip() or "300")
 EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,5m,15m,1h").strip()
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
+FINNHUB_TOKEN = (os.getenv("FINNHUB_TOKEN") or "").strip()
 DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) // 60, 2), 30)
 MARKET_KIND_CONFIG = {
     "forex": {"title": "Forex", "path": "forex"},
@@ -83,6 +84,13 @@ MARKET_KIND_ALIASES = {
     "stocks": "stocks",
     "crypto": "crypto",
     "crypta": "crypto",
+}
+
+COUNTRY_TO_CURRENCY = {
+    "US": "USD", "GB": "GBP", "CA": "CAD", "AU": "AUD", "NZ": "NZD",
+    "JP": "JPY", "CH": "CHF", "CN": "CNY", "RU": "RUB", "TR": "TRY",
+    "ZA": "ZAR", "MX": "MXN", "BR": "BRL", "IN": "INR", "KR": "KRW",
+    "EU": "EUR", "DE": "EUR", "FR": "EUR", "IT": "EUR", "ES": "EUR",
 }
 
 DB_CONFIG = {
@@ -868,40 +876,163 @@ async def get_expiration_options(user: Dict[str, Any] = Depends(get_telegram_use
     return {"expirations": expirations}
 
 
+def _parse_finnhub_event_time(raw_value: Any) -> Optional[datetime]:
+    value = str(raw_value or "").strip()
+    if not value:
+        return None
+    normalized = value.replace("T", " ").replace("Z", "").strip()
+    patterns = (
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%d",
+    )
+    for pattern in patterns:
+        try:
+            parsed = datetime.strptime(normalized, pattern)
+            return parsed.replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _normalize_finnhub_impact(raw_value: Any) -> str:
+    value = str(raw_value or "").strip().lower()
+    mapping = {
+        "high": "high",
+        "h": "high",
+        "3": "high",
+        "medium": "medium",
+        "med": "medium",
+        "moderate": "medium",
+        "2": "medium",
+        "low": "low",
+        "l": "low",
+        "1": "low",
+    }
+    return mapping.get(value, "medium")
+
+
+async def fetch_news_data(limit: int = 40) -> Dict[str, Any]:
+    if not FINNHUB_TOKEN:
+        return {
+            "items": [],
+            "today_items": [],
+            "tomorrow_items": [],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    url = f"https://finnhub.io/api/v1/calendar/economic?token={FINNHUB_TOKEN}"
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=5.0)
+            if response.status_code != 200:
+                return {
+                    "items": [],
+                    "today_items": [],
+                    "tomorrow_items": [],
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            raw_data = response.json()
+    except Exception as exc:
+        print(f"News API Error: {exc}")
+        return {
+            "items": [],
+            "today_items": [],
+            "tomorrow_items": [],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    events = raw_data.get("economicCalendar", [])
+    if not isinstance(events, list) or not events:
+        return {
+            "items": [],
+            "today_items": [],
+            "tomorrow_items": [],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+    prepared_items: List[Dict[str, Any]] = []
+
+    for index, event in enumerate(events):
+        if not isinstance(event, dict):
+            continue
+        event_time = _parse_finnhub_event_time(event.get("time"))
+        if event_time is None:
+            continue
+
+        event_date = event_time.date()
+        if event_date == today:
+            if event_time <= (now - timedelta(hours=2)):
+                continue
+            day_bucket = "today"
+        elif event_date == tomorrow:
+            day_bucket = "tomorrow"
+        else:
+            continue
+
+        country = str(event.get("country") or "").strip().upper()
+        currency = COUNTRY_TO_CURRENCY.get(country, "ALL")
+        event_name = str(event.get("event") or event.get("title") or "").strip()
+        if not event_name:
+            continue
+
+        actual_value = str(event.get("actual") or "").strip()
+        forecast_value = str(event.get("estimate") or event.get("forecast") or "").strip()
+        previous_value = str(event.get("prev") or event.get("previous") or "").strip()
+        unit = str(event.get("unit") or "").strip()
+        summary_parts = []
+        if actual_value:
+            summary_parts.append(f"Actual: {actual_value}{unit}")
+        if forecast_value:
+            summary_parts.append(f"Forecast: {forecast_value}{unit}")
+        if previous_value:
+            summary_parts.append(f"Previous: {previous_value}{unit}")
+
+        prepared_items.append(
+            {
+                "id": f"{event_time.isoformat()}::{country}::{event_name}::{index}",
+                "title": event_name,
+                "summary": " | ".join(summary_parts),
+                "source_name": "Finnhub",
+                "source_url": "https://finnhub.io/",
+                "published_at": event_time.isoformat(),
+                "country": country or "ALL",
+                "currency": currency,
+                "impact": _normalize_finnhub_impact(event.get("impact")),
+                "actual": actual_value,
+                "forecast": forecast_value,
+                "previous": previous_value,
+                "unit": unit,
+                "day_bucket": day_bucket,
+                "day_label": "Сегодня" if day_bucket == "today" else "Завтра",
+                "time_label": event_time.strftime("%H:%M"),
+            }
+        )
+
+    prepared_items.sort(key=lambda item: str(item.get("published_at") or ""))
+    prepared_items = prepared_items[: int(limit)]
+    today_items = [item for item in prepared_items if item.get("day_bucket") == "today"]
+    tomorrow_items = [item for item in prepared_items if item.get("day_bucket") == "tomorrow"]
+
+    return {
+        "items": prepared_items,
+        "today_items": today_items,
+        "tomorrow_items": tomorrow_items,
+        "updated_at": now.isoformat(),
+    }
+
+
 @app.get("/api/news")
 async def get_news(
     limit: int = Query(default=25, ge=1, le=100),
     user: Dict[str, Any] = Depends(get_telegram_user),
 ):
     await upsert_user_from_telegram(user)
-    pool = await require_db_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(
-                """
-                SELECT id, title, summary, image_url, source_name, source_url, published_at
-                FROM news_items
-                WHERE is_visible = 1
-                ORDER BY COALESCE(published_at, created_at) DESC
-                LIMIT %s
-                """,
-                (int(limit),),
-            )
-            rows = await cur.fetchall()
-    items = []
-    for row in rows:
-        items.append(
-            {
-                "id": int(row["id"]),
-                "title": row.get("title") or "",
-                "summary": row.get("summary") or "",
-                "image_url": row.get("image_url") or "",
-                "source_name": row.get("source_name") or "",
-                "source_url": row.get("source_url") or "",
-                "published_at": row.get("published_at").isoformat() if row.get("published_at") else None,
-            }
-        )
-    return {"items": items}
+    return await fetch_news_data(limit=limit)
 
 
 @app.get("/api/stats/daily")

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiAdminFetchJson } from "../lib/api";
 import "./admin.css";
 
@@ -58,7 +58,7 @@ function getUserStatusLabel(status) {
   return USER_STATUS_LABELS[status] || status || "-";
 }
 
-export default function AdminApp({ authError, adminUser }) {
+export default function AdminApp({ authError }) {
   const [tab, setTab] = useState("stats");
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
@@ -139,11 +139,6 @@ export default function AdminApp({ authError, adminUser }) {
     }
   };
 
-  const activeTab = useMemo(
-    () => TABS.find((item) => item.id === tab) || TABS[0],
-    [tab]
-  );
-
   const statsCards = [
     {
       key: "users_total",
@@ -185,19 +180,7 @@ export default function AdminApp({ authError, adminUser }) {
 
   return (
     <div className="admin-shell">
-      <header className="admin-card admin-header admin-hero">
-        <div className="admin-hero-copy">
-          <div className="admin-kicker">SonicFX Control</div>
-          <div className="admin-title">Админ-панель</div>
-          <div className="admin-subtitle">Управление пользователями, режимами и рыночными данными mini app.</div>
-        </div>
-        <div className="admin-user-badge">
-          <span className="admin-user-label">Администратор</span>
-          <strong>ID {adminUser?.user_id || "-"}</strong>
-        </div>
-      </header>
-
-      <nav className="admin-tabs admin-card">
+      <nav className="admin-tabs">
         {TABS.map((item) => (
           <button
             className={`admin-tab ${tab === item.id ? "active" : ""}`}
@@ -212,14 +195,6 @@ export default function AdminApp({ authError, adminUser }) {
       </nav>
 
       <main className="admin-main">
-        <section className="admin-card admin-section-intro">
-          <div>
-            <div className="admin-section-kicker">Раздел</div>
-            <h2>{activeTab.label}</h2>
-            <p>{activeTab.subtitle}</p>
-          </div>
-        </section>
-
         {loading && (
           <div className="admin-card admin-state-card">
             <div className="admin-state-badge">Загрузка</div>

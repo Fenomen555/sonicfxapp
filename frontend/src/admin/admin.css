@@ -23,74 +23,11 @@
   gap: 12px;
 }
 
-.admin-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.admin-hero {
-  background:
-    radial-gradient(circle at top right, rgba(143, 184, 255, 0.1), transparent 34%),
-    linear-gradient(180deg, rgba(18, 26, 40, 0.98), rgba(12, 19, 29, 0.98));
-}
-
-.admin-hero-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.admin-kicker,
-.admin-section-kicker {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: #89a7de;
-}
-
-.admin-title {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-}
-
-.admin-subtitle {
-  max-width: 520px;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.admin-user-badge {
-  min-width: 128px;
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(12, 18, 30, 0.7);
-  border: 1px solid rgba(95, 143, 255, 0.2);
-  text-align: right;
-}
-
-.admin-user-label {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.admin-user-badge strong {
-  font-size: 16px;
-}
-
 .admin-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .admin-tab {
@@ -130,13 +67,11 @@
   gap: 12px;
 }
 
-.admin-section-intro h2,
 .admin-state-card h2 {
   margin: 4px 0 6px;
   font-size: 20px;
 }
 
-.admin-section-intro p,
 .admin-state-card p,
 .flag-card p,
 .admin-market-hero p {
@@ -349,19 +284,6 @@
 @media (max-width: 720px) {
   .admin-shell {
     padding: 12px;
-  }
-
-  .admin-header {
-    grid-template-columns: 1fr;
-    display: grid;
-  }
-
-  .admin-user-badge {
-    text-align: left;
-  }
-
-  .admin-title {
-    font-size: 23px;
   }
 
   .admin-stats-grid,

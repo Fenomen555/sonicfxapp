@@ -452,15 +452,22 @@ def _pair_kind_normalized(kind: str) -> str:
 def _normalize_pairs(payload: Any) -> List[Dict[str, Any]]:
     rows = payload if isinstance(payload, list) else []
     normalized: List[Dict[str, Any]] = []
+    seen: set[str] = set()
     for row in rows:
         if not isinstance(row, dict):
             continue
-        pair_raw = row.get("pair") or row.get("symbol") or row.get("name") or ""
-        pair = str(pair_raw).strip()
+        pair = _pair_label(row)
         if not pair:
             continue
+        symbol = _pair_symbol(row, pair)
+        normalized_symbol = _normalize_pair_symbol(symbol or pair)
+        if not normalized_symbol or normalized_symbol in seen:
+            continue
+        seen.add(normalized_symbol)
         payout_raw = row.get("payout")
         try:
+            if payout_raw is None:
+                payout_raw = row.get("profit", row.get("percent"))
             payout = int(float(payout_raw)) if payout_raw is not None else None
         except (TypeError, ValueError):
             payout = None
@@ -472,6 +479,74 @@ def _normalize_pairs(payload: Any) -> List[Dict[str, Any]]:
         )
     normalized.sort(key=lambda item: item["pair"])
     return normalized
+
+
+def _extract_pairs_payload(payload: Any) -> List[Any]:
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+
+    for key in ("pairs", "data", "items", "results", "assets", "symbols", "instruments"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            nested = _extract_pairs_payload(value)
+            if nested:
+                return nested
+    return []
+
+
+def _pair_label(item: Dict[str, Any]) -> str:
+    direct = (
+        item.get("pair")
+        or item.get("name")
+        or item.get("label")
+        or item.get("asset")
+        or item.get("display_name")
+        or item.get("display")
+        or item.get("title")
+        or item.get("ticker")
+        or item.get("symbol")
+    )
+    label = str(direct or "").strip()
+    if label:
+        return label
+
+    base = str(item.get("base") or item.get("base_asset") or item.get("currency_base") or "").strip()
+    quote = str(item.get("quote") or item.get("quote_asset") or item.get("currency_quote") or "").strip()
+    if base and quote:
+        return f"{base}/{quote}"
+    return ""
+
+
+def _pair_symbol(item: Dict[str, Any], label: str) -> str:
+    raw = (
+        item.get("symbol")
+        or item.get("ticker")
+        or item.get("code")
+        or item.get("asset")
+        or item.get("slug")
+        or item.get("pair_code")
+        or item.get("instrument")
+    )
+    symbol = str(raw or "").strip()
+    if symbol:
+        return symbol
+    return label
+
+
+def _normalize_pair_symbol(raw: str) -> str:
+    return (
+        str(raw or "")
+        .strip()
+        .upper()
+        .replace(" ", "")
+        .replace("/", "")
+        .replace("-", "")
+        .replace("_", "")
+    )
 
 
 async def _fetch_devsbite_pairs(kind: str, min_payout: int) -> tuple[List[Dict[str, Any]], bool]:
@@ -496,8 +571,11 @@ async def _fetch_devsbite_pairs(kind: str, min_payout: int) -> tuple[List[Dict[s
             data = response.json()
     except Exception:
         return ([], False)
-    pairs_payload = data.get("pairs", []) if isinstance(data, dict) else []
-    return (_normalize_pairs(pairs_payload), True)
+    pairs_payload = _extract_pairs_payload(data)
+    parsed_pairs = _normalize_pairs(pairs_payload)
+    if not parsed_pairs:
+        return ([], False)
+    return (parsed_pairs, True)
 
 
 async def _fetch_expiration_options() -> List[Dict[str, Any]]:

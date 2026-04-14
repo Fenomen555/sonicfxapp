@@ -209,6 +209,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     title VARCHAR(500) NOT NULL,
                     summary TEXT NULL,
                     image_url TEXT NULL,
+                    related_symbols VARCHAR(255) NULL,
                     source_name VARCHAR(255) NULL,
                     source_url TEXT NULL,
                     country_code VARCHAR(8) NULL,
@@ -304,6 +305,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "news_items", "news_category", "ALTER TABLE news_items ADD COLUMN news_category VARCHAR(64) NULL")
         await _ensure_column(conn, db_name, "news_items", "country_code", "ALTER TABLE news_items ADD COLUMN country_code VARCHAR(8) NULL")
         await _ensure_column(conn, db_name, "news_items", "currency_code", "ALTER TABLE news_items ADD COLUMN currency_code VARCHAR(8) NULL")
+        await _ensure_column(conn, db_name, "news_items", "related_symbols", "ALTER TABLE news_items ADD COLUMN related_symbols VARCHAR(255) NULL")
         await _ensure_column(conn, db_name, "news_items", "impact_level", "ALTER TABLE news_items ADD COLUMN impact_level VARCHAR(16) NULL")
         await _ensure_column(conn, db_name, "news_items", "actual_value", "ALTER TABLE news_items ADD COLUMN actual_value VARCHAR(64) NULL")
         await _ensure_column(conn, db_name, "news_items", "forecast_value", "ALTER TABLE news_items ADD COLUMN forecast_value VARCHAR(64) NULL")

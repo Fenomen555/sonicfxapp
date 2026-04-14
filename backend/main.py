@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import mimetypes
 import os
 import re
 import secrets
@@ -19,6 +20,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from db_bootstrap import (
@@ -72,7 +74,7 @@ FINNHUB_TOKEN = (os.getenv("FINNHUB_TOKEN") or "").strip()
 DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) // 60, 2), 30)
 DEFAULT_NEWS_SYNC_INTERVAL_MIN = 60
 VALID_NEWS_FEEDS = {"economic", "market"}
-NEWS_MARKET_CATEGORIES = ("general", "forex", "crypto", "merger")
+NEWS_GENERAL_CATEGORY = "general"
 MARKET_KIND_CONFIG = {
     "forex": {"title": "Forex", "path": "forex"},
     "otc": {"title": "OTC", "path": "otc"},
@@ -116,6 +118,8 @@ dp = Dispatcher()
 
 media_dir = Path(__file__).resolve().parent / "media"
 media_dir.mkdir(parents=True, exist_ok=True)
+news_media_dir = media_dir / "news"
+news_media_dir.mkdir(parents=True, exist_ok=True)
 admin_token_file_path = media_dir / "admin.token"
 admin_panel_token = (os.getenv("ADMIN_PANEL_TOKEN") or "").strip()
 
@@ -965,6 +969,93 @@ def _normalize_news_title(raw_title: Any) -> str:
     return title
 
 
+def _guess_market_country_code(*parts: Any) -> str:
+    haystack = f" {' '.join(_coerce_news_text(part, max_len=600) for part in parts if part)} ".lower()
+    if not haystack.strip():
+        return ""
+    keyword_map = {
+        " united states ": "US",
+        " u.s. ": "US",
+        " us ": "US",
+        " america ": "US",
+        " euro zone ": "EU",
+        " eurozone ": "EU",
+        " european union ": "EU",
+        " britain ": "GB",
+        " united kingdom ": "GB",
+        " uk ": "GB",
+        " england ": "GB",
+        " australia ": "AU",
+        " australian ": "AU",
+        " japan ": "JP",
+        " japanese ": "JP",
+        " china ": "CN",
+        " chinese ": "CN",
+        " india ": "IN",
+        " indian ": "IN",
+        " iran ": "IR",
+        " turkey ": "TR",
+        " turkish ": "TR",
+        " nigeria ": "NG",
+        " canada ": "CA",
+        " canadian ": "CA",
+        " new zealand ": "NZ",
+        " switzerland ": "CH",
+        " swiss ": "CH",
+        " germany ": "DE",
+        " german ": "DE",
+        " france ": "FR",
+        " french ": "FR",
+        " italy ": "IT",
+        " italian ": "IT",
+        " spain ": "ES",
+        " spanish ": "ES",
+        " south africa ": "ZA",
+        " brazil ": "BR",
+        " brazilian ": "BR",
+        " mexico ": "MX",
+        " mexican ": "MX",
+        " russia ": "RU",
+        " russian ": "RU",
+    }
+    for needle, code in keyword_map.items():
+        if needle in haystack:
+            return code
+    return ""
+
+
+def _resolve_news_image_suffix(source_url: str, content_type: str) -> str:
+    suffix = mimetypes.guess_extension((content_type or "").split(";", 1)[0].strip()) or ""
+    if suffix in {".jpe", ".jpeg", ".jpg", ".png", ".webp", ".svg", ".gif"}:
+        return ".jpg" if suffix == ".jpe" else suffix
+    parsed = Path((source_url or "").split("?", 1)[0])
+    ext = parsed.suffix.lower()
+    if ext in {".jpeg", ".jpg", ".png", ".webp", ".svg", ".gif"}:
+        return ".jpg" if ext == ".jpeg" else ext
+    return ".img"
+
+
+async def _resolve_cached_news_image_path(news_item_id: int, source_url: str) -> Optional[Path]:
+    if not news_item_id or not source_url:
+        return None
+    source_hash = hashlib.sha1(source_url.encode("utf-8")).hexdigest()[:16]
+    existing = next(iter(news_media_dir.glob(f"{news_item_id}-{source_hash}.*")), None)
+    if existing and existing.is_file():
+        return existing
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.get(source_url, timeout=12.0)
+        if response.status_code != 200 or not response.content:
+            return None
+        suffix = _resolve_news_image_suffix(source_url, response.headers.get("content-type", ""))
+        target = news_media_dir / f"{news_item_id}-{source_hash}{suffix}"
+        target.write_bytes(response.content)
+        return target
+    except Exception as exc:
+        print(f"News image cache error [{news_item_id}]: {exc}")
+        return None
+
+
 def _build_news_external_id(feed_type: str, *parts: Any) -> str:
     seed = "::".join(_coerce_news_text(part) for part in parts if _coerce_news_text(part))
     digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()
@@ -983,15 +1074,19 @@ def _serialize_news_row(row: Dict[str, Any]) -> Dict[str, Any]:
     published_at = row.get("published_at")
     updated_at = row.get("updated_at")
     published_iso = published_at.isoformat() if published_at else None
+    row_id = int(row.get("id") or 0)
+    image_url = row.get("image_url") or ""
     return {
+        "db_id": row_id,
         "id": row.get("external_id") or str(row.get("id") or ""),
         "title": row.get("title") or "",
         "summary": row.get("summary") or "",
-        "image_url": row.get("image_url") or "",
+        "image_url": f"/api/news/image/{row_id}" if row_id and image_url else "",
         "source_name": row.get("source_name") or "",
         "source_url": row.get("source_url") or "",
         "feed_type": row.get("feed_type") or "market",
         "category": row.get("news_category") or "",
+        "related": row.get("related_symbols") or "",
         "country_code": (row.get("country_code") or "").strip().upper(),
         "currency": (row.get("currency_code") or "").strip().upper(),
         "impact": (row.get("impact_level") or "medium").strip().lower() or "medium",
@@ -1039,17 +1134,18 @@ async def _replace_news_feed(feed_type: str, items: List[Dict[str, Any]]) -> Non
             await cur.executemany(
                 """
                 INSERT INTO news_items (
-                    external_id, feed_type, news_category, title, summary, image_url,
+                    external_id, feed_type, news_category, title, summary, image_url, related_symbols,
                     source_name, source_url, country_code, currency_code, impact_level,
                     actual_value, forecast_value, previous_value, unit, published_at, is_visible
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1
                 )
                 ON DUPLICATE KEY UPDATE
                     news_category = VALUES(news_category),
                     title = VALUES(title),
                     summary = VALUES(summary),
                     image_url = VALUES(image_url),
+                    related_symbols = VALUES(related_symbols),
                     source_name = VALUES(source_name),
                     source_url = VALUES(source_url),
                     country_code = VALUES(country_code),
@@ -1071,6 +1167,7 @@ async def _replace_news_feed(feed_type: str, items: List[Dict[str, Any]]) -> Non
                         item["title"],
                         item["summary"],
                         item["image_url"],
+                        item["related_symbols"],
                         item["source_name"],
                         item["source_url"],
                         item["country_code"],
@@ -1134,6 +1231,7 @@ async def _sync_economic_news() -> int:
                 "title": title,
                 "summary": " · ".join(summary_parts),
                 "image_url": "",
+                "related_symbols": "",
                 "source_name": "Finnhub",
                 "source_url": "https://finnhub.io/",
                 "country_code": country,
@@ -1156,53 +1254,55 @@ async def _sync_market_news() -> int:
     today = now.date()
     prepared_items: List[Dict[str, Any]] = []
 
-    for category in NEWS_MARKET_CATEGORIES:
-        raw_items = await _fetch_finnhub_json("news", {"category": category})
-        if not isinstance(raw_items, list):
+    raw_items = await _fetch_finnhub_json("news", {"category": NEWS_GENERAL_CATEGORY})
+    if not isinstance(raw_items, list):
+        raw_items = []
+
+    for item in raw_items:
+        if not isinstance(item, dict):
             continue
-        for item in raw_items:
-            if not isinstance(item, dict):
-                continue
-            published_at = _parse_finnhub_market_datetime(item.get("datetime"))
-            if published_at is None or published_at.date() != today:
-                continue
-            title = _normalize_news_title(item.get("headline") or item.get("title"))
-            if not title:
-                continue
-            summary = _coerce_news_text(item.get("summary"), max_len=420)
-            source_name = _coerce_news_text(item.get("source"), max_len=128)
-            source_url = _coerce_news_text(item.get("url"), max_len=500)
-            image_url = _coerce_news_text(item.get("image"), max_len=500)
-            country_code = _coerce_news_text(item.get("country"), max_len=8).upper()
-            related = _coerce_news_text(item.get("related"), max_len=120)
-            if related:
-                summary = f"{related} · {summary}" if summary else related
-            prepared_items.append(
-                {
-                    "external_id": _build_news_external_id(
-                        "market",
-                        category,
-                        item.get("id"),
-                        published_at.isoformat(),
-                        title,
-                    ),
-                    "feed_type": "market",
-                    "news_category": category,
-                    "title": title,
-                    "summary": summary,
-                    "image_url": image_url,
-                    "source_name": source_name or "Finnhub",
-                    "source_url": source_url,
-                    "country_code": country_code,
-                    "currency_code": "",
-                    "impact_level": "",
-                    "actual_value": "",
-                    "forecast_value": "",
-                    "previous_value": "",
-                    "unit": "",
-                    "published_at": published_at.strftime("%Y-%m-%d %H:%M:%S"),
-                }
-            )
+        published_at = _parse_finnhub_market_datetime(item.get("datetime"))
+        if published_at is None or published_at.date() != today:
+            continue
+        title = _normalize_news_title(item.get("headline") or item.get("title"))
+        if not title:
+            continue
+        summary = _coerce_news_text(item.get("summary"), max_len=700)
+        source_name = _coerce_news_text(item.get("source"), max_len=128)
+        source_url = _coerce_news_text(item.get("url"), max_len=500)
+        image_url = _coerce_news_text(item.get("image"), max_len=500)
+        related = _coerce_news_text(item.get("related"), max_len=255)
+        news_category = _coerce_news_text(item.get("category"), max_len=64).lower() or NEWS_GENERAL_CATEGORY
+        country_code = _coerce_news_text(item.get("country"), max_len=8).upper()
+        if not country_code:
+            country_code = _guess_market_country_code(title, summary, related, source_name)
+        prepared_items.append(
+            {
+                "external_id": _build_news_external_id(
+                    "market",
+                    news_category,
+                    item.get("id"),
+                    published_at.isoformat(),
+                    title,
+                ),
+                "feed_type": "market",
+                "news_category": news_category,
+                "title": title,
+                "summary": summary,
+                "image_url": image_url,
+                "related_symbols": related,
+                "source_name": source_name or "Finnhub",
+                "source_url": source_url,
+                "country_code": country_code,
+                "currency_code": "",
+                "impact_level": "",
+                "actual_value": "",
+                "forecast_value": "",
+                "previous_value": "",
+                "unit": "",
+                "published_at": published_at.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
 
     await _replace_news_feed("market", prepared_items)
     return len(prepared_items)
@@ -1386,6 +1486,29 @@ async def get_news(
 ):
     await upsert_user_from_telegram(user)
     return await fetch_news_data(feed=feed, category=category, limit=limit)
+
+
+@app.get("/api/news/image/{news_item_id}")
+async def get_news_image(news_item_id: int):
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT id, image_url
+                FROM news_items
+                WHERE id = %s AND is_visible = 1
+                LIMIT 1
+                """,
+                (int(news_item_id),),
+            )
+            row = await cur.fetchone()
+    if not row or not row.get("image_url"):
+        raise HTTPException(status_code=404, detail="News image not found")
+    cached_path = await _resolve_cached_news_image_path(int(row["id"]), str(row.get("image_url") or ""))
+    if not cached_path or not cached_path.exists():
+        raise HTTPException(status_code=404, detail="News image is unavailable")
+    return FileResponse(cached_path)
 
 
 @app.get("/api/stats/daily")
@@ -1735,4 +1858,3 @@ if __name__ == "__main__":
         asyncio.run(main(parse_runtime_mode()))
     except KeyboardInterrupt:
         pass
-

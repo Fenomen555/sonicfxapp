@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import ReactCountryFlag from "react-country-flag";
 import { apiFetchJson } from "../lib/api";
 
 function getImpactLabel(impact, t) {
@@ -19,17 +20,18 @@ function formatUpdateTime(value, lang = "ru") {
   });
 }
 
-function buildFlagEmoji(countryCode) {
-  const code = String(countryCode || "").trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(code)) return "🌐";
-  return String.fromCodePoint(...code.split("").map((char) => 127397 + char.charCodeAt(0)));
+function hasCountryFlag(countryCode) {
+  return /^[A-Z]{2}$/.test(String(countryCode || "").trim().toUpperCase());
 }
 
 function normalizeEconomicTitle(title, t) {
   return String(title || "")
-    .replace(/\bMoM\b/g, `(${t.news.momShort || "m/m"})`)
-    .replace(/\bYoY\b/g, `(${t.news.yoyShort || "y/y"})`)
-    .replace(/\bQoQ\b/g, `(${t.news.qoqShort || "q/q"})`);
+    .replace(/\bm\/m\b/gi, `(${t.news.momShort || "м/м"})`)
+    .replace(/\by\/y\b/gi, `(${t.news.yoyShort || "г/г"})`)
+    .replace(/\bq\/q\b/gi, `(${t.news.qoqShort || "к/к"})`)
+    .replace(/\bMoM\b/g, `(${t.news.momShort || "м/м"})`)
+    .replace(/\bYoY\b/g, `(${t.news.yoyShort || "г/г"})`)
+    .replace(/\bQoQ\b/g, `(${t.news.qoqShort || "к/к"})`);
 }
 
 function getMarketCategoryLabel(category, t) {
@@ -37,11 +39,37 @@ function getMarketCategoryLabel(category, t) {
   const map = {
     all: t.news.categoryAll || "Все",
     general: t.news.categoryGeneral || "Общие",
+    business: t.news.categoryBusiness || "Бизнес",
+    company: t.news.categoryCompany || "Компании",
+    economy: t.news.categoryEconomy || "Экономика",
+    politics: t.news.categoryPolitics || "Политика",
+    "top news": t.news.categoryTopNews || "Главное",
     forex: t.news.categoryForex || "Forex",
     crypto: t.news.categoryCrypto || "Crypto",
     merger: t.news.categoryMerger || "Сделки"
   };
-  return map[key] || key;
+  if (map[key]) return map[key];
+  return key
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function FlagBadge({ countryCode, fallback = "🌐", title = "Global" }) {
+  const code = String(countryCode || "").trim().toUpperCase();
+  if (!hasCountryFlag(code)) {
+    return <span className="news-flag-fallback">{fallback}</span>;
+  }
+  return (
+    <ReactCountryFlag
+      countryCode={code}
+      svg
+      aria-label={title}
+      title={title}
+      className="news-flag-svg"
+    />
+  );
 }
 
 function SummaryCard({ label, value, accent }) {
@@ -67,7 +95,7 @@ function EconomicSection({ title, items, t }) {
             <div className="news-card-top">
               <div className="news-card-tags">
                 <span className="news-flag-chip" title={item.country_code || item.currency || "Global"}>
-                  {buildFlagEmoji(item.country_code)}
+                  <FlagBadge countryCode={item.country_code} title={item.country_code || item.currency || "Global"} />
                 </span>
                 <span className="news-currency-chip">{item.currency || "ALL"}</span>
                 <span className={`news-impact-chip impact-${item.impact || "medium"}`}>
@@ -79,7 +107,7 @@ function EconomicSection({ title, items, t }) {
 
             <div className="news-card-copy">
               <h3>{normalizeEconomicTitle(item.title, t)}</h3>
-              <p>{[item.country_code || "ALL", item.source_name || "Finnhub"].join(" · ")}</p>
+              <p>{[item.country_code || item.currency || "ALL", item.source_name || "Finnhub"].join(" · ")}</p>
             </div>
 
             <div className="news-stat-row compact">
@@ -131,19 +159,49 @@ function MarketSection({ items, categories, selectedCategory, onSelectCategory, 
             <div className="news-card-top">
               <div className="news-card-tags">
                 <span className="news-flag-chip" title={item.country_code || "Global"}>
-                  {buildFlagEmoji(item.country_code)}
+                  <FlagBadge countryCode={item.country_code} title={item.country_code || "Global"} />
                 </span>
                 <span className="news-currency-chip">{getMarketCategoryLabel(item.category, t)}</span>
               </div>
               <span className="news-time-chip">{formatUpdateTime(item.published_at, lang).split(", ").pop() || item.time_label || "--:--"}</span>
             </div>
 
-            <div className="news-card-copy compact-copy">
+            {!!item.image_url && (
+              <div className="news-market-media">
+                <img src={item.image_url} alt={item.title} loading="lazy" />
+              </div>
+            )}
+
+            <div className="news-card-copy compact-copy market-copy">
               <h3>{item.title}</h3>
               <p>{item.source_name || "Finnhub"}</p>
             </div>
 
-            {!!item.summary && <p className="news-market-summary">{item.summary}</p>}
+            {!!item.related && (
+              <div className="news-related-row">
+                {String(item.related || "")
+                  .split(",")
+                  .map((part) => part.trim())
+                  .filter(Boolean)
+                  .slice(0, 4)
+                  .map((part) => (
+                    <span className="news-related-chip" key={part}>{part}</span>
+                  ))}
+              </div>
+            )}
+
+            {!!item.summary && (
+              <details className="news-market-summary-card">
+                <summary>{t.news.showSummary || "Кратко"}</summary>
+                <p className="news-market-summary">{item.summary}</p>
+              </details>
+            )}
+
+            {!!item.source_url && (
+              <a className="news-open-link" href={item.source_url} target="_blank" rel="noreferrer">
+                {t.news.openNews || "Открыть"}
+              </a>
+            )}
           </article>
         ))}
       </div>
@@ -173,7 +231,7 @@ export default function NewsPage({ t, lang = "ru" }) {
         const qs = new URLSearchParams({
           feed,
           category: feed === "market" ? marketCategory : "all",
-          limit: feed === "market" ? "30" : "18"
+          limit: feed === "market" ? "24" : "16"
         });
         const response = await apiFetchJson(`/api/news?${qs.toString()}`).catch(() => ({
           feed,
@@ -251,11 +309,6 @@ export default function NewsPage({ t, lang = "ru" }) {
           {summaryCards.map((item) => (
             <SummaryCard key={item.key} label={item.label} value={item.value} accent={item.accent} />
           ))}
-        </div>
-
-        <div className="news-hero-footer compact-footer">
-          <span>{t.news.updated || "Обновлено"}: {formatUpdateTime(newsData.updated_at, lang)}</span>
-          <span>{feed === "market" ? (t.news.marketFeed || "Лента рынка") : (t.news.calendarFeed || "Календарь")}</span>
         </div>
       </div>
 

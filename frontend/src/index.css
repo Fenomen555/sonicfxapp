@@ -379,11 +379,17 @@ textarea {
 
 .upload-animation-shell {
   position: relative;
+  display: grid;
+  place-items: center;
 }
 
 .upload-animation {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  transform: translate(-50%, -50%) translateY(6px);
   opacity: 0;
   transition: opacity 0.24s ease;
 }
@@ -913,6 +919,12 @@ textarea {
   .upload-animation-fallback {
     width: 60px;
     height: 60px;
+  }
+
+  .upload-animation {
+    width: 50px;
+    height: 50px;
+    transform: translate(-50%, -50%) translateY(5px);
   }
 }
 

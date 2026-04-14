@@ -1,37 +1,50 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiAdminFetchJson } from "../lib/api";
 import "./admin.css";
 
 const TABS = [
-  { id: "stats", label: "Обзор", subtitle: "Статистика и активность" },
-  { id: "users", label: "Пользователи", subtitle: "Статусы и доступ" },
-  { id: "flags", label: "Функции", subtitle: "Управление режимами" },
-  { id: "market", label: "Рынок", subtitle: "Пары и синхронизация" }
+  { id: "stats", label: "Обзор", subtitle: "Статистика и активность", accent: "A" },
+  { id: "users", label: "Пользователи", subtitle: "Карточки, поиск и фильтры", accent: "U" },
+  { id: "flags", label: "Функции", subtitle: "Управление режимами", accent: "F" },
+  { id: "market", label: "Рынок", subtitle: "Пары и синхронизация", accent: "M" }
 ];
 
 const FLAG_META = {
   mode_ai_enabled: {
-    title: "AI-режим",
-    description: "Автоматическая генерация сигналов и связанные сценарии."
+    title: "Автоматический режим",
+    description: "Разрешает потоковую генерацию сигналов и связанные сценарии."
   },
   mode_indicators_enabled: {
     title: "Индикаторы",
-    description: "Ручной режим по рынку, тикеру и экспирации."
+    description: "Открывает ручной режим по рынку, тикеру и экспирации."
   },
   mode_scanner_enabled: {
     title: "Сканер",
-    description: "Главный режим анализа по скриншоту графика."
+    description: "Оставляет доступным основной режим анализа по скриншоту графика."
   },
   news_enabled: {
     title: "Новости",
-    description: "Показывать ленту новостей внутри mini app."
+    description: "Показывает новостную ленту внутри mini app."
   }
 };
 
-const USER_STATUS_LABELS = {
-  inactive: "Не активирован",
-  active: "Активен",
-  active_scanner: "Сканер активен"
+const USER_STATUS_META = {
+  inactive: { label: "Не активирован", tone: "neutral" },
+  active: { label: "Активен", tone: "success" },
+  active_scanner: { label: "Сканер активен", tone: "accent" }
+};
+
+const FILTER_DEFAULTS = {
+  status: "all",
+  access: "all",
+  deposit: "all",
+  registered: "all"
+};
+
+const EMPTY_MARKET_SETTINGS = {
+  market_pairs_sync_interval_min: 5,
+  interval_options: [],
+  items: []
 };
 
 function formatDateTime(value) {
@@ -47,6 +60,34 @@ function formatDateTime(value) {
   });
 }
 
+function formatDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleDateString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+function formatNumber(value) {
+  const numeric = Number(value || 0);
+  return new Intl.NumberFormat("ru-RU").format(numeric);
+}
+
+function formatDeposit(value) {
+  const numeric = Number(value || 0);
+  return new Intl.NumberFormat("ru-RU", {
+    minimumFractionDigits: numeric % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2
+  }).format(numeric);
+}
+
+function formatPercent(value) {
+  return `${Math.round(Number(value || 0))}%`;
+}
+
 function getFlagMeta(key) {
   return FLAG_META[key] || {
     title: key,
@@ -54,71 +95,247 @@ function getFlagMeta(key) {
   };
 }
 
-function getUserStatusLabel(status) {
-  return USER_STATUS_LABELS[status] || status || "-";
+function getUserStatusMeta(status) {
+  return USER_STATUS_META[status] || { label: status || "-", tone: "neutral" };
+}
+
+function getRegistrationFilterLabel(value) {
+  const labels = {
+    all: "Все даты",
+    today: "Сегодня",
+    week: "Последние 7 дней",
+    month: "Последние 30 дней",
+    quarter: "Последние 90 дней"
+  };
+  return labels[value] || labels.all;
+}
+
+function isWithinRegistrationRange(value, filter) {
+  if (!value || filter === "all") return true;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (filter === "today") {
+    return date >= startToday;
+  }
+
+  const days = filter === "week" ? 7 : filter === "month" ? 30 : filter === "quarter" ? 90 : null;
+  if (!days) return true;
+
+  const threshold = new Date(now);
+  threshold.setDate(now.getDate() - days);
+  return date >= threshold;
+}
+
+function buildToast(type, title, message) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    title,
+    message
+  };
 }
 
 export default function AdminApp({ authError }) {
   const [tab, setTab] = useState("stats");
+  const [menuExpanded, setMenuExpanded] = useState(true);
+  const [marketDetailsExpanded, setMarketDetailsExpanded] = useState(false);
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [flags, setFlags] = useState([]);
-  const [marketSettings, setMarketSettings] = useState({
-    market_pairs_sync_interval_min: 5,
-    interval_options: [],
-    items: []
-  });
+  const [marketSettings, setMarketSettings] = useState(EMPTY_MARKET_SETTINGS);
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [toastItems, setToastItems] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userFilters, setUserFilters] = useState(FILTER_DEFAULTS);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [userEditor, setUserEditor] = useState({ activation_status: "inactive", deposit_amount: "0" });
+  const [userSaving, setUserSaving] = useState(false);
+  const [flagSavingKey, setFlagSavingKey] = useState("");
+
+  const pushToast = (type, title, message) => {
+    const nextToast = buildToast(type, title, message);
+    setToastItems((prev) => [...prev, nextToast]);
+    window.setTimeout(() => {
+      setToastItems((prev) => prev.filter((item) => item.id !== nextToast.id));
+    }, 3600);
+  };
+
+  const selectedUser = useMemo(
+    () => users.find((item) => item.user_id === selectedUserId) || null,
+    [users, selectedUserId]
+  );
+
+  useEffect(() => {
+    if (!selectedUser) return;
+    setUserEditor({
+      activation_status: selectedUser.activation_status || "inactive",
+      deposit_amount: String(selectedUser.deposit_amount ?? 0)
+    });
+  }, [selectedUser]);
+  const loadCurrentTab = async (targetTab = tab, options = {}) => {
+    const { silent = false } = options;
+    if (!silent) setLoading(true);
+    try {
+      if (targetTab === "stats") {
+        const data = await apiAdminFetchJson("/api/admin/stats");
+        setStats(data);
+      }
+      if (targetTab === "users") {
+        const data = await apiAdminFetchJson("/api/admin/users?limit=200");
+        setUsers(data?.items || []);
+      }
+      if (targetTab === "flags") {
+        const data = await apiAdminFetchJson("/api/admin/feature-flags");
+        setFlags(data?.items || []);
+      }
+      if (targetTab === "market") {
+        const data = await apiAdminFetchJson("/api/admin/market-settings");
+        setMarketSettings(data || EMPTY_MARKET_SETTINGS);
+        setMarketInterval(String(data?.market_pairs_sync_interval_min || 5));
+      }
+    } catch (error) {
+      pushToast("error", "Не удалось загрузить раздел", error.message || "Попробуйте обновить данные ещё раз.");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (authError) return;
-    let isActive = true;
-
-    async function load() {
-      setLoading(true);
-      try {
-        if (tab === "stats") {
-          const data = await apiAdminFetchJson("/api/admin/stats");
-          if (isActive) setStats(data);
-        }
-        if (tab === "users") {
-          const data = await apiAdminFetchJson("/api/admin/users");
-          if (isActive) setUsers(data?.items || []);
-        }
-        if (tab === "flags") {
-          const data = await apiAdminFetchJson("/api/admin/feature-flags");
-          if (isActive) setFlags(data?.items || []);
-        }
-        if (tab === "market") {
-          const data = await apiAdminFetchJson("/api/admin/market-settings");
-          if (isActive) {
-            setMarketSettings(data || { market_pairs_sync_interval_min: 5, interval_options: [], items: [] });
-            setMarketInterval(String(data?.market_pairs_sync_interval_min || 5));
-          }
-        }
-      } finally {
-        if (isActive) setLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      isActive = false;
-    };
+    loadCurrentTab(tab);
   }, [tab, authError]);
 
-  const toggleFlag = async (item) => {
-    await apiAdminFetchJson("/api/admin/feature-flags", {
-      method: "POST",
-      body: JSON.stringify({
-        key: item.key,
-        is_enabled: item.is_enabled === 1 ? 0 : 1
-      })
+  const refreshActiveTab = async () => {
+    await loadCurrentTab(tab, { silent: true });
+    pushToast("success", "Данные обновлены", "Панель получила актуальное состояние по выбранному разделу.");
+  };
+
+  const handleFilterChange = (key, value) => {
+    setUserFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    return users.filter((item) => {
+      const haystack = [
+        String(item.user_id || ""),
+        item.tg_username || "",
+        item.mini_username || "",
+        item.first_name || ""
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      if (query && !haystack.includes(query)) return false;
+      if (userFilters.status !== "all" && item.activation_status !== userFilters.status) return false;
+      if (userFilters.access === "with_access" && !item.scanner_access) return false;
+      if (userFilters.access === "without_access" && item.scanner_access) return false;
+      if (userFilters.deposit === "with_deposit" && Number(item.deposit_amount || 0) <= 0) return false;
+      if (userFilters.deposit === "without_deposit" && Number(item.deposit_amount || 0) > 0) return false;
+      if (!isWithinRegistrationRange(item.created_at, userFilters.registered)) return false;
+      return true;
     });
-    const data = await apiAdminFetchJson("/api/admin/feature-flags");
-    setFlags(data?.items || []);
+  }, [userFilters, userSearch, users]);
+
+  const statsCards = useMemo(() => {
+    const usersTotal = Number(stats?.users_total || 0);
+    const activatedTotal = Number(stats?.activated_total || 0);
+    const scannerTotal = Number(stats?.scanner_total || 0);
+    const signalsToday = Number(stats?.signals_today || 0);
+    const activationRate = usersTotal > 0 ? (activatedTotal / usersTotal) * 100 : 0;
+    const scannerRate = usersTotal > 0 ? (scannerTotal / usersTotal) * 100 : 0;
+    const inactiveTotal = Math.max(usersTotal - activatedTotal, 0);
+
+    return [
+      { key: "users_total", label: "Всего пользователей", value: formatNumber(usersTotal), note: "База mini app", tone: "accent" },
+      { key: "activated_total", label: "Активировано", value: formatNumber(activatedTotal), note: `Конверсия ${formatPercent(activationRate)}`, tone: "success" },
+      { key: "scanner_total", label: "Доступ к сканеру", value: formatNumber(scannerTotal), note: `Охват ${formatPercent(scannerRate)}`, tone: "info" },
+      { key: "signals_today", label: "Сигналов сегодня", value: formatNumber(signalsToday), note: "Текущая активность", tone: "warm" },
+      { key: "inactive_total", label: "Без активации", value: formatNumber(inactiveTotal), note: "Потенциал для возврата", tone: "neutral" }
+    ];
+  }, [stats]);
+
+  const statsHighlights = useMemo(() => {
+    const usersTotal = Number(stats?.users_total || 0);
+    const activatedTotal = Number(stats?.activated_total || 0);
+    const scannerTotal = Number(stats?.scanner_total || 0);
+    const signalsToday = Number(stats?.signals_today || 0);
+
+    return [
+      {
+        key: "conversion",
+        title: "Активация базы",
+        value: usersTotal > 0 ? formatPercent((activatedTotal / usersTotal) * 100) : "0%",
+        description: "Доля пользователей с доступом к продукту."
+      },
+      {
+        key: "scanner_share",
+        title: "Охват сканера",
+        value: usersTotal > 0 ? formatPercent((scannerTotal / usersTotal) * 100) : "0%",
+        description: `Сегодня отправлено ${formatNumber(signalsToday)} сигналов.`
+      }
+    ];
+  }, [stats]);
+
+  const tabCards = useMemo(() => {
+    return TABS.map((item) => {
+      if (item.id === "stats") {
+        return { ...item, metric: `${formatNumber(stats?.users_total || 0)} пользователей` };
+      }
+      if (item.id === "users") {
+        return { ...item, metric: `${formatNumber(users.length)} карточек` };
+      }
+      if (item.id === "flags") {
+        return { ...item, metric: `${formatNumber(flags.filter((flag) => flag.is_enabled === 1).length)} активных` };
+      }
+      const marketCount = (marketSettings.items || []).length;
+      return { ...item, metric: `${formatNumber(marketCount)} рынков` };
+    });
+  }, [flags, marketSettings.items, stats?.users_total, users.length]);
+
+  const marketSummary = useMemo(() => {
+    const items = marketSettings.items || [];
+    const totals = items.reduce(
+      (acc, item) => {
+        acc.totalPairs += Number(item.total_count || 0);
+        acc.activePairs += Number(item.active_count || 0);
+        if (item.last_seen_at && (!acc.lastSeenAt || new Date(item.last_seen_at) > new Date(acc.lastSeenAt))) {
+          acc.lastSeenAt = item.last_seen_at;
+        }
+        return acc;
+      },
+      { totalPairs: 0, activePairs: 0, lastSeenAt: null }
+    );
+
+    return [
+      { key: "active_pairs", label: "Активных пар", value: formatNumber(totals.activePairs), note: "Сейчас доступны в локальном кеше" },
+      { key: "total_pairs", label: "Всего пар", value: formatNumber(totals.totalPairs), note: "Полный объём по всем рынкам" },
+      { key: "markets_total", label: "Рынков", value: formatNumber(items.length), note: "Категории, которые мониторим" },
+      { key: "last_sync", label: "Последний sync", value: totals.lastSeenAt ? formatDateTime(totals.lastSeenAt) : "-", note: "Время последнего обновления" }
+    ];
+  }, [marketSettings.items]);
+  const toggleFlag = async (item) => {
+    setFlagSavingKey(item.key);
+    try {
+      const enabled = item.is_enabled === 1;
+      await apiAdminFetchJson("/api/admin/feature-flags", {
+        method: "POST",
+        body: JSON.stringify({ key: item.key, is_enabled: enabled ? 0 : 1 })
+      });
+      const data = await apiAdminFetchJson("/api/admin/feature-flags");
+      setFlags(data?.items || []);
+      pushToast("success", enabled ? "Функция выключена" : "Функция включена", `${getFlagMeta(item.key).title} обновлена без ошибок.`);
+    } catch (error) {
+      pushToast("error", "Не удалось изменить функцию", error.message || "Попробуйте ещё раз.");
+    } finally {
+      setFlagSavingKey("");
+    }
   };
 
   const saveMarketSettings = async () => {
@@ -127,52 +344,53 @@ export default function AdminApp({ authError }) {
       const nextValue = Number(marketInterval || 5);
       await apiAdminFetchJson("/api/admin/market-settings", {
         method: "POST",
-        body: JSON.stringify({
-          market_pairs_sync_interval_min: nextValue
-        })
+        body: JSON.stringify({ market_pairs_sync_interval_min: nextValue })
       });
       const data = await apiAdminFetchJson("/api/admin/market-settings");
-      setMarketSettings(data || { market_pairs_sync_interval_min: 5, interval_options: [], items: [] });
+      setMarketSettings(data || EMPTY_MARKET_SETTINGS);
       setMarketInterval(String(data?.market_pairs_sync_interval_min || nextValue));
+      pushToast("success", "Интервал обновлён", `Синхронизация валютных пар теперь идёт раз в ${nextValue} мин.`);
+    } catch (error) {
+      pushToast("error", "Не удалось сохранить интервал", error.message || "Проверьте значение и повторите попытку.");
     } finally {
       setMarketSaving(false);
     }
   };
 
-  const statsCards = [
-    {
-      key: "users_total",
-      label: "Всего пользователей",
-      value: stats?.users_total ?? "-",
-      note: "Зарегистрированы в системе"
-    },
-    {
-      key: "activated_total",
-      label: "Активировано",
-      value: stats?.activated_total ?? "-",
-      note: "Есть доступ к продукту"
-    },
-    {
-      key: "scanner_total",
-      label: "Доступ к сканеру",
-      value: stats?.scanner_total ?? "-",
-      note: "Могут запускать сканер"
-    },
-    {
-      key: "signals_today",
-      label: "Сигналов сегодня",
-      value: stats?.signals_today ?? "-",
-      note: "Активность за текущие сутки"
+  const saveUserCard = async () => {
+    if (!selectedUser) return;
+    setUserSaving(true);
+    try {
+      await apiAdminFetchJson("/api/admin/users/set-activation", {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: selectedUser.user_id,
+          activation_status: userEditor.activation_status,
+          deposit_amount: Number(userEditor.deposit_amount || 0)
+        })
+      });
+
+      const data = await apiAdminFetchJson("/api/admin/users?limit=200");
+      setUsers(data?.items || []);
+      const nextStats = await apiAdminFetchJson("/api/admin/stats");
+      setStats(nextStats);
+      pushToast("success", "Пользователь обновлён", `Карточка ${selectedUser.user_id} успешно сохранена.`);
+    } catch (error) {
+      pushToast("error", "Не удалось сохранить пользователя", error.message || "Изменения не были применены.");
+    } finally {
+      setUserSaving(false);
     }
-  ];
+  };
 
   if (authError) {
     return (
       <div className="admin-shell">
-        <div className="admin-card admin-state-card">
-          <div className="admin-state-badge">Доступ ограничен</div>
-          <h2>Админ-панель недоступна</h2>
-          <p>{authError}</p>
+        <div className="admin-card admin-empty-state">
+          <div className="admin-empty-icon">!</div>
+          <div className="admin-empty-copy">
+            <strong>Админ-панель недоступна</strong>
+            <span>{authError}</span>
+          </div>
         </div>
       </div>
     );
@@ -180,178 +398,403 @@ export default function AdminApp({ authError }) {
 
   return (
     <div className="admin-shell">
-      <nav className="admin-tabs">
-        {TABS.map((item) => (
-          <button
-            className={`admin-tab ${tab === item.id ? "active" : ""}`}
-            key={item.id}
-            onClick={() => setTab(item.id)}
-            type="button"
-          >
-            <span>{item.label}</span>
-            <small>{item.subtitle}</small>
+      <section className="admin-topbar admin-card">
+        <div className="admin-topbar-copy">
+          <span className="admin-kicker">Управление SonicFX</span>
+          <h1>Админка mini app</h1>
+          <p>Собранный центр управления пользователями, режимами и рыночными данными.</p>
+        </div>
+        <div className="admin-topbar-actions">
+          <button className="admin-ghost-button" type="button" onClick={() => setMenuExpanded((prev) => !prev)}>
+            {menuExpanded ? "Свернуть разделы" : "Развернуть разделы"}
           </button>
-        ))}
-      </nav>
+          <button className="admin-primary-button" type="button" onClick={refreshActiveTab}>
+            Обновить данные
+          </button>
+        </div>
+      </section>
 
-      <main className="admin-main">
+      {menuExpanded && (
+        <nav className="admin-section-grid">
+          {tabCards.map((item) => (
+            <button
+              className={`admin-section-card ${tab === item.id ? "active" : ""}`}
+              key={item.id}
+              onClick={() => setTab(item.id)}
+              type="button"
+            >
+              <span className="admin-section-accent">{item.accent}</span>
+              <span className="admin-section-content">
+                <strong>{item.label}</strong>
+                <small>{item.subtitle}</small>
+              </span>
+              <span className="admin-section-metric">{item.metric}</span>
+            </button>
+          ))}
+        </nav>
+      )}
+
+      <main className="admin-page-stack">
         {loading && (
-          <div className="admin-card admin-state-card">
-            <div className="admin-state-badge">Загрузка</div>
-            <h2>Подтягиваем данные</h2>
-            <p>Секунду, собираю актуальную информацию для этого раздела.</p>
+          <div className="admin-card admin-empty-state">
+            <div className="admin-empty-icon">...</div>
+            <div className="admin-empty-copy">
+              <strong>Загружаем раздел</strong>
+              <span>Собираю актуальные данные для текущей вкладки.</span>
+            </div>
           </div>
         )}
 
         {!loading && tab === "stats" && (
-          <div className="admin-main stack">
-            <section className="admin-stats-grid">
-              {statsCards.map((item) => (
-                <article className="admin-card admin-stat-card" key={item.key}>
-                  <span className="admin-stat-label">{item.label}</span>
-                  <strong className="admin-stat-value">{item.value}</strong>
-                  <span className="admin-stat-note">{item.note}</span>
+          <>
+            <section className="admin-highlight-grid">
+              {statsHighlights.map((item) => (
+                <article className="admin-card admin-highlight-card" key={item.key}>
+                  <span className="admin-highlight-title">{item.title}</span>
+                  <strong>{item.value}</strong>
+                  <p>{item.description}</p>
                 </article>
               ))}
             </section>
-          </div>
-        )}
 
+            <section className="admin-kpi-grid">
+              {statsCards.map((item) => (
+                <article className={`admin-card admin-kpi-card tone-${item.tone}`} key={item.key}>
+                  <span className="admin-kpi-label">{item.label}</span>
+                  <strong className="admin-kpi-value">{item.value}</strong>
+                  <span className="admin-kpi-note">{item.note}</span>
+                </article>
+              ))}
+            </section>
+          </>
+        )}
         {!loading && tab === "users" && (
-          <div className="admin-main stack">
-            <section className="admin-card admin-summary-card">
-              <div>
-                <div className="admin-section-title">Пользователи</div>
-                <div className="admin-note">Всего записей: {users.length}</div>
+          <>
+            <section className="admin-card admin-filter-card">
+              <div className="admin-filter-head">
+                <div>
+                  <div className="admin-section-title">Поиск и фильтры</div>
+                  <div className="admin-muted-text">Ищем по user id, username, mini username и имени пользователя.</div>
+                </div>
+                <div className="admin-filter-meta">Найдено: {filteredUsers.length}</div>
+              </div>
+
+              <div className="admin-filter-grid">
+                <label className="admin-field admin-field-wide">
+                  <span>Поиск</span>
+                  <input
+                    className="admin-input"
+                    type="text"
+                    placeholder="Например: 7097, devsbite, Test"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                  />
+                </label>
+
+                <label className="admin-field">
+                  <span>Статус</span>
+                  <select className="admin-select" value={userFilters.status} onChange={(e) => handleFilterChange("status", e.target.value)}>
+                    <option value="all">Все статусы</option>
+                    <option value="inactive">Не активирован</option>
+                    <option value="active">Активен</option>
+                    <option value="active_scanner">Сканер активен</option>
+                  </select>
+                </label>
+
+                <label className="admin-field">
+                  <span>Доступ</span>
+                  <select className="admin-select" value={userFilters.access} onChange={(e) => handleFilterChange("access", e.target.value)}>
+                    <option value="all">Любой доступ</option>
+                    <option value="with_access">Есть доступ</option>
+                    <option value="without_access">Нет доступа</option>
+                  </select>
+                </label>
+
+                <label className="admin-field">
+                  <span>Депозит</span>
+                  <select className="admin-select" value={userFilters.deposit} onChange={(e) => handleFilterChange("deposit", e.target.value)}>
+                    <option value="all">Любой депозит</option>
+                    <option value="with_deposit">Есть депозит</option>
+                    <option value="without_deposit">Нет депозита</option>
+                  </select>
+                </label>
+
+                <label className="admin-field">
+                  <span>Дата регистрации</span>
+                  <select className="admin-select" value={userFilters.registered} onChange={(e) => handleFilterChange("registered", e.target.value)}>
+                    <option value="all">Все даты</option>
+                    <option value="today">Сегодня</option>
+                    <option value="week">Последние 7 дней</option>
+                    <option value="month">Последние 30 дней</option>
+                    <option value="quarter">Последние 90 дней</option>
+                  </select>
+                </label>
               </div>
             </section>
 
-            <div className="admin-card table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Пользователь</th>
-                    <th>Статус</th>
-                    <th>Депозит</th>
-                    <th>Сканер</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((item) => (
-                    <tr key={item.user_id}>
-                      <td>{item.user_id}</td>
-                      <td>
-                        <div className="admin-table-main">@{item.tg_username || "-"}</div>
-                        <div className="admin-table-sub">Mini app: {item.mini_username || "-"}</div>
-                      </td>
-                      <td>
-                        <span className={`admin-status-badge status-${item.activation_status || "inactive"}`}>
-                          {getUserStatusLabel(item.activation_status)}
-                        </span>
-                      </td>
-                      <td>{item.deposit_amount}</td>
-                      <td>{item.scanner_access ? "Да" : "Нет"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            {filteredUsers.length === 0 && (
+              <section className="admin-card admin-empty-state">
+                <div className="admin-empty-icon">0</div>
+                <div className="admin-empty-copy">
+                  <strong>Ничего не найдено</strong>
+                  <span>Измени строку поиска или фильтры, чтобы увидеть другие карточки пользователей.</span>
+                </div>
+              </section>
+            )}
+
+            <section className="admin-user-grid">
+              {filteredUsers.map((item) => {
+                const statusMeta = getUserStatusMeta(item.activation_status);
+                return (
+                  <button
+                    className={`admin-user-card ${selectedUserId === item.user_id ? "active" : ""}`}
+                    key={item.user_id}
+                    onClick={() => setSelectedUserId(item.user_id)}
+                    type="button"
+                  >
+                    <div className="admin-user-card-top">
+                      <div>
+                        <strong>{item.first_name || item.tg_username || "Без имени"}</strong>
+                        <span>#{item.user_id}</span>
+                      </div>
+                      <span className={`admin-badge tone-${statusMeta.tone}`}>{statusMeta.label}</span>
+                    </div>
+
+                    <div className="admin-user-card-body">
+                      <div className="admin-user-line">@{item.tg_username || "-"}</div>
+                      <div className="admin-user-line">Mini app: {item.mini_username || "-"}</div>
+                    </div>
+
+                    <div className="admin-user-chip-row">
+                      <span className={`admin-mini-chip ${item.scanner_access ? "is-on" : ""}`}>{item.scanner_access ? "Сканер: да" : "Сканер: нет"}</span>
+                      <span className={`admin-mini-chip ${Number(item.deposit_amount || 0) > 0 ? "is-on" : ""}`}>Депозит: {formatDeposit(item.deposit_amount)}</span>
+                    </div>
+
+                    <div className="admin-user-card-footer">Регистрация: {formatDate(item.created_at)}</div>
+                  </button>
+                );
+              })}
+            </section>
+          </>
         )}
 
         {!loading && tab === "flags" && (
-          <div className="admin-main stack">
+          <section className="admin-control-grid">
             {flags.map((item) => {
               const meta = getFlagMeta(item.key);
               const enabled = item.is_enabled === 1;
               return (
-                <article className="admin-card flag-card" key={item.key}>
-                  <div className="flag-card-copy">
-                    <div className="flag-card-title-row">
+                <article className="admin-card admin-control-card" key={item.key}>
+                  <div className="admin-control-head">
+                    <div>
                       <strong>{meta.title}</strong>
-                      <span className={`admin-status-badge ${enabled ? "status-on" : "status-off"}`}>
-                        {enabled ? "Включено" : "Выключено"}
-                      </span>
+                      <span>Ключ: {item.key}</span>
                     </div>
-                    <p>{meta.description}</p>
-                    <span className="admin-note">Ключ: {item.key}</span>
+                    <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
+                      {enabled ? "Включено" : "Выключено"}
+                    </span>
                   </div>
-                  <button className="admin-action" onClick={() => toggleFlag(item)} type="button">
-                    {enabled ? "Отключить" : "Включить"}
-                  </button>
+                  <p>{meta.description}</p>
+                  <div className="admin-control-footer">
+                    <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
+                    <button
+                      className="admin-primary-button"
+                      disabled={flagSavingKey === item.key}
+                      onClick={() => toggleFlag(item)}
+                      type="button"
+                    >
+                      {flagSavingKey === item.key ? "Сохраняем..." : enabled ? "Отключить" : "Включить"}
+                    </button>
+                  </div>
                 </article>
               );
             })}
-          </div>
+          </section>
         )}
-
         {!loading && tab === "market" && (
-          <div className="admin-main stack">
+          <>
             <section className="admin-card admin-market-hero">
               <div className="admin-market-hero-copy">
                 <div className="admin-section-title">Синхронизация рынков</div>
-                <p>Пары подтягиваются из DevsBite, сохраняются локально и отключаются, если исчезают из апстрима.</p>
+                <p>Пары подтягиваются из DevsBite, сохраняются локально и переключаются по актуальному списку без лишних запросов с клиента.</p>
               </div>
-              <div className="market-settings-row">
-                <label className="admin-label" htmlFor="market-sync-interval">Интервал обновления пар</label>
-                <div className="market-settings-controls">
-                  <select
-                    id="market-sync-interval"
-                    className="admin-select"
-                    value={marketInterval}
-                    onChange={(e) => setMarketInterval(e.target.value)}
-                    disabled={marketSaving}
-                  >
+
+              <div className="admin-market-settings">
+                <label className="admin-field">
+                  <span>Интервал обновления</span>
+                  <select className="admin-select" value={marketInterval} onChange={(e) => setMarketInterval(e.target.value)} disabled={marketSaving}>
                     {(marketSettings.interval_options || []).map((item) => (
                       <option key={item} value={item}>{item} мин</option>
                     ))}
                   </select>
-                  <button className="admin-action" onClick={saveMarketSettings} disabled={marketSaving} type="button">
-                    {marketSaving ? "Сохраняем..." : "Сохранить"}
-                  </button>
-                </div>
+                </label>
+                <button className="admin-primary-button" disabled={marketSaving} onClick={saveMarketSettings} type="button">
+                  {marketSaving ? "Сохраняем..." : "Сохранить"}
+                </button>
               </div>
             </section>
 
-            <section className="admin-market-grid">
-              {(marketSettings.items || []).map((item) => (
-                <article className="admin-card admin-market-card" key={item.key}>
-                  <div className="admin-market-card-head">
-                    <strong>{item.title}</strong>
-                    <span className="admin-status-badge status-on">Активно {item.active_count}</span>
-                  </div>
-                  <div className="admin-market-card-value">Всего пар: {item.total_count}</div>
-                  <div className="admin-market-card-note">Последнее обновление: {formatDateTime(item.last_seen_at)}</div>
+            <section className="admin-kpi-grid market-summary-grid">
+              {marketSummary.map((item) => (
+                <article className="admin-card admin-kpi-card tone-info" key={item.key}>
+                  <span className="admin-kpi-label">{item.label}</span>
+                  <strong className="admin-kpi-value small">{item.value}</strong>
+                  <span className="admin-kpi-note">{item.note}</span>
                 </article>
               ))}
             </section>
 
-            <div className="admin-card table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Рынок</th>
-                    <th>Активно</th>
-                    <th>Всего</th>
-                    <th>Последнее обновление</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <section className="admin-market-grid">
+              {(marketSettings.items || []).map((item) => {
+                const totalCount = Number(item.total_count || 0);
+                const activeCount = Number(item.active_count || 0);
+                const progress = totalCount > 0 ? Math.min((activeCount / totalCount) * 100, 100) : 0;
+                return (
+                  <article className="admin-card admin-market-card" key={item.key}>
+                    <div className="admin-market-card-head">
+                      <strong>{item.title}</strong>
+                      <span className="admin-badge tone-success">Активно {activeCount}</span>
+                    </div>
+                    <div className="admin-market-main-metric">{formatNumber(totalCount)}</div>
+                    <div className="admin-market-subtitle">Всего пар в кеше</div>
+                    <div className="admin-progress-track">
+                      <span className="admin-progress-fill" style={{ width: `${progress}%` }} />
+                    </div>
+                    <div className="admin-market-meta-row">
+                      <span>Покрытие: {formatPercent(progress)}</span>
+                      <span>{formatDateTime(item.last_seen_at)}</span>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+
+            <section className="admin-card admin-details-panel">
+              <div className="admin-details-panel-head">
+                <div>
+                  <div className="admin-section-title">Подробности по рынкам</div>
+                  <div className="admin-muted-text">Сводка по локально сохранённым парам и времени последнего обновления.</div>
+                </div>
+                <button className="admin-ghost-button" type="button" onClick={() => setMarketDetailsExpanded((prev) => !prev)}>
+                  {marketDetailsExpanded ? "Свернуть" : "Развернуть"}
+                </button>
+              </div>
+
+              {marketDetailsExpanded && (
+                <div className="admin-market-detail-list">
                   {(marketSettings.items || []).map((item) => (
-                    <tr key={item.key}>
-                      <td>{item.title}</td>
-                      <td>{item.active_count}</td>
-                      <td>{item.total_count}</td>
-                      <td>{formatDateTime(item.last_seen_at)}</td>
-                    </tr>
+                    <div className="admin-market-detail-row" key={item.key}>
+                      <div>
+                        <strong>{item.title}</strong>
+                        <span>{formatDateTime(item.last_seen_at)}</span>
+                      </div>
+                      <div className="admin-market-detail-metrics">
+                        <span>Активно: {formatNumber(item.active_count)}</span>
+                        <span>Всего: {formatNumber(item.total_count)}</span>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                </div>
+              )}
+            </section>
+          </>
         )}
       </main>
+
+      {selectedUser && (
+        <div className="admin-modal-layer" role="presentation">
+          <button className="admin-modal-backdrop" type="button" aria-label="Закрыть карточку пользователя" onClick={() => setSelectedUserId(null)} />
+          <section className="admin-modal-card" role="dialog" aria-modal="true" aria-label="Карточка пользователя">
+            <div className="admin-modal-head">
+              <div>
+                <span className="admin-kicker">Карточка пользователя</span>
+                <h2>{selectedUser.first_name || selectedUser.tg_username || "Без имени"}</h2>
+                <p>Полный профиль пользователя, доступы и ручное изменение статуса.</p>
+              </div>
+              <button className="admin-modal-close" type="button" onClick={() => setSelectedUserId(null)}>x</button>
+            </div>
+            <div className="admin-user-detail-grid">
+              <article className="admin-card admin-user-detail-card">
+                <div className="admin-user-detail-head">
+                  <strong>Основное</strong>
+                  <span className={`admin-badge tone-${getUserStatusMeta(selectedUser.activation_status).tone}`}>
+                    {getUserStatusMeta(selectedUser.activation_status).label}
+                  </span>
+                </div>
+                <div className="admin-info-list">
+                  <div><span>User ID</span><strong>{selectedUser.user_id}</strong></div>
+                  <div><span>Username</span><strong>@{selectedUser.tg_username || "-"}</strong></div>
+                  <div><span>Mini app</span><strong>{selectedUser.mini_username || "-"}</strong></div>
+                  <div><span>Язык</span><strong>{selectedUser.lang || "-"}</strong></div>
+                  <div><span>Тема</span><strong>{selectedUser.theme || "-"}</strong></div>
+                  <div><span>Регистрация</span><strong>{formatDateTime(selectedUser.created_at)}</strong></div>
+                  <div><span>Последняя активность</span><strong>{formatDateTime(selectedUser.last_active_at)}</strong></div>
+                </div>
+              </article>
+
+              <article className="admin-card admin-user-detail-card">
+                <div className="admin-user-detail-head">
+                  <strong>Доступы и финансы</strong>
+                  <span className={`admin-badge ${selectedUser.is_blocked ? "tone-danger" : "tone-success"}`}>
+                    {selectedUser.is_blocked ? "Заблокирован" : "Не заблокирован"}
+                  </span>
+                </div>
+                <div className="admin-info-list">
+                  <div><span>Сканер</span><strong>{selectedUser.scanner_access ? "Есть доступ" : "Нет доступа"}</strong></div>
+                  <div><span>Депозит</span><strong>{formatDeposit(selectedUser.deposit_amount)}</strong></div>
+                  <div><span>Фильтр даты</span><strong>{getRegistrationFilterLabel(userFilters.registered)}</strong></div>
+                </div>
+
+                <div className="admin-editor-grid">
+                  <label className="admin-field">
+                    <span>Новый статус</span>
+                    <select
+                      className="admin-select"
+                      value={userEditor.activation_status}
+                      onChange={(e) => setUserEditor((prev) => ({ ...prev, activation_status: e.target.value }))}
+                    >
+                      <option value="inactive">Не активирован</option>
+                      <option value="active">Активен</option>
+                      <option value="active_scanner">Сканер активен</option>
+                    </select>
+                  </label>
+
+                  <label className="admin-field">
+                    <span>Депозит</span>
+                    <input
+                      className="admin-input"
+                      inputMode="decimal"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={userEditor.deposit_amount}
+                      onChange={(e) => setUserEditor((prev) => ({ ...prev, deposit_amount: e.target.value }))}
+                    />
+                  </label>
+                </div>
+
+                <div className="admin-modal-actions">
+                  <button className="admin-ghost-button" type="button" onClick={() => setSelectedUserId(null)}>Закрыть</button>
+                  <button className="admin-primary-button" disabled={userSaving} type="button" onClick={saveUserCard}>
+                    {userSaving ? "Сохраняем..." : "Сохранить изменения"}
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {toastItems.length > 0 && (
+        <div className="admin-toast-stack" aria-live="polite">
+          {toastItems.map((item) => (
+            <article className={`admin-toast admin-toast-${item.type}`} key={item.id}>
+              <strong>{item.title}</strong>
+              <span>{item.message}</span>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

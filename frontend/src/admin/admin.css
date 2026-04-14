@@ -1,90 +1,286 @@
 .admin-shell {
   min-height: 100dvh;
-  background: var(--bg-main);
+  background:
+    radial-gradient(circle at top, rgba(29, 40, 61, 0.42), transparent 42%),
+    linear-gradient(180deg, rgba(6, 8, 13, 1), rgba(8, 11, 18, 1));
   color: var(--text-main);
   padding: 16px;
 }
 
 .admin-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-soft);
-  border-radius: 16px;
-  padding: 14px;
+  background: linear-gradient(180deg, rgba(17, 24, 37, 0.98), rgba(12, 18, 28, 0.98));
+  border: 1px solid rgba(73, 92, 122, 0.42);
+  border-radius: 22px;
+  padding: 16px;
+  box-shadow:
+    0 18px 36px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.admin-main.stack,
+.admin-main .stack {
+  display: grid;
+  gap: 12px;
 }
 
 .admin-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.admin-hero {
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(18, 26, 40, 0.98), rgba(12, 19, 29, 0.98));
+}
+
+.admin-hero-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-kicker,
+.admin-section-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #89a7de;
 }
 
 .admin-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.admin-subtitle {
+  max-width: 520px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-user-badge {
+  min-width: 128px;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(12, 18, 30, 0.7);
+  border: 1px solid rgba(95, 143, 255, 0.2);
+  text-align: right;
+}
+
+.admin-user-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-user-badge strong {
+  font-size: 16px;
 }
 
 .admin-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .admin-tab {
-  border: 1px solid var(--border-soft);
-  background: transparent;
+  border: 1px solid rgba(73, 92, 122, 0.44);
+  background: rgba(13, 20, 31, 0.7);
   color: var(--text-main);
-  border-radius: 10px;
-  padding: 8px 12px;
+  border-radius: 18px;
+  padding: 12px 14px;
   cursor: pointer;
+  text-align: left;
+  display: grid;
+  gap: 4px;
+  transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-tab span {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.admin-tab small {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.3;
 }
 
 .admin-tab.active {
-  background: var(--accent-soft);
-  border-color: var(--accent-main);
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(28, 41, 64, 0.98), rgba(18, 27, 43, 0.98));
+  border-color: rgba(174, 199, 255, 0.54);
+  box-shadow: 0 0 0 3px rgba(95, 143, 255, 0.08);
 }
 
-.admin-main .stack {
+.admin-main {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.admin-section-intro h2,
+.admin-state-card h2 {
+  margin: 4px 0 6px;
+  font-size: 20px;
+}
+
+.admin-section-intro p,
+.admin-state-card p,
+.flag-card p,
+.admin-market-hero p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-state-card {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-state-badge,
+.admin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-state-badge {
+  background: rgba(228, 196, 134, 0.14);
+  color: #f2ddb2;
+  border: 1px solid rgba(228, 196, 134, 0.24);
+}
+
+.status-active,
+.status-active_scanner,
+.status-on {
+  background: rgba(123, 205, 159, 0.14);
+  color: #b7efcc;
+  border: 1px solid rgba(123, 205, 159, 0.24);
+}
+
+.status-inactive,
+.status-off {
+  background: rgba(161, 174, 199, 0.12);
+  color: #d7dfef;
+  border: 1px solid rgba(161, 174, 199, 0.18);
+}
+
+.admin-stats-grid,
+.admin-market-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-stat-card,
+.admin-market-card {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.admin-stat-value {
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.admin-stat-note,
+.admin-market-card-note,
+.admin-note,
+.admin-table-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.admin-summary-card,
+.admin-market-hero {
+  display: grid;
+  gap: 12px;
 }
 
 .admin-section-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
 }
 
 .table-wrap {
-  overflow: auto;
+  overflow-x: auto;
 }
 
 .table-wrap table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 620px;
 }
 
 .table-wrap th,
 .table-wrap td {
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid rgba(73, 92, 122, 0.22);
   text-align: left;
-  padding: 8px;
+  padding: 12px 10px;
   font-size: 13px;
+  vertical-align: top;
 }
 
-.flag-row {
+.table-wrap th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8fa6cf;
+}
+
+.table-wrap tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-table-main {
+  font-weight: 700;
+}
+
+.flag-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 14px;
 }
 
-.flag-row button {
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  padding: 6px 10px;
-  background: var(--bg-elevated);
-  color: var(--text-main);
-  cursor: pointer;
+.flag-card-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.flag-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .market-settings-row {
@@ -93,7 +289,7 @@
 }
 
 .admin-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -101,29 +297,105 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .admin-select {
   min-width: 140px;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: var(--bg-elevated);
+  border: 1px solid rgba(73, 92, 122, 0.44);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(10, 16, 25, 0.92);
   color: var(--text-main);
 }
 
 .admin-action {
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 10px 14px;
-  background: var(--accent-soft);
+  border: 1px solid rgba(143, 184, 255, 0.24);
+  border-radius: 14px;
+  padding: 12px 16px;
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(28, 41, 64, 0.98), rgba(18, 27, 43, 0.98));
   color: var(--text-main);
   cursor: pointer;
   font-weight: 700;
 }
 
-.admin-note {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.45;
+.admin-market-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-market-card-value {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+@media (hover: hover) {
+  .admin-tab:hover,
+  .admin-action:hover {
+    transform: translateY(-1px);
+  }
+
+  .admin-tab:hover {
+    border-color: rgba(151, 175, 214, 0.38);
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-shell {
+    padding: 12px;
+  }
+
+  .admin-header {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .admin-user-badge {
+    text-align: left;
+  }
+
+  .admin-title {
+    font-size: 23px;
+  }
+
+  .admin-stats-grid,
+  .admin-market-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .flag-card {
+    display: grid;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-card {
+    padding: 14px;
+    border-radius: 20px;
+  }
+
+  .table-wrap th,
+  .table-wrap td {
+    padding: 10px 8px;
+  }
+
+  .admin-action,
+  .admin-select {
+    width: 100%;
+  }
+
+  .market-settings-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
 }

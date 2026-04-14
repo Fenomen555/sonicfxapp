@@ -1,20 +1,73 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiAdminFetchJson } from "../lib/api";
 import "./admin.css";
 
 const TABS = [
-  { id: "stats", label: "Stats" },
-  { id: "users", label: "Users" },
-  { id: "flags", label: "Flags" },
-  { id: "market", label: "Market" }
+  { id: "stats", label: "Обзор", subtitle: "Статистика и активность" },
+  { id: "users", label: "Пользователи", subtitle: "Статусы и доступ" },
+  { id: "flags", label: "Функции", subtitle: "Управление режимами" },
+  { id: "market", label: "Рынок", subtitle: "Пары и синхронизация" }
 ];
+
+const FLAG_META = {
+  mode_ai_enabled: {
+    title: "AI-режим",
+    description: "Автоматическая генерация сигналов и связанные сценарии."
+  },
+  mode_indicators_enabled: {
+    title: "Индикаторы",
+    description: "Ручной режим по рынку, тикеру и экспирации."
+  },
+  mode_scanner_enabled: {
+    title: "Сканер",
+    description: "Главный режим анализа по скриншоту графика."
+  },
+  news_enabled: {
+    title: "Новости",
+    description: "Показывать ленту новостей внутри mini app."
+  }
+};
+
+const USER_STATUS_LABELS = {
+  inactive: "Не активирован",
+  active: "Активен",
+  active_scanner: "Сканер активен"
+};
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function getFlagMeta(key) {
+  return FLAG_META[key] || {
+    title: key,
+    description: "Служебный переключатель приложения."
+  };
+}
+
+function getUserStatusLabel(status) {
+  return USER_STATUS_LABELS[status] || status || "-";
+}
 
 export default function AdminApp({ authError, adminUser }) {
   const [tab, setTab] = useState("stats");
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [flags, setFlags] = useState([]);
-  const [marketSettings, setMarketSettings] = useState({ market_pairs_sync_interval_min: 5, interval_options: [], items: [] });
+  const [marketSettings, setMarketSettings] = useState({
+    market_pairs_sync_interval_min: 5,
+    interval_options: [],
+    items: []
+  });
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -86,11 +139,44 @@ export default function AdminApp({ authError, adminUser }) {
     }
   };
 
+  const activeTab = useMemo(
+    () => TABS.find((item) => item.id === tab) || TABS[0],
+    [tab]
+  );
+
+  const statsCards = [
+    {
+      key: "users_total",
+      label: "Всего пользователей",
+      value: stats?.users_total ?? "-",
+      note: "Зарегистрированы в системе"
+    },
+    {
+      key: "activated_total",
+      label: "Активировано",
+      value: stats?.activated_total ?? "-",
+      note: "Есть доступ к продукту"
+    },
+    {
+      key: "scanner_total",
+      label: "Доступ к сканеру",
+      value: stats?.scanner_total ?? "-",
+      note: "Могут запускать сканер"
+    },
+    {
+      key: "signals_today",
+      label: "Сигналов сегодня",
+      value: stats?.signals_today ?? "-",
+      note: "Активность за текущие сутки"
+    }
+  ];
+
   if (authError) {
     return (
       <div className="admin-shell">
-        <div className="admin-card">
-          <h2>Access denied</h2>
+        <div className="admin-card admin-state-card">
+          <div className="admin-state-badge">Доступ ограничен</div>
+          <h2>Админ-панель недоступна</h2>
           <p>{authError}</p>
         </div>
       </div>
@@ -99,9 +185,16 @@ export default function AdminApp({ authError, adminUser }) {
 
   return (
     <div className="admin-shell">
-      <header className="admin-card admin-header">
-        <div className="admin-title">SonicFX Admin</div>
-        <div className="admin-user">ID {adminUser?.user_id || "-"}</div>
+      <header className="admin-card admin-header admin-hero">
+        <div className="admin-hero-copy">
+          <div className="admin-kicker">SonicFX Control</div>
+          <div className="admin-title">Админ-панель</div>
+          <div className="admin-subtitle">Управление пользователями, режимами и рыночными данными mini app.</div>
+        </div>
+        <div className="admin-user-badge">
+          <span className="admin-user-label">Администратор</span>
+          <strong>ID {adminUser?.user_id || "-"}</strong>
+        </div>
       </header>
 
       <nav className="admin-tabs admin-card">
@@ -110,68 +203,123 @@ export default function AdminApp({ authError, adminUser }) {
             className={`admin-tab ${tab === item.id ? "active" : ""}`}
             key={item.id}
             onClick={() => setTab(item.id)}
+            type="button"
           >
-            {item.label}
+            <span>{item.label}</span>
+            <small>{item.subtitle}</small>
           </button>
         ))}
       </nav>
 
       <main className="admin-main">
-        {loading && <div className="admin-card">Loading...</div>}
+        <section className="admin-card admin-section-intro">
+          <div>
+            <div className="admin-section-kicker">Раздел</div>
+            <h2>{activeTab.label}</h2>
+            <p>{activeTab.subtitle}</p>
+          </div>
+        </section>
+
+        {loading && (
+          <div className="admin-card admin-state-card">
+            <div className="admin-state-badge">Загрузка</div>
+            <h2>Подтягиваем данные</h2>
+            <p>Секунду, собираю актуальную информацию для этого раздела.</p>
+          </div>
+        )}
 
         {!loading && tab === "stats" && (
-          <div className="admin-card stack">
-            <div>Total users: {stats?.users_total ?? "-"}</div>
-            <div>Activated: {stats?.activated_total ?? "-"}</div>
-            <div>Scanner access: {stats?.scanner_total ?? "-"}</div>
-            <div>Signals today: {stats?.signals_today ?? "-"}</div>
+          <div className="admin-main stack">
+            <section className="admin-stats-grid">
+              {statsCards.map((item) => (
+                <article className="admin-card admin-stat-card" key={item.key}>
+                  <span className="admin-stat-label">{item.label}</span>
+                  <strong className="admin-stat-value">{item.value}</strong>
+                  <span className="admin-stat-note">{item.note}</span>
+                </article>
+              ))}
+            </section>
           </div>
         )}
 
         {!loading && tab === "users" && (
-          <div className="admin-card table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>User ID</th>
-                  <th>Username</th>
-                  <th>Status</th>
-                  <th>Deposit</th>
-                  <th>Scanner</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((item) => (
-                  <tr key={item.user_id}>
-                    <td>{item.user_id}</td>
-                    <td>@{item.tg_username || "-"}</td>
-                    <td>{item.activation_status}</td>
-                    <td>{item.deposit_amount}</td>
-                    <td>{item.scanner_access ? "yes" : "no"}</td>
+          <div className="admin-main stack">
+            <section className="admin-card admin-summary-card">
+              <div>
+                <div className="admin-section-title">Пользователи</div>
+                <div className="admin-note">Всего записей: {users.length}</div>
+              </div>
+            </section>
+
+            <div className="admin-card table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Пользователь</th>
+                    <th>Статус</th>
+                    <th>Депозит</th>
+                    <th>Сканер</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {users.map((item) => (
+                    <tr key={item.user_id}>
+                      <td>{item.user_id}</td>
+                      <td>
+                        <div className="admin-table-main">@{item.tg_username || "-"}</div>
+                        <div className="admin-table-sub">Mini app: {item.mini_username || "-"}</div>
+                      </td>
+                      <td>
+                        <span className={`admin-status-badge status-${item.activation_status || "inactive"}`}>
+                          {getUserStatusLabel(item.activation_status)}
+                        </span>
+                      </td>
+                      <td>{item.deposit_amount}</td>
+                      <td>{item.scanner_access ? "Да" : "Нет"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {!loading && tab === "flags" && (
-          <div className="admin-card stack">
-            {flags.map((item) => (
-              <div className="flag-row" key={item.key}>
-                <span>{item.key}</span>
-                <button onClick={() => toggleFlag(item)}>{item.is_enabled ? "Enabled" : "Disabled"}</button>
-              </div>
-            ))}
+          <div className="admin-main stack">
+            {flags.map((item) => {
+              const meta = getFlagMeta(item.key);
+              const enabled = item.is_enabled === 1;
+              return (
+                <article className="admin-card flag-card" key={item.key}>
+                  <div className="flag-card-copy">
+                    <div className="flag-card-title-row">
+                      <strong>{meta.title}</strong>
+                      <span className={`admin-status-badge ${enabled ? "status-on" : "status-off"}`}>
+                        {enabled ? "Включено" : "Выключено"}
+                      </span>
+                    </div>
+                    <p>{meta.description}</p>
+                    <span className="admin-note">Ключ: {item.key}</span>
+                  </div>
+                  <button className="admin-action" onClick={() => toggleFlag(item)} type="button">
+                    {enabled ? "Отключить" : "Включить"}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         )}
 
         {!loading && tab === "market" && (
-          <div className="stack">
-            <div className="admin-card stack">
-              <div className="admin-section-title">Market Sync</div>
+          <div className="admin-main stack">
+            <section className="admin-card admin-market-hero">
+              <div className="admin-market-hero-copy">
+                <div className="admin-section-title">Синхронизация рынков</div>
+                <p>Пары подтягиваются из DevsBite, сохраняются локально и отключаются, если исчезают из апстрима.</p>
+              </div>
               <div className="market-settings-row">
-                <label className="admin-label" htmlFor="market-sync-interval">Pair refresh interval</label>
+                <label className="admin-label" htmlFor="market-sync-interval">Интервал обновления пар</label>
                 <div className="market-settings-controls">
                   <select
                     id="market-sync-interval"
@@ -181,25 +329,37 @@ export default function AdminApp({ authError, adminUser }) {
                     disabled={marketSaving}
                   >
                     {(marketSettings.interval_options || []).map((item) => (
-                      <option key={item} value={item}>{item} min</option>
+                      <option key={item} value={item}>{item} мин</option>
                     ))}
                   </select>
-                  <button className="admin-action" onClick={saveMarketSettings} disabled={marketSaving}>
-                    {marketSaving ? "Saving..." : "Save"}
+                  <button className="admin-action" onClick={saveMarketSettings} disabled={marketSaving} type="button">
+                    {marketSaving ? "Сохраняем..." : "Сохранить"}
                   </button>
                 </div>
               </div>
-              <div className="admin-note">Pairs are synced from DevsBite, stored locally, and deactivated when they disappear from upstream.</div>
-            </div>
+            </section>
+
+            <section className="admin-market-grid">
+              {(marketSettings.items || []).map((item) => (
+                <article className="admin-card admin-market-card" key={item.key}>
+                  <div className="admin-market-card-head">
+                    <strong>{item.title}</strong>
+                    <span className="admin-status-badge status-on">Активно {item.active_count}</span>
+                  </div>
+                  <div className="admin-market-card-value">Всего пар: {item.total_count}</div>
+                  <div className="admin-market-card-note">Последнее обновление: {formatDateTime(item.last_seen_at)}</div>
+                </article>
+              ))}
+            </section>
 
             <div className="admin-card table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Market</th>
-                    <th>Active</th>
-                    <th>Total</th>
-                    <th>Last seen</th>
+                    <th>Рынок</th>
+                    <th>Активно</th>
+                    <th>Всего</th>
+                    <th>Последнее обновление</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -208,7 +368,7 @@ export default function AdminApp({ authError, adminUser }) {
                       <td>{item.title}</td>
                       <td>{item.active_count}</td>
                       <td>{item.total_count}</td>
-                      <td>{item.last_seen_at ? new Date(item.last_seen_at).toLocaleString() : "-"}</td>
+                      <td>{formatDateTime(item.last_seen_at)}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -278,6 +278,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "users", "lang", "ALTER TABLE users ADD COLUMN lang VARCHAR(8) NOT NULL DEFAULT 'ru'")
         await _ensure_column(conn, db_name, "users", "timezone", "ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev'")
         await _ensure_column(conn, db_name, "users", "mini_username", "ALTER TABLE users ADD COLUMN mini_username VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "users", "photo_url", "ALTER TABLE users ADD COLUMN photo_url TEXT NULL")
         await _ensure_column(conn, db_name, "users", "activation_status", "ALTER TABLE users ADD COLUMN activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive'")
         await _ensure_column(conn, db_name, "users", "deposit_amount", "ALTER TABLE users ADD COLUMN deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "scanner_access", "ALTER TABLE users ADD COLUMN scanner_access TINYINT(1) NOT NULL DEFAULT 0")

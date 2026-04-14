@@ -196,11 +196,6 @@ export default function HomePage({ t }) {
         <div className="upload-subhint">{t.home.sourceHint || "Выберите источник загрузки"}</div>
       </button>
 
-      <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
-        <SparkIcon className="primary-btn-icon" aria-hidden="true" />
-        <span>{actionLabel}</span>
-      </button>
-
       <div className="signal-panel">
         <div className="signal-panel-label">
           {t.home.signalModeLabel || "Режим генерации сигнала"}
@@ -234,6 +229,11 @@ export default function HomePage({ t }) {
           })}
         </div>
       </div>
+
+      <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
+        <SparkIcon className="primary-btn-icon" aria-hidden="true" />
+        <span>{actionLabel}</span>
+      </button>
 
       <div className="card form-card ref-form-card generator-panel">
         <div className="generator-panel-head">

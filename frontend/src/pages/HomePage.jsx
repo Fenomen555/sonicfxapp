@@ -245,13 +245,12 @@ export default function HomePage({ t }) {
 
         {isSignalModeExpanded && (
           <div className="signal-mode-grid">
-            {SIGNAL_MODES.map((item) => {
+            {SIGNAL_MODES.filter((item) => item.id !== signalMode).map((item) => {
               const Icon = item.icon;
-              const isActive = signalMode === item.id;
               return (
                 <button
                   key={item.id}
-                  className={`signal-mode-card ${isActive ? "active" : ""}`}
+                  className="signal-mode-card"
                   onClick={() => { setSignalMode(item.id); setIsSignalModeExpanded(false); }}
                   type="button"
                 >
@@ -262,9 +261,7 @@ export default function HomePage({ t }) {
                     <strong>{item.label}</strong>
                     <small>{item.hint}</small>
                   </span>
-                  <span className={`signal-mode-cta ${isActive ? "active" : ""}`}>
-                    {isActive ? "Выбрано" : "Выбрать"}
-                  </span>
+                  <span className="signal-mode-cta">Выбрать</span>
                 </button>
               );
             })}

@@ -48,3 +48,35 @@ export function LinkIcon(props) {
     </svg>
   );
 }
+
+export function ScannerModeIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="4.5" y="4.5" width="15" height="15" rx="4" />
+      <path d="M8 4.5v4M16 4.5v4M4.5 8h4M15.5 8h4M8 19.5v-4M16 19.5v-4M4.5 16h4M15.5 16h4" />
+      <circle cx="12" cy="12" r="2.6" />
+    </svg>
+  );
+}
+
+export function AutoModeIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M6 13a6 6 0 1 0 2.2-4.6" />
+      <path d="M5.2 6.9H9v3.8" />
+      <path d="M12 8.3v4.2l2.8 1.8" />
+    </svg>
+  );
+}
+
+export function IndicatorModeIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M5 18.5h14" />
+      <path d="M7.5 16V11" />
+      <path d="M12 16V7.5" />
+      <path d="M16.5 16V10" />
+      <path d="m6 9.5 3-2.5 3 1.8 4.5-3.8" />
+    </svg>
+  );
+}

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { CameraIcon, GalleryIcon, LinkIcon, SparkIcon } from "../components/AppIcons";
+import {
+  AutoModeIcon,
+  CameraIcon,
+  GalleryIcon,
+  IndicatorModeIcon,
+  LinkIcon,
+  ScannerModeIcon,
+  SparkIcon
+} from "../components/AppIcons";
 import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetchJson } from "../lib/api";
-
-const MODE_OPTIONS = [
-  { id: "otc", label: "OTC" },
-  { id: "forex", label: "Forex" }
-];
 
 const FALLBACK_EXPIRATIONS = [
   { value: "5s", label: "5s" },
@@ -17,14 +20,72 @@ const FALLBACK_EXPIRATIONS = [
   { value: "1h", label: "1h" }
 ];
 
+const BASIC_MARKETS = [
+  { key: "otc", label: "OTC" },
+  { key: "forex", label: "Forex" }
+];
+
+const INDICATOR_MARKETS = [
+  { key: "otc", label: "OTC" },
+  { key: "forex", label: "Forex" },
+  { key: "crypto", label: "Crypto" },
+  { key: "commodities", label: "Metals" },
+  { key: "stocks", label: "Stocks" }
+];
+
+const SIGNAL_MODES = [
+  {
+    id: "scanner",
+    label: "Сканер",
+    hint: "Скриншот + AI разбор",
+    icon: ScannerModeIcon
+  },
+  {
+    id: "automatic",
+    label: "Автоматический",
+    hint: "AI ведет поток сигнала",
+    icon: AutoModeIcon
+  },
+  {
+    id: "indicators",
+    label: "Индикаторы",
+    hint: "Рынок, тикер и экспирация",
+    icon: IndicatorModeIcon
+  }
+];
+
 export default function HomePage({ t }) {
-  const [kind, setKind] = useState("forex");
+  const [signalMode, setSignalMode] = useState("scanner");
+  const [marketKind, setMarketKind] = useState("otc");
   const [pairs, setPairs] = useState([]);
   const [expirations, setExpirations] = useState(FALLBACK_EXPIRATIONS);
   const [asset, setAsset] = useState("");
   const [expiration, setExpiration] = useState("5m");
   const [isLoading, setIsLoading] = useState(false);
   const [errorText, setErrorText] = useState("");
+  const [availableMarkets, setAvailableMarkets] = useState([]);
+
+  const quickActions = [
+    { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
+    { id: "camera", label: t.home.camera || "Camera", icon: CameraIcon },
+    { id: "link", label: t.home.link || "Link", icon: LinkIcon }
+  ];
+
+  const allowedMarkets = useMemo(
+    () => (signalMode === "indicators" ? INDICATOR_MARKETS : BASIC_MARKETS),
+    [signalMode]
+  );
+
+  const marketMap = useMemo(
+    () => new Map(allowedMarkets.map((item) => [item.key, item])),
+    [allowedMarkets]
+  );
+
+  useEffect(() => {
+    if (!marketMap.has(marketKind)) {
+      setMarketKind(allowedMarkets[0]?.key || "otc");
+    }
+  }, [allowedMarkets, marketKind, marketMap]);
 
   useEffect(() => {
     let isActive = true;
@@ -34,16 +95,18 @@ export default function HomePage({ t }) {
       setErrorText("");
 
       try {
-        const data = await apiFetchJson(`/api/market/options?kind=${kind}`);
+        const data = await apiFetchJson(`/api/market/options?kind=${marketKind}`);
         if (!isActive) return;
 
         const nextPairs = Array.isArray(data?.pairs) ? data.pairs : [];
         const nextExp = Array.isArray(data?.expirations) && data.expirations.length > 0
           ? data.expirations
           : FALLBACK_EXPIRATIONS;
+        const nextMarkets = Array.isArray(data?.available_markets) ? data.available_markets : [];
 
         setPairs(nextPairs);
         setExpirations(nextExp);
+        setAvailableMarkets(nextMarkets);
 
         setAsset((prev) => {
           if (prev && nextPairs.some((item) => item?.pair === prev)) return prev;
@@ -58,6 +121,7 @@ export default function HomePage({ t }) {
         if (!isActive) return;
         setPairs([]);
         setExpirations(FALLBACK_EXPIRATIONS);
+        setAvailableMarkets([]);
         setErrorText(error.message || "Failed to load market data");
       } finally {
         if (isActive) setIsLoading(false);
@@ -69,14 +133,39 @@ export default function HomePage({ t }) {
     return () => {
       isActive = false;
     };
-  }, [kind]);
+  }, [marketKind]);
 
-  const quickExpirations = useMemo(() => expirations.slice(0, 6), [expirations]);
-  const quickActions = [
-    { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
-    { id: "camera", label: t.home.camera || "Camera", icon: CameraIcon },
-    { id: "link", label: t.home.link || "Link", icon: LinkIcon }
-  ];
+  const indicatorMarkets = useMemo(() => {
+    if (!availableMarkets.length) return INDICATOR_MARKETS;
+    const labels = new Map(
+      INDICATOR_MARKETS.map((item) => [item.key, item.label])
+    );
+    return availableMarkets
+      .filter((item) => labels.has(item.key))
+      .map((item) => ({
+        key: item.key,
+        label: labels.get(item.key) || item.title || item.key
+      }));
+  }, [availableMarkets]);
+
+  const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
+  const actionLabel = signalMode === "automatic"
+    ? "Запустить авто режим"
+    : signalMode === "indicators"
+      ? "Получить сигнал"
+      : (t.home.analyze || "Анализировать");
+
+  const configTitle = signalMode === "automatic"
+    ? "Автоматический поток"
+    : signalMode === "indicators"
+      ? "Режим по индикаторам"
+      : "Параметры сканера";
+
+  const configHint = signalMode === "automatic"
+    ? "Подберем актив и время для автоматического сценария."
+    : signalMode === "indicators"
+      ? "Выберите рынок, тикер и экспирацию для ручного сигнала."
+      : "Сканер остается главным режимом и работает вместе с загрузкой графика.";
 
   return (
     <section className="page page-home-ref">
@@ -120,22 +209,59 @@ export default function HomePage({ t }) {
         })}
       </div>
 
-      <div className="card form-card ref-form-card">
-        <label className="field-label">{t.home.mode || "Analysis mode"}</label>
-        <div className="mode-toggle">
-          {MODE_OPTIONS.map((item) => (
+      <div className="signal-panel">
+        <div className="signal-panel-label">
+          {t.home.signalModeLabel || "Режим генерации сигнала"}
+        </div>
+
+        <div className="signal-mode-grid">
+          {SIGNAL_MODES.map((item) => {
+            const Icon = item.icon;
+            const isActive = signalMode === item.id;
+            return (
+              <button
+                key={item.id}
+                className={`signal-mode-card ${isActive ? "active" : ""}`}
+                onClick={() => setSignalMode(item.id)}
+                type="button"
+              >
+                <span className="signal-mode-icon" aria-hidden="true">
+                  <Icon />
+                </span>
+                <span className="signal-mode-text">
+                  <strong>{item.label}</strong>
+                  <small>{item.hint}</small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="card form-card ref-form-card generator-panel">
+        <div className="generator-panel-head">
+          <div className="generator-panel-copy">
+            <strong>{configTitle}</strong>
+            <span>{configHint}</span>
+          </div>
+          <span className="generator-panel-badge">{SIGNAL_MODES.find((item) => item.id === signalMode)?.label}</span>
+        </div>
+
+        <label className="field-label">{t.home.marketLabel || "Рынок"}</label>
+        <div className={`market-chip-grid ${signalMode === "indicators" ? "indicators" : "basic"}`}>
+          {currentMarkets.map((item) => (
             <button
-              key={item.id}
-              className={`mode-btn ${kind === item.id ? "active" : ""}`}
-              onClick={() => setKind(item.id)}
+              key={item.key}
+              className={`market-chip ${marketKind === item.key ? "active" : ""}`}
+              onClick={() => setMarketKind(item.key)}
               type="button"
             >
-              {item.label}
+              <span>{item.label}</span>
             </button>
           ))}
         </div>
 
-        <div className="field-row">
+        <div className={`field-row ${signalMode === "indicators" ? "field-row-indicators" : ""}`}>
           <div className="field-grow">
             <label className="field-label">{t.home.asset || "Symbol"}</label>
             <select
@@ -171,24 +297,11 @@ export default function HomePage({ t }) {
           </div>
         </div>
 
-        <div className="tf-chip-row">
-          {quickExpirations.map((item) => (
-            <button
-              key={item.value}
-              className={`tf-chip ${expiration === item.value ? "active" : ""}`}
-              onClick={() => setExpiration(item.value)}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
         {errorText && <div className="form-error">{errorText}</div>}
 
         <button className="primary-btn ref-primary" type="button">
           <SparkIcon className="primary-btn-icon" aria-hidden="true" />
-          <span>{t.home.analyze || "Analyze"}</span>
+          <span>{actionLabel}</span>
         </button>
       </div>
     </section>

@@ -54,6 +54,23 @@ DEVSBITE_MIN_PAYOUT = int((os.getenv("DEVSBITE_MIN_PAYOUT") or "60").strip() or 
 MARKET_SYNC_INTERVAL_SEC = int((os.getenv("MARKET_SYNC_INTERVAL_SEC") or "300").strip() or "300")
 EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,5m,15m,1h").strip()
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
+MARKET_KIND_CONFIG = {
+    "forex": {"title": "Forex", "path": "forex"},
+    "otc": {"title": "OTC", "path": "otc"},
+    "commodities": {"title": "Metals", "path": "otc/commodities"},
+    "stocks": {"title": "Stocks", "path": "otc/stocks"},
+    "crypto": {"title": "Crypto", "path": "otc/crypto"},
+}
+MARKET_KIND_ALIASES = {
+    "metal": "commodities",
+    "metals": "commodities",
+    "commodity": "commodities",
+    "commodities": "commodities",
+    "stock": "stocks",
+    "stocks": "stocks",
+    "crypto": "crypto",
+    "crypta": "crypto",
+}
 
 DB_CONFIG = {
     "host": (os.getenv("DB_HOST") or "127.0.0.1").strip(),
@@ -360,7 +377,12 @@ def parse_expiration_options(raw: str) -> List[Dict[str, Any]]:
 
 
 def _pair_kind_normalized(kind: str) -> str:
-    return "otc" if str(kind or "").strip().lower() == "otc" else "forex"
+    raw = str(kind or "").strip().lower()
+    if raw in MARKET_KIND_CONFIG:
+        return raw
+    if raw in MARKET_KIND_ALIASES:
+        return MARKET_KIND_ALIASES[raw]
+    return "otc" if raw == "otc" else "forex"
 
 
 def _normalize_pairs(payload: Any) -> List[Dict[str, Any]]:
@@ -392,7 +414,8 @@ async def _fetch_devsbite_pairs(kind: str, min_payout: int) -> tuple[List[Dict[s
     if not DEVSBITE_TOKEN:
         return ([], False)
     pair_kind = _pair_kind_normalized(kind)
-    url = f"{DEVSBITE_API_BASE_URL}/pairs/{pair_kind}"
+    pair_path = MARKET_KIND_CONFIG.get(pair_kind, MARKET_KIND_CONFIG["forex"])["path"]
+    url = f"{DEVSBITE_API_BASE_URL}/pairs/{pair_path}"
     headers = {
         "accept": "application/json",
         "X-Client-Token": DEVSBITE_TOKEN,
@@ -506,7 +529,7 @@ async def sync_market_pairs_kind(kind: str, min_payout: int) -> bool:
 
 async def sync_market_pairs_once() -> Dict[str, bool]:
     result: Dict[str, bool] = {}
-    for kind in ("forex", "otc"):
+    for kind in MARKET_KIND_CONFIG:
         try:
             result[kind] = await sync_market_pairs_kind(kind, DEVSBITE_MIN_PAYOUT)
         except Exception:
@@ -561,6 +584,11 @@ async def get_market_options_payload(kind: str, min_payout: int) -> Dict[str, An
     expirations = await _fetch_expiration_options()
     payload = {
         "kind": pair_kind,
+        "market_title": MARKET_KIND_CONFIG.get(pair_kind, MARKET_KIND_CONFIG["forex"])["title"],
+        "available_markets": [
+            {"key": key, "title": value["title"]}
+            for key, value in MARKET_KIND_CONFIG.items()
+        ],
         "pairs": pairs,
         "expirations": expirations,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -667,6 +695,20 @@ async def get_otc_pairs(user: Dict[str, Any] = Depends(get_telegram_user)):
     await upsert_user_from_telegram(user)
     payload = await get_market_options_payload(kind="otc", min_payout=DEVSBITE_MIN_PAYOUT)
     return {"pairs": payload["pairs"]}
+
+
+@app.get("/api/pairs")
+async def get_pairs_by_kind(
+    kind: str = Query(default="forex"),
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    payload = await get_market_options_payload(kind=kind, min_payout=DEVSBITE_MIN_PAYOUT)
+    return {
+        "kind": payload["kind"],
+        "market_title": payload["market_title"],
+        "pairs": payload["pairs"],
+    }
 
 
 @app.get("/api/expirations")

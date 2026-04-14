@@ -226,7 +226,7 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        {tab === "news" && <NewsPage t={t} />}
+        {tab === "news" && <NewsPage t={t} lang={lang} />}
         {tab === "home" && <HomePage t={t} />}
         {tab === "profile" && (
           <ProfilePage

@@ -1,7 +1,9 @@
 import argparse
 import asyncio
+import hashlib
 import json
 import os
+import re
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
@@ -68,6 +70,9 @@ EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,5m,15m,1h").
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
 FINNHUB_TOKEN = (os.getenv("FINNHUB_TOKEN") or "").strip()
 DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) // 60, 2), 30)
+DEFAULT_NEWS_SYNC_INTERVAL_MIN = 60
+VALID_NEWS_FEEDS = {"economic", "market"}
+NEWS_MARKET_CATEGORIES = ("general", "forex", "crypto", "merger")
 MARKET_KIND_CONFIG = {
     "forex": {"title": "Forex", "path": "forex"},
     "otc": {"title": "OTC", "path": "otc"},
@@ -427,6 +432,15 @@ async def set_app_setting(key: str, value: str) -> None:
 async def get_market_sync_interval_min() -> int:
     raw = await get_app_setting("market_pairs_sync_interval_min", str(DEFAULT_MARKET_SYNC_INTERVAL_MIN))
     return _sanitize_market_sync_interval_min(raw)
+
+
+async def get_news_sync_interval_min() -> int:
+    raw = await get_app_setting("news_sync_interval_min", str(DEFAULT_NEWS_SYNC_INTERVAL_MIN))
+    try:
+        numeric = int(raw)
+    except (TypeError, ValueError):
+        numeric = DEFAULT_NEWS_SYNC_INTERVAL_MIN
+    return max(numeric, DEFAULT_NEWS_SYNC_INTERVAL_MIN)
 
 
 def parse_expiration_options(raw: str) -> List[Dict[str, Any]]:
@@ -912,127 +926,466 @@ def _normalize_finnhub_impact(raw_value: Any) -> str:
     return mapping.get(value, "medium")
 
 
-async def fetch_news_data(limit: int = 40) -> Dict[str, Any]:
+def _parse_finnhub_market_datetime(raw_value: Any) -> Optional[datetime]:
+    if raw_value is None:
+        return None
+    if isinstance(raw_value, (int, float)):
+        try:
+            return datetime.fromtimestamp(float(raw_value), tz=timezone.utc)
+        except (TypeError, ValueError, OSError):
+            return None
+    value = str(raw_value or "").strip()
+    if not value:
+        return None
+    if re.fullmatch(r"\d+(\.\d+)?", value):
+        try:
+            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+        except (TypeError, ValueError, OSError):
+            return None
+    return _parse_finnhub_event_time(value)
+
+
+def _coerce_news_text(raw_value: Any, max_len: Optional[int] = None) -> str:
+    text = re.sub(r"\s+", " ", str(raw_value or "")).strip()
+    if max_len and len(text) > max_len:
+        return f"{text[: max_len - 1].rstrip()}…"
+    return text
+
+
+def _normalize_news_title(raw_title: Any) -> str:
+    title = _coerce_news_text(raw_title, max_len=320)
+    replacements = {
+        r"\bMoM\b": "m/m",
+        r"\bYoY\b": "y/y",
+        r"\bQoQ\b": "q/q",
+        r"\bQoQ\s+Annualized\b": "q/q annualized",
+    }
+    for pattern, value in replacements.items():
+        title = re.sub(pattern, value, title, flags=re.IGNORECASE)
+    return title
+
+
+def _build_news_external_id(feed_type: str, *parts: Any) -> str:
+    seed = "::".join(_coerce_news_text(part) for part in parts if _coerce_news_text(part))
+    digest = hashlib.sha1(seed.encode("utf-8")).hexdigest()
+    return f"{feed_type}:{digest}"
+
+
+def _format_news_metric_value(raw_value: Any, unit: str = "") -> str:
+    value = _coerce_news_text(raw_value, max_len=64)
+    if not value:
+        return ""
+    suffix = _coerce_news_text(unit, max_len=16)
+    return f"{value}{suffix}" if suffix else value
+
+
+def _serialize_news_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    published_at = row.get("published_at")
+    updated_at = row.get("updated_at")
+    published_iso = published_at.isoformat() if published_at else None
+    return {
+        "id": row.get("external_id") or str(row.get("id") or ""),
+        "title": row.get("title") or "",
+        "summary": row.get("summary") or "",
+        "image_url": row.get("image_url") or "",
+        "source_name": row.get("source_name") or "",
+        "source_url": row.get("source_url") or "",
+        "feed_type": row.get("feed_type") or "market",
+        "category": row.get("news_category") or "",
+        "country_code": (row.get("country_code") or "").strip().upper(),
+        "currency": (row.get("currency_code") or "").strip().upper(),
+        "impact": (row.get("impact_level") or "medium").strip().lower() or "medium",
+        "actual": row.get("actual_value") or "",
+        "forecast": row.get("forecast_value") or "",
+        "previous": row.get("previous_value") or "",
+        "unit": row.get("unit") or "",
+        "published_at": published_iso,
+        "updated_at": updated_at.isoformat() if updated_at else published_iso,
+        "time_label": published_at.strftime("%H:%M") if published_at else "--:--",
+    }
+
+
+async def _fetch_finnhub_json(path: str, params: Optional[Dict[str, Any]] = None) -> Any:
     if not FINNHUB_TOKEN:
-        return {
-            "items": [],
-            "today_items": [],
-            "tomorrow_items": [],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-
-    url = f"https://finnhub.io/api/v1/calendar/economic?token={FINNHUB_TOKEN}"
-
+        return None
+    url = f"https://finnhub.io/api/v1/{path.lstrip('/')}"
+    request_params = dict(params or {})
+    request_params["token"] = FINNHUB_TOKEN
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(url, timeout=5.0)
+            response = await client.get(url, params=request_params, timeout=8.0)
             if response.status_code != 200:
-                return {
-                    "items": [],
-                    "today_items": [],
-                    "tomorrow_items": [],
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                }
-            raw_data = response.json()
+                return None
+            return response.json()
     except Exception as exc:
-        print(f"News API Error: {exc}")
-        return {
-            "items": [],
-            "today_items": [],
-            "tomorrow_items": [],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
+        print(f"Finnhub API Error [{path}]: {exc}")
+        return None
 
-    events = raw_data.get("economicCalendar", [])
-    if not isinstance(events, list) or not events:
-        return {
-            "items": [],
-            "today_items": [],
-            "tomorrow_items": [],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
 
+async def _replace_news_feed(feed_type: str, items: List[Dict[str, Any]]) -> None:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE news_items
+                SET is_visible = 0, updated_at = NOW()
+                WHERE feed_type = %s
+                """,
+                (feed_type,),
+            )
+            if not items:
+                return
+            await cur.executemany(
+                """
+                INSERT INTO news_items (
+                    external_id, feed_type, news_category, title, summary, image_url,
+                    source_name, source_url, country_code, currency_code, impact_level,
+                    actual_value, forecast_value, previous_value, unit, published_at, is_visible
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1
+                )
+                ON DUPLICATE KEY UPDATE
+                    news_category = VALUES(news_category),
+                    title = VALUES(title),
+                    summary = VALUES(summary),
+                    image_url = VALUES(image_url),
+                    source_name = VALUES(source_name),
+                    source_url = VALUES(source_url),
+                    country_code = VALUES(country_code),
+                    currency_code = VALUES(currency_code),
+                    impact_level = VALUES(impact_level),
+                    actual_value = VALUES(actual_value),
+                    forecast_value = VALUES(forecast_value),
+                    previous_value = VALUES(previous_value),
+                    unit = VALUES(unit),
+                    published_at = VALUES(published_at),
+                    is_visible = 1,
+                    updated_at = NOW()
+                """,
+                [
+                    (
+                        item["external_id"],
+                        item["feed_type"],
+                        item["news_category"],
+                        item["title"],
+                        item["summary"],
+                        item["image_url"],
+                        item["source_name"],
+                        item["source_url"],
+                        item["country_code"],
+                        item["currency_code"],
+                        item["impact_level"],
+                        item["actual_value"],
+                        item["forecast_value"],
+                        item["previous_value"],
+                        item["unit"],
+                        item["published_at"],
+                    )
+                    for item in items
+                ],
+            )
+
+
+async def _sync_economic_news() -> int:
+    raw_data = await _fetch_finnhub_json("calendar/economic")
+    events = raw_data.get("economicCalendar", []) if isinstance(raw_data, dict) else []
     now = datetime.now(timezone.utc)
     today = now.date()
     tomorrow = today + timedelta(days=1)
     prepared_items: List[Dict[str, Any]] = []
 
-    for index, event in enumerate(events):
+    for event in events:
         if not isinstance(event, dict):
             continue
         event_time = _parse_finnhub_event_time(event.get("time"))
         if event_time is None:
             continue
-
         event_date = event_time.date()
         if event_date == today:
-            if event_time <= (now - timedelta(hours=2)):
+            if event_time <= now - timedelta(hours=2):
                 continue
-            day_bucket = "today"
-        elif event_date == tomorrow:
-            day_bucket = "tomorrow"
-        else:
+        elif event_date != tomorrow:
             continue
 
-        country = str(event.get("country") or "").strip().upper()
-        currency = COUNTRY_TO_CURRENCY.get(country, "ALL")
-        event_name = str(event.get("event") or event.get("title") or "").strip()
-        if not event_name:
+        country = _coerce_news_text(event.get("country"), max_len=8).upper()
+        title = _normalize_news_title(event.get("event") or event.get("title"))
+        if not title:
             continue
-
-        actual_value = str(event.get("actual") or "").strip()
-        forecast_value = str(event.get("estimate") or event.get("forecast") or "").strip()
-        previous_value = str(event.get("prev") or event.get("previous") or "").strip()
-        unit = str(event.get("unit") or "").strip()
-        summary_parts = []
-        if actual_value:
-            summary_parts.append(f"Actual: {actual_value}{unit}")
-        if forecast_value:
-            summary_parts.append(f"Forecast: {forecast_value}{unit}")
-        if previous_value:
-            summary_parts.append(f"Previous: {previous_value}{unit}")
-
+        unit = _coerce_news_text(event.get("unit"), max_len=16)
+        actual_value = _format_news_metric_value(event.get("actual"), unit)
+        forecast_value = _format_news_metric_value(event.get("estimate") or event.get("forecast"), unit)
+        previous_value = _format_news_metric_value(event.get("prev") or event.get("previous"), unit)
+        currency_code = COUNTRY_TO_CURRENCY.get(country, "")
+        summary_parts = [
+            part
+            for part in (
+                f"Actual {actual_value}" if actual_value else "",
+                f"Forecast {forecast_value}" if forecast_value else "",
+                f"Previous {previous_value}" if previous_value else "",
+            )
+            if part
+        ]
         prepared_items.append(
             {
-                "id": f"{event_time.isoformat()}::{country}::{event_name}::{index}",
-                "title": event_name,
-                "summary": " | ".join(summary_parts),
+                "external_id": _build_news_external_id("economic", event_time.isoformat(), country, title),
+                "feed_type": "economic",
+                "news_category": "economic",
+                "title": title,
+                "summary": " · ".join(summary_parts),
+                "image_url": "",
                 "source_name": "Finnhub",
                 "source_url": "https://finnhub.io/",
-                "published_at": event_time.isoformat(),
-                "country": country or "ALL",
-                "currency": currency,
-                "impact": _normalize_finnhub_impact(event.get("impact")),
-                "actual": actual_value,
-                "forecast": forecast_value,
-                "previous": previous_value,
+                "country_code": country,
+                "currency_code": currency_code,
+                "impact_level": _normalize_finnhub_impact(event.get("impact")),
+                "actual_value": actual_value,
+                "forecast_value": forecast_value,
+                "previous_value": previous_value,
                 "unit": unit,
-                "day_bucket": day_bucket,
-                "day_label": "Сегодня" if day_bucket == "today" else "Завтра",
-                "time_label": event_time.strftime("%H:%M"),
+                "published_at": event_time.strftime("%Y-%m-%d %H:%M:%S"),
             }
         )
 
-    prepared_items.sort(key=lambda item: str(item.get("published_at") or ""))
-    prepared_items = prepared_items[: int(limit)]
-    today_items = [item for item in prepared_items if item.get("day_bucket") == "today"]
-    tomorrow_items = [item for item in prepared_items if item.get("day_bucket") == "tomorrow"]
+    await _replace_news_feed("economic", prepared_items)
+    return len(prepared_items)
 
+
+async def _sync_market_news() -> int:
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    prepared_items: List[Dict[str, Any]] = []
+
+    for category in NEWS_MARKET_CATEGORIES:
+        raw_items = await _fetch_finnhub_json("news", {"category": category})
+        if not isinstance(raw_items, list):
+            continue
+        for item in raw_items:
+            if not isinstance(item, dict):
+                continue
+            published_at = _parse_finnhub_market_datetime(item.get("datetime"))
+            if published_at is None or published_at.date() != today:
+                continue
+            title = _normalize_news_title(item.get("headline") or item.get("title"))
+            if not title:
+                continue
+            summary = _coerce_news_text(item.get("summary"), max_len=420)
+            source_name = _coerce_news_text(item.get("source"), max_len=128)
+            source_url = _coerce_news_text(item.get("url"), max_len=500)
+            image_url = _coerce_news_text(item.get("image"), max_len=500)
+            country_code = _coerce_news_text(item.get("country"), max_len=8).upper()
+            related = _coerce_news_text(item.get("related"), max_len=120)
+            if related:
+                summary = f"{related} · {summary}" if summary else related
+            prepared_items.append(
+                {
+                    "external_id": _build_news_external_id(
+                        "market",
+                        category,
+                        item.get("id"),
+                        published_at.isoformat(),
+                        title,
+                    ),
+                    "feed_type": "market",
+                    "news_category": category,
+                    "title": title,
+                    "summary": summary,
+                    "image_url": image_url,
+                    "source_name": source_name or "Finnhub",
+                    "source_url": source_url,
+                    "country_code": country_code,
+                    "currency_code": "",
+                    "impact_level": "",
+                    "actual_value": "",
+                    "forecast_value": "",
+                    "previous_value": "",
+                    "unit": "",
+                    "published_at": published_at.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+
+    await _replace_news_feed("market", prepared_items)
+    return len(prepared_items)
+
+
+async def sync_news_once() -> Dict[str, int]:
+    if not FINNHUB_TOKEN:
+        return {"economic": 0, "market": 0}
+    result = {"economic": 0, "market": 0}
+    try:
+        result["economic"] = await _sync_economic_news()
+    except Exception as exc:
+        print(f"News sync economic error: {exc}")
+    try:
+        result["market"] = await _sync_market_news()
+    except Exception as exc:
+        print(f"News sync market error: {exc}")
+    return result
+
+
+async def news_sync_loop() -> None:
+    await asyncio.sleep(4)
+    while True:
+        started_at = time.monotonic()
+        try:
+            await sync_news_once()
+        except Exception:
+            pass
+        while True:
+            interval_min = await get_news_sync_interval_min()
+            interval_sec = max(interval_min * 60, DEFAULT_NEWS_SYNC_INTERVAL_MIN * 60)
+            elapsed = time.monotonic() - started_at
+            remaining = interval_sec - elapsed
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(30, remaining))
+
+
+async def _get_news_updated_at(feed_type: str) -> str:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT MAX(updated_at) AS updated_at
+                FROM news_items
+                WHERE feed_type = %s AND is_visible = 1
+                """,
+                (feed_type,),
+            )
+            row = await cur.fetchone()
+    value = (row or {}).get("updated_at")
+    return value.isoformat() if value else datetime.now(timezone.utc).isoformat()
+
+
+async def _load_economic_news_from_db(limit: int) -> Dict[str, Any]:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT *
+                FROM news_items
+                WHERE feed_type = 'economic' AND is_visible = 1
+                ORDER BY published_at ASC
+                LIMIT %s
+                """,
+                (int(max(limit * 2, 50)),),
+            )
+            rows = await cur.fetchall()
+
+    now = datetime.now(timezone.utc)
+    today = now.date()
+    tomorrow = today + timedelta(days=1)
+    today_items: List[Dict[str, Any]] = []
+    tomorrow_items: List[Dict[str, Any]] = []
+    for row in rows:
+        published_at = row.get("published_at")
+        if not published_at:
+            continue
+        serialized = _serialize_news_row(row)
+        published_date = published_at.date()
+        if published_date == today:
+            today_items.append(serialized)
+        elif published_date == tomorrow:
+            tomorrow_items.append(serialized)
+
+    today_items = today_items[: int(limit)]
+    tomorrow_items = tomorrow_items[: int(limit)]
     return {
-        "items": prepared_items,
+        "feed": "economic",
+        "items": [*today_items, *tomorrow_items],
         "today_items": today_items,
         "tomorrow_items": tomorrow_items,
-        "updated_at": now.isoformat(),
+        "updated_at": await _get_news_updated_at("economic"),
     }
+
+
+async def _load_market_news_from_db(category: str, limit: int) -> Dict[str, Any]:
+    pool = await require_db_pool()
+    normalized_category = (category or "all").strip().lower() or "all"
+    params: List[Any] = []
+    query = """
+        SELECT *
+        FROM news_items
+        WHERE feed_type = 'market' AND is_visible = 1
+    """
+    if normalized_category != "all":
+        query += " AND news_category = %s"
+        params.append(normalized_category)
+    query += " ORDER BY published_at DESC LIMIT %s"
+    params.append(int(limit))
+
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(query, tuple(params))
+            rows = await cur.fetchall()
+            await cur.execute(
+                """
+                SELECT news_category, COUNT(*) AS cnt
+                FROM news_items
+                WHERE feed_type = 'market'
+                  AND is_visible = 1
+                  AND DATE(published_at) = UTC_DATE()
+                GROUP BY news_category
+                ORDER BY cnt DESC, news_category ASC
+                """
+            )
+            category_rows = await cur.fetchall()
+
+    categories = [
+        {
+            "key": "all",
+            "count": sum(int(item.get("cnt") or 0) for item in category_rows),
+        }
+    ]
+    categories.extend(
+        {
+            "key": (item.get("news_category") or "").strip().lower(),
+            "count": int(item.get("cnt") or 0),
+        }
+        for item in category_rows
+        if item.get("news_category")
+    )
+    return {
+        "feed": "market",
+        "items": [_serialize_news_row(row) for row in rows],
+        "categories": categories,
+        "selected_category": normalized_category,
+        "updated_at": await _get_news_updated_at("market"),
+    }
+
+
+async def fetch_news_data(feed: str = "economic", category: str = "all", limit: int = 25) -> Dict[str, Any]:
+    normalized_feed = (feed or "economic").strip().lower()
+    if normalized_feed not in VALID_NEWS_FEEDS:
+        normalized_feed = "economic"
+
+    payload = (
+        await _load_economic_news_from_db(limit)
+        if normalized_feed == "economic"
+        else await _load_market_news_from_db(category, limit)
+    )
+    if payload.get("items"):
+        return payload
+
+    await sync_news_once()
+    return (
+        await _load_economic_news_from_db(limit)
+        if normalized_feed == "economic"
+        else await _load_market_news_from_db(category, limit)
+    )
 
 
 @app.get("/api/news")
 async def get_news(
+    feed: str = Query(default="economic"),
+    category: str = Query(default="all"),
     limit: int = Query(default=25, ge=1, le=100),
     user: Dict[str, Any] = Depends(get_telegram_user),
 ):
     await upsert_user_from_telegram(user)
-    return await fetch_news_data(limit=limit)
+    return await fetch_news_data(feed=feed, category=category, limit=limit)
 
 
 @app.get("/api/stats/daily")
@@ -1357,6 +1710,7 @@ async def main(mode: str = "all"):
     try:
         if mode in {"all", "api"}:
             await sync_market_pairs_once()
+            await sync_news_once()
     except Exception:
         pass
     try:
@@ -1366,6 +1720,7 @@ async def main(mode: str = "all"):
         if mode in {"all", "api"}:
             tasks.append(start_api())
             tasks.append(market_pairs_sync_loop())
+            tasks.append(news_sync_loop())
         if not tasks:
             raise RuntimeError(f"Unsupported runtime mode: {mode}")
         await asyncio.gather(*tasks)
@@ -1380,3 +1735,4 @@ if __name__ == "__main__":
         asyncio.run(main(parse_runtime_mode()))
     except KeyboardInterrupt:
         pass
+

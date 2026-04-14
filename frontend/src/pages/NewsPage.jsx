@@ -7,11 +7,11 @@ function getImpactLabel(impact, t) {
   return t.news.impactMedium || "Средний";
 }
 
-function formatUpdateTime(value) {
+function formatUpdateTime(value, lang = "ru") {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("ru-RU", {
+  return date.toLocaleString(lang === "uk" ? "uk-UA" : lang === "en" ? "en-US" : "ru-RU", {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
@@ -19,22 +19,56 @@ function formatUpdateTime(value) {
   });
 }
 
-function NewsSection({ title, subtitle, items, t }) {
-  return (
-    <section className="news-section">
-      <div className="news-section-head">
-        <div>
-          <strong>{title}</strong>
-          <span>{subtitle}</span>
-        </div>
-        <span className="news-section-count">{items.length}</span>
-      </div>
+function buildFlagEmoji(countryCode) {
+  const code = String(countryCode || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) return "🌐";
+  return String.fromCodePoint(...code.split("").map((char) => 127397 + char.charCodeAt(0)));
+}
 
-      <div className="news-event-grid">
+function normalizeEconomicTitle(title, t) {
+  return String(title || "")
+    .replace(/\bMoM\b/g, `(${t.news.momShort || "m/m"})`)
+    .replace(/\bYoY\b/g, `(${t.news.yoyShort || "y/y"})`)
+    .replace(/\bQoQ\b/g, `(${t.news.qoqShort || "q/q"})`);
+}
+
+function getMarketCategoryLabel(category, t) {
+  const key = String(category || "all").toLowerCase();
+  const map = {
+    all: t.news.categoryAll || "Все",
+    general: t.news.categoryGeneral || "Общие",
+    forex: t.news.categoryForex || "Forex",
+    crypto: t.news.categoryCrypto || "Crypto",
+    merger: t.news.categoryMerger || "Сделки"
+  };
+  return map[key] || key;
+}
+
+function SummaryCard({ label, value, accent }) {
+  return (
+    <article className={`news-mini-stat news-mini-stat-${accent || "default"}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
+  );
+}
+
+function EconomicSection({ title, items, t }) {
+  if (!items.length) return null;
+  return (
+    <section className="news-block">
+      <div className="news-block-head">
+        <strong>{title}</strong>
+        <span>{items.length}</span>
+      </div>
+      <div className="news-card-grid">
         {items.map((item) => (
-          <article className={`card news-event-card impact-${item.impact || "medium"}`} key={item.id}>
-            <div className="news-event-top">
-              <div className="news-event-tags">
+          <article className={`card news-card news-card-economic impact-${item.impact || "medium"}`} key={item.id}>
+            <div className="news-card-top">
+              <div className="news-card-tags">
+                <span className="news-flag-chip" title={item.country_code || item.currency || "Global"}>
+                  {buildFlagEmoji(item.country_code)}
+                </span>
                 <span className="news-currency-chip">{item.currency || "ALL"}</span>
                 <span className={`news-impact-chip impact-${item.impact || "medium"}`}>
                   {getImpactLabel(item.impact, t)}
@@ -43,12 +77,12 @@ function NewsSection({ title, subtitle, items, t }) {
               <span className="news-time-chip">{item.time_label || "--:--"}</span>
             </div>
 
-            <div className="news-event-copy">
-              <h3>{item.title}</h3>
-              <p>{item.country || "ALL"} · {item.source_name || "Finnhub"}</p>
+            <div className="news-card-copy">
+              <h3>{normalizeEconomicTitle(item.title, t)}</h3>
+              <p>{[item.country_code || "ALL", item.source_name || "Finnhub"].join(" · ")}</p>
             </div>
 
-            <div className="news-stat-row">
+            <div className="news-stat-row compact">
               <div className="news-stat-box">
                 <span>{t.news.actual || "Actual"}</span>
                 <strong>{item.actual || "-"}</strong>
@@ -69,35 +103,101 @@ function NewsSection({ title, subtitle, items, t }) {
   );
 }
 
-export default function NewsPage({ t }) {
-  const [items, setItems] = useState([]);
-  const [todayItems, setTodayItems] = useState([]);
-  const [tomorrowItems, setTomorrowItems] = useState([]);
-  const [updatedAt, setUpdatedAt] = useState("");
-  const [stats, setStats] = useState({ total: 0, wins: 0, losses: 0, winrate: 0 });
+function MarketSection({ items, categories, selectedCategory, onSelectCategory, t, lang }) {
+  return (
+    <section className="news-block">
+      <div className="news-category-strip" role="tablist" aria-label={t.news.marketCategories || "Категории"}>
+        {categories.map((category) => {
+          const isActive = selectedCategory === category.key;
+          return (
+            <button
+              key={category.key}
+              type="button"
+              className={`news-category-chip ${isActive ? "active" : ""}`}
+              onClick={() => onSelectCategory(category.key)}
+            >
+              <span>{getMarketCategoryLabel(category.key, t)}</span>
+              <strong>{category.count}</strong>
+            </button>
+          );
+        })}
+      </div>
+
+      {!items.length && <div className="card news-empty-card">{t.news.marketEmpty || t.news.empty}</div>}
+
+      <div className="news-card-grid news-card-grid-market">
+        {items.map((item) => (
+          <article className="card news-card news-card-market" key={item.id}>
+            <div className="news-card-top">
+              <div className="news-card-tags">
+                <span className="news-flag-chip" title={item.country_code || "Global"}>
+                  {buildFlagEmoji(item.country_code)}
+                </span>
+                <span className="news-currency-chip">{getMarketCategoryLabel(item.category, t)}</span>
+              </div>
+              <span className="news-time-chip">{formatUpdateTime(item.published_at, lang).split(", ").pop() || item.time_label || "--:--"}</span>
+            </div>
+
+            <div className="news-card-copy compact-copy">
+              <h3>{item.title}</h3>
+              <p>{item.source_name || "Finnhub"}</p>
+            </div>
+
+            {!!item.summary && <p className="news-market-summary">{item.summary}</p>}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export default function NewsPage({ t, lang = "ru" }) {
+  const [feed, setFeed] = useState("economic");
+  const [marketCategory, setMarketCategory] = useState("all");
+  const [newsData, setNewsData] = useState({
+    feed: "economic",
+    items: [],
+    today_items: [],
+    tomorrow_items: [],
+    categories: [],
+    updated_at: ""
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isActive = true;
 
     async function load() {
+      setLoading(true);
       try {
-        const [newsRes, dailyStats] = await Promise.all([
-          apiFetchJson("/api/news").catch(() => ({ items: [], today_items: [], tomorrow_items: [], updated_at: "" })),
-          apiFetchJson("/api/stats/daily").catch(() => ({ total: 0, wins: 0, losses: 0, winrate: 0 }))
-        ]);
-
-        if (!isActive) return;
-        setItems(newsRes?.items || []);
-        setTodayItems(newsRes?.today_items || []);
-        setTomorrowItems(newsRes?.tomorrow_items || []);
-        setUpdatedAt(newsRes?.updated_at || "");
-        setStats({
-          total: Number(dailyStats?.total || 0),
-          wins: Number(dailyStats?.wins || 0),
-          losses: Number(dailyStats?.losses || 0),
-          winrate: Number(dailyStats?.winrate || 0)
+        const qs = new URLSearchParams({
+          feed,
+          category: feed === "market" ? marketCategory : "all",
+          limit: feed === "market" ? "30" : "18"
         });
+        const response = await apiFetchJson(`/api/news?${qs.toString()}`).catch(() => ({
+          feed,
+          items: [],
+          today_items: [],
+          tomorrow_items: [],
+          categories: [],
+          updated_at: ""
+        }));
+        if (!isActive) return;
+        const nextCategories = Array.isArray(response?.categories) && response.categories.length
+          ? response.categories
+          : [{ key: "all", count: Number(response?.items?.length || 0) }];
+        setNewsData({
+          feed,
+          items: response?.items || [],
+          today_items: response?.today_items || [],
+          tomorrow_items: response?.tomorrow_items || [],
+          categories: nextCategories,
+          updated_at: response?.updated_at || ""
+        });
+        if (feed === "market" && marketCategory !== "all" && !nextCategories.some((item) => item.key === marketCategory)) {
+          setMarketCategory("all");
+        }
       } finally {
         if (isActive) setLoading(false);
       }
@@ -107,99 +207,79 @@ export default function NewsPage({ t }) {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [feed, marketCategory]);
 
-  const summaryCards = useMemo(
-    () => [
-      {
-        key: "today",
-        label: t.news.today || "Сегодня",
-        value: todayItems.length
-      },
-      {
-        key: "tomorrow",
-        label: t.news.tomorrow || "Завтра",
-        value: tomorrowItems.length
-      },
-      {
-        key: "winrate",
-        label: t.news.winrate || "Winrate",
-        value: `${stats.winrate}%`
-      }
-    ],
-    [stats.winrate, t.news.today, t.news.tomorrow, t.news.winrate, todayItems.length, tomorrowItems.length]
-  );
+  const summaryCards = useMemo(() => {
+    if (feed === "market") {
+      const categoryCount = Math.max((newsData.categories || []).filter((item) => item.key !== "all").length, 0);
+      return [
+        { key: "market-total", label: t.news.totalEvents || "Событий", value: newsData.items.length, accent: "primary" },
+        { key: "market-category", label: t.news.marketCategories || "Категорий", value: categoryCount, accent: "secondary" },
+        { key: "market-selected", label: t.news.selectedCategory || "Выбор", value: getMarketCategoryLabel(marketCategory, t), accent: "neutral" }
+      ];
+    }
+    return [
+      { key: "today", label: t.news.today || "Сегодня", value: newsData.today_items.length, accent: "primary" },
+      { key: "tomorrow", label: t.news.tomorrow || "Завтра", value: newsData.tomorrow_items.length, accent: "secondary" },
+      { key: "total", label: t.news.totalEvents || "Событий", value: newsData.items.length, accent: "neutral" }
+    ];
+  }, [feed, marketCategory, newsData.categories, newsData.items.length, newsData.today_items.length, newsData.tomorrow_items.length, t]);
+
+  const hasItems = newsData.items.length > 0;
 
   return (
     <section className="page page-news news-page-ref">
-      <div className="news-hero card">
-        <div className="news-hero-copy">
-          <span className="news-kicker">{t.news.kicker || "Economic calendar"}</span>
-          <h1 className="page-title">{t.news.title}</h1>
-          <p>{t.news.subtitle || "Высоковолатильные события по экономическому календарю на сегодня и завтра."}</p>
+      <div className="news-shell card">
+        <div className="news-switcher" role="tablist" aria-label={t.news.switcherLabel || "Переключатель новостей"}>
+          <button
+            type="button"
+            className={`news-switcher-btn ${feed === "economic" ? "active" : ""}`}
+            onClick={() => setFeed("economic")}
+          >
+            {t.news.switchEconomic || "Экономический календарь"}
+          </button>
+          <button
+            type="button"
+            className={`news-switcher-btn ${feed === "market" ? "active" : ""}`}
+            onClick={() => setFeed("market")}
+          >
+            {t.news.switchMarket || "Общерыночные новости"}
+          </button>
         </div>
 
-        <div className="news-summary-grid">
+        <div className="news-summary-grid compact-grid">
           {summaryCards.map((item) => (
-            <article className="news-summary-card" key={item.key}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </article>
+            <SummaryCard key={item.key} label={item.label} value={item.value} accent={item.accent} />
           ))}
         </div>
 
-        <div className="news-hero-footer">
-          <span>{t.news.updated || "Обновлено"}: {formatUpdateTime(updatedAt)}</span>
-          <span>{t.news.totalEvents || "Событий"}: {items.length}</span>
+        <div className="news-hero-footer compact-footer">
+          <span>{t.news.updated || "Обновлено"}: {formatUpdateTime(newsData.updated_at, lang)}</span>
+          <span>{feed === "market" ? (t.news.marketFeed || "Лента рынка") : (t.news.calendarFeed || "Календарь")}</span>
         </div>
       </div>
 
       {loading && <div className="card news-empty-card">{t.news.loading || "Загружаем события..."}</div>}
 
-      {!loading && items.length === 0 && <div className="card news-empty-card">{t.news.empty}</div>}
+      {!loading && !hasItems && <div className="card news-empty-card">{t.news.empty}</div>}
 
-      {!loading && todayItems.length > 0 && (
-        <NewsSection
-          title={t.news.today || "Сегодня"}
-          subtitle={t.news.todaySubtitle || "События начиная от последних двух часов и дальше по дню."}
-          items={todayItems}
-          t={t}
-        />
+      {!loading && feed === "economic" && (
+        <>
+          <EconomicSection title={t.news.today || "Сегодня"} items={newsData.today_items || []} t={t} />
+          <EconomicSection title={t.news.tomorrow || "Завтра"} items={newsData.tomorrow_items || []} t={t} />
+        </>
       )}
 
-      {!loading && tomorrowItems.length > 0 && (
-        <NewsSection
-          title={t.news.tomorrow || "Завтра"}
-          subtitle={t.news.tomorrowSubtitle || "Запланированные события следующего дня."}
-          items={tomorrowItems}
+      {!loading && feed === "market" && (
+        <MarketSection
+          items={newsData.items || []}
+          categories={newsData.categories || [{ key: "all", count: newsData.items.length }]}
+          selectedCategory={marketCategory}
+          onSelectCategory={setMarketCategory}
           t={t}
+          lang={lang}
         />
       )}
-
-      <section className="news-performance card">
-        <div className="news-performance-head">
-          <strong>{t.news.todayStats}</strong>
-          <span>{t.news.performanceHint || "Статистика текущих сигналов за день."}</span>
-        </div>
-        <div className="news-performance-grid">
-          <div className="news-performance-item">
-            <span>{t.news.total}</span>
-            <strong>{stats.total}</strong>
-          </div>
-          <div className="news-performance-item">
-            <span>{t.news.wins}</span>
-            <strong>{stats.wins}</strong>
-          </div>
-          <div className="news-performance-item">
-            <span>{t.news.losses}</span>
-            <strong>{stats.losses}</strong>
-          </div>
-          <div className="news-performance-item">
-            <span>{t.news.winrate}</span>
-            <strong>{stats.winrate}%</strong>
-          </div>
-        </div>
-      </section>
     </section>
   );
 }

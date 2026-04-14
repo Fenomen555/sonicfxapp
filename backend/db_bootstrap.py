@@ -135,6 +135,7 @@ async def _seed_app_settings(conn) -> None:
     default_interval_min = min(max(default_interval_min or 5, 2), 30)
     defaults: Tuple[Tuple[str, str], ...] = (
         ("market_pairs_sync_interval_min", str(default_interval_min)),
+        ("news_sync_interval_min", "60"),
     )
     async with conn.cursor() as cur:
         for key, value in defaults:
@@ -202,14 +203,25 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                 """
                 CREATE TABLE IF NOT EXISTS news_items (
                     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    external_id VARCHAR(255) NULL,
+                    feed_type VARCHAR(32) NOT NULL DEFAULT 'market',
+                    news_category VARCHAR(64) NULL,
                     title VARCHAR(500) NOT NULL,
                     summary TEXT NULL,
                     image_url TEXT NULL,
                     source_name VARCHAR(255) NULL,
                     source_url TEXT NULL,
+                    country_code VARCHAR(8) NULL,
+                    currency_code VARCHAR(8) NULL,
+                    impact_level VARCHAR(16) NULL,
+                    actual_value VARCHAR(64) NULL,
+                    forecast_value VARCHAR(64) NULL,
+                    previous_value VARCHAR(64) NULL,
+                    unit VARCHAR(32) NULL,
                     published_at TIMESTAMP NULL DEFAULT NULL,
                     is_visible TINYINT(1) NOT NULL DEFAULT 1,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """
             )
@@ -287,6 +299,17 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
 
         await _ensure_column(conn, db_name, "signals", "status", "ALTER TABLE signals ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'pending'")
         await _ensure_column(conn, db_name, "signals", "result", "ALTER TABLE signals ADD COLUMN result VARCHAR(32) NULL")
+        await _ensure_column(conn, db_name, "news_items", "external_id", "ALTER TABLE news_items ADD COLUMN external_id VARCHAR(255) NULL")
+        await _ensure_column(conn, db_name, "news_items", "feed_type", "ALTER TABLE news_items ADD COLUMN feed_type VARCHAR(32) NOT NULL DEFAULT 'market'")
+        await _ensure_column(conn, db_name, "news_items", "news_category", "ALTER TABLE news_items ADD COLUMN news_category VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "news_items", "country_code", "ALTER TABLE news_items ADD COLUMN country_code VARCHAR(8) NULL")
+        await _ensure_column(conn, db_name, "news_items", "currency_code", "ALTER TABLE news_items ADD COLUMN currency_code VARCHAR(8) NULL")
+        await _ensure_column(conn, db_name, "news_items", "impact_level", "ALTER TABLE news_items ADD COLUMN impact_level VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "news_items", "actual_value", "ALTER TABLE news_items ADD COLUMN actual_value VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "news_items", "forecast_value", "ALTER TABLE news_items ADD COLUMN forecast_value VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "news_items", "previous_value", "ALTER TABLE news_items ADD COLUMN previous_value VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "news_items", "unit", "ALTER TABLE news_items ADD COLUMN unit VARCHAR(32) NULL")
+        await _ensure_column(conn, db_name, "news_items", "updated_at", "ALTER TABLE news_items ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
         await _ensure_column(conn, db_name, "market_pairs", "payout", "ALTER TABLE market_pairs ADD COLUMN payout INT NULL")
         await _ensure_column(conn, db_name, "market_pairs", "is_active", "ALTER TABLE market_pairs ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "market_pairs", "source", "ALTER TABLE market_pairs ADD COLUMN source VARCHAR(32) NOT NULL DEFAULT 'devsbite'")
@@ -295,6 +318,9 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "signals", "idx_signals_user_created", "CREATE INDEX idx_signals_user_created ON signals (user_id, created_at)")
         await _ensure_index(conn, db_name, "signals", "idx_signals_status", "CREATE INDEX idx_signals_status ON signals (status)")
         await _ensure_index(conn, db_name, "news_items", "idx_news_visible_published", "CREATE INDEX idx_news_visible_published ON news_items (is_visible, published_at)")
+        await _ensure_index(conn, db_name, "news_items", "uq_news_external_id", "CREATE UNIQUE INDEX uq_news_external_id ON news_items (external_id)")
+        await _ensure_index(conn, db_name, "news_items", "idx_news_feed_visible_published", "CREATE INDEX idx_news_feed_visible_published ON news_items (feed_type, is_visible, published_at)")
+        await _ensure_index(conn, db_name, "news_items", "idx_news_feed_category_visible", "CREATE INDEX idx_news_feed_category_visible ON news_items (feed_type, news_category, is_visible)")
         await _ensure_index(conn, db_name, "users", "idx_users_activation_status", "CREATE INDEX idx_users_activation_status ON users (activation_status)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_kind_active", "CREATE INDEX idx_market_pairs_kind_active ON market_pairs (pair_kind, is_active)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_last_seen", "CREATE INDEX idx_market_pairs_last_seen ON market_pairs (last_seen_at)")

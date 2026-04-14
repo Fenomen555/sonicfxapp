@@ -54,15 +54,16 @@ export function LinkIcon(props) {
 export function ScannerModeIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M8 5H6.9A1.9 1.9 0 0 0 5 6.9V8" />
-      <path d="M16 5h1.1A1.9 1.9 0 0 1 19 6.9V8" />
-      <path d="M8 19H6.9A1.9 1.9 0 0 1 5 17.1V16" />
-      <path d="M16 19h1.1a1.9 1.9 0 0 0 1.9-1.9V16" />
-      <circle cx="12" cy="12" r="3.1" />
-      <path d="M12 9.7v.01" />
-      <path d="M12 14.3v.01" />
-      <path d="M14.3 12h.01" />
-      <path d="M9.7 12h.01" />
+      <rect x="5" y="5" width="14" height="14" rx="4.2" />
+      <path d="M9 5v2.1" />
+      <path d="M15 5v2.1" />
+      <path d="M9 16.9V19" />
+      <path d="M15 16.9V19" />
+      <path d="M5 9h2.1" />
+      <path d="M16.9 9H19" />
+      <path d="M5 15h2.1" />
+      <path d="M16.9 15H19" />
+      <circle cx="12" cy="12" r="2.35" />
     </svg>
   );
 }
@@ -70,10 +71,11 @@ export function ScannerModeIcon(props) {
 export function AutoModeIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M18.2 12A6.2 6.2 0 1 1 9 6.5" />
-      <path d="M9 4.8v1.7h1.7" />
-      <path d="M12 9.1v3l2.1 1.3" />
-      <circle cx="12" cy="12" r="4.9" />
+      <path d="M7.4 7.8A6.5 6.5 0 0 1 18 10.1" />
+      <path d="M16.6 16.2A6.5 6.5 0 0 1 6 13.9" />
+      <path d="M17 6.7v3.5h-3.5" />
+      <path d="M7 17.3v-3.5h3.5" />
+      <path d="M12 9.2v2.8l1.9 1.4" />
     </svg>
   );
 }
@@ -82,11 +84,13 @@ export function IndicatorModeIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round" {...props}>
       <path d="M5.5 18.5h13" />
-      <path d="M7.5 18.5v-5.2" />
-      <path d="M12 18.5V9.4" />
-      <path d="M16.5 18.5v-6.8" />
-      <path d="m6.5 12.2 3-2.3 2.4 1.6 4.6-3.8" />
-      <path d="M15.6 7.7H18v2.4" />
+      <path d="M8 16.8v-4.6" />
+      <path d="M8 11v-.8" />
+      <path d="M12 15.8v-6.1" />
+      <path d="M12 8.6v-.8" />
+      <path d="M16 17.3v-7.3" />
+      <path d="M16 8.9v-.8" />
+      <path d="m6.7 13.4 2.5-1.8 2.5 1.1 4.6-3.2" />
     </svg>
   );
 }

@@ -269,8 +269,8 @@ export default function HomePage({ t }) {
       </div>
 
       <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
-        <img className="primary-btn-icon primary-btn-icon-sonic" src={sonicCtaIcon} alt="" loading="lazy" aria-hidden="true" />
         <span>{actionLabel}</span>
+        <img className="primary-btn-icon primary-btn-icon-sonic" src={sonicCtaIcon} alt="" loading="lazy" aria-hidden="true" />
       </button>
 
       <div className="card form-card ref-form-card generator-panel">

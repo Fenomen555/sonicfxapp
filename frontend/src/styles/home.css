@@ -303,17 +303,15 @@
   min-height: 54px;
   border-radius: 18px;
   background:
-    radial-gradient(circle at 14% 18%, rgba(137, 234, 172, 0.24), transparent 34%),
-    radial-gradient(circle at 88% 88%, rgba(68, 154, 106, 0.24), transparent 30%),
-    linear-gradient(180deg, rgba(23, 58, 47, 0.98), rgba(14, 37, 30, 0.98));
-  border-color: rgba(118, 199, 156, 0.34);
-  color: #effff6;
+    linear-gradient(135deg, #f2f6ff 0%, #aecbff 52%, #f3dcb0 100%);
+  border-color: rgba(198, 214, 241, 0.18);
+  color: #0f1727;
   overflow: hidden;
   box-shadow:
-    0 20px 30px rgba(20, 54, 42, 0.24),
-    0 0 0 1px rgba(130, 219, 171, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -6px 12px rgba(7, 22, 17, 0.16);
+    0 18px 30px rgba(88, 130, 225, 0.2),
+    0 0 0 1px rgba(206, 220, 245, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    inset 0 -6px 12px rgba(165, 186, 225, 0.16);
 }
 
 .primary-btn.primary-btn-scanner::before {
@@ -331,8 +329,8 @@
   z-index: 1;
   width: 20px;
   height: 20px;
-  color: #d9ffe7;
-  filter: drop-shadow(0 0 10px rgba(131, 237, 178, 0.28));
+  color: #4b6de2;
+  filter: drop-shadow(0 0 10px rgba(136, 171, 255, 0.2));
   opacity: 0.98;
 }
 
@@ -340,7 +338,7 @@
   width: 24px;
   height: 24px;
   object-fit: contain;
-  filter: drop-shadow(0 3px 8px rgba(9, 26, 20, 0.24));
+  filter: drop-shadow(0 3px 8px rgba(63, 92, 150, 0.16));
 }
 
 .primary-btn.primary-btn-scanner span:last-child {
@@ -975,25 +973,23 @@
 
 :root[data-theme="light"] .primary-btn.primary-btn-scanner {
   background:
-    radial-gradient(circle at 14% 18%, rgba(104, 210, 145, 0.28), transparent 34%),
-    radial-gradient(circle at 88% 88%, rgba(43, 121, 83, 0.18), transparent 30%),
-    linear-gradient(180deg, rgba(36, 116, 79, 0.98), rgba(22, 87, 57, 0.98));
-  border-color: rgba(44, 137, 93, 0.36);
-  color: #f5fff8;
+    linear-gradient(135deg, #f2f6ff 0%, #aecbff 52%, #f3dcb0 100%);
+  border-color: rgba(198, 214, 241, 0.22);
+  color: #0f1727;
   box-shadow:
-    0 18px 28px rgba(42, 117, 80, 0.18),
-    0 0 0 1px rgba(98, 208, 143, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -6px 12px rgba(20, 71, 46, 0.12);
+    0 18px 28px rgba(88, 130, 225, 0.16),
+    0 0 0 1px rgba(206, 220, 245, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -6px 12px rgba(165, 186, 225, 0.12);
 }
 
 :root[data-theme="light"] .primary-btn.primary-btn-scanner .primary-btn-icon {
-  color: #f2fff7;
-  filter: drop-shadow(0 0 8px rgba(189, 255, 215, 0.24));
+  color: #4b6de2;
+  filter: drop-shadow(0 0 8px rgba(136, 171, 255, 0.18));
 }
 
 :root[data-theme="light"] .primary-btn.primary-btn-scanner .primary-btn-icon-sonic {
-  filter: drop-shadow(0 3px 8px rgba(42, 117, 80, 0.18));
+  filter: drop-shadow(0 3px 8px rgba(63, 92, 150, 0.14));
 }
 
 .ref-form-card {

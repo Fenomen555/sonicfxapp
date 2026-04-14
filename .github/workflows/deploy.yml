@@ -43,9 +43,13 @@ jobs:
           DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
         run: |
           set -euo pipefail
+          HOST="$(printf '%s' "$DEPLOY_HOST" | tr -d '\r\n\t ')"
+          USER="$(printf '%s' "$DEPLOY_USER" | tr -d '\r\n\t ')"
+          PORT="$(printf '%s' "$DEPLOY_PORT" | tr -d '\r\n\t ')"
+
           ssh -i ~/.ssh/deploy_key \
-            -p "$DEPLOY_PORT" \
+            -p "$PORT" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "$USER@$HOST" \
             'set -e; cd /root/miniapp; bash /root/miniapp/deploy_from_git.sh'

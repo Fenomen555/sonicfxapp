@@ -336,6 +336,13 @@
   opacity: 0.98;
 }
 
+.primary-btn.primary-btn-scanner .primary-btn-icon-sonic {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(9, 26, 20, 0.24));
+}
+
 .primary-btn.primary-btn-scanner span:last-child {
   position: relative;
   z-index: 1;
@@ -983,6 +990,10 @@
 :root[data-theme="light"] .primary-btn.primary-btn-scanner .primary-btn-icon {
   color: #f2fff7;
   filter: drop-shadow(0 0 8px rgba(189, 255, 215, 0.24));
+}
+
+:root[data-theme="light"] .primary-btn.primary-btn-scanner .primary-btn-icon-sonic {
+  filter: drop-shadow(0 3px 8px rgba(42, 117, 80, 0.18));
 }
 
 .ref-form-card {

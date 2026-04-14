@@ -8,6 +8,7 @@ import {
   ScannerModeIcon,
   SparkIcon
 } from "../components/AppIcons";
+import sonicCtaIcon from "../assets/sonic-cta.png";
 import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetchJson } from "../lib/api";
 
@@ -268,7 +269,7 @@ export default function HomePage({ t }) {
       </div>
 
       <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
-        <SparkIcon className="primary-btn-icon" aria-hidden="true" />
+        <img className="primary-btn-icon primary-btn-icon-sonic" src={sonicCtaIcon} alt="" loading="lazy" aria-hidden="true" />
         <span>{actionLabel}</span>
       </button>
 

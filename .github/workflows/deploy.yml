@@ -8,8 +8,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Если у тебя secrets в Environment "production", раскомментируй:
-    # environment: production
 
     steps:
       - name: Validate deploy inputs
@@ -31,6 +29,9 @@ jobs:
           username: ${{ vars.DEPLOY_USER }}
           port: ${{ vars.DEPLOY_PORT }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
+          timeout: 60s
+          command_timeout: 30m
+          script_stop: true
           script: |
             set -e
             cd /root/miniapp

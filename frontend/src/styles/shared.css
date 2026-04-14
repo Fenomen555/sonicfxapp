@@ -558,10 +558,6 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .signal-mode-card:last-child {
-    grid-column: 1 / -1;
-  }
-
   .signal-mode-cta {
     width: 100%;
   }

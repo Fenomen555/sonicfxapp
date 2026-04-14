@@ -1,3 +1,5 @@
+import aiBrainIcon from "../assets/ai-brain.png";
+
 export function SparkIcon(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -65,14 +67,7 @@ export function ScannerModeIcon(props) {
 }
 
 export function AutoModeIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <path d="M17.2 8.1A5.9 5.9 0 0 0 7 9.4" />
-      <path d="M17.2 8.1v3.1h-3.1" />
-      <path d="M6.8 15.9A5.9 5.9 0 0 0 17 14.6" />
-      <path d="M6.8 15.9v-3.1h3.1" />
-    </svg>
-  );
+  return <img src={aiBrainIcon} alt="" loading="lazy" {...props} />;
 }
 
 export function IndicatorModeIcon(props) {

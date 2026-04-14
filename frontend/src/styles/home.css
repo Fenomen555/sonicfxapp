@@ -421,9 +421,12 @@
     0 10px 20px rgba(21, 34, 58, 0.18);
 }
 
-.signal-panel-selected-icon svg {
+.signal-panel-selected-icon svg,
+.signal-panel-selected-icon img {
   width: 20px;
   height: 20px;
+  object-fit: contain;
+  display: block;
 }
 
 .signal-panel-selected-text {
@@ -540,9 +543,12 @@
   min-width: 0;
 }
 
-.signal-mode-icon svg {
+.signal-mode-icon svg,
+.signal-mode-icon img {
   width: 18px;
   height: 18px;
+  object-fit: contain;
+  display: block;
 }
 
 .signal-mode-text {
@@ -1271,7 +1277,8 @@
     border-radius: 14px;
   }
 
-  .signal-panel-selected-icon svg {
+  .signal-panel-selected-icon svg,
+  .signal-panel-selected-icon img {
     width: 18px;
     height: 18px;
   }
@@ -1322,7 +1329,8 @@
     height: 36px;
   }
 
-  .signal-mode-icon svg {
+  .signal-mode-icon svg,
+  .signal-mode-icon img {
     width: 17px;
     height: 17px;
   }

@@ -34,6 +34,24 @@ const INDICATOR_MARKETS = [
   { key: "stocks", label: "Stocks" }
 ];
 
+const FALLBACK_INDICATORS = [
+  { code: "rsi", title: "RSI", description: "Relative Strength Index" },
+  { code: "stochastic_oscillator", title: "Stochastic Oscillator", description: "Momentum oscillator" },
+  { code: "cci", title: "CCI", description: "Commodity Channel Index" },
+  { code: "williams_r", title: "Williams %R", description: "Overbought / oversold oscillator" },
+  { code: "macd", title: "MACD", description: "Trend and momentum convergence" },
+  { code: "ema_9_50_200", title: "Moving Average (EMA 9 / 50 / 200)", description: "EMA stack for trend alignment" },
+  { code: "adx", title: "ADX", description: "Average Directional Index" },
+  { code: "atr", title: "ATR", description: "Average True Range" },
+  { code: "bollinger_bands", title: "Bollinger Bands", description: "Volatility envelope" },
+  { code: "keltner_channel", title: "Keltner Channel", description: "ATR-based channel" },
+  { code: "supertrend", title: "SuperTrend", description: "Trend-following overlay" },
+  { code: "parabolic_sar", title: "Parabolic SAR", description: "Stop and reverse trend marker" },
+  { code: "vortex", title: "Vortex", description: "Directional trend strength" },
+  { code: "momentum", title: "Momentum", description: "Raw momentum oscillator" },
+  { code: "rate_of_change", title: "Rate Of Change", description: "ROC momentum percentage" }
+];
+
 const SIGNAL_MODES = [
   {
     id: "scanner",
@@ -69,6 +87,8 @@ export default function HomePage({ t }) {
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
   const [pickerSheet, setPickerSheet] = useState(null);
   const [pickerSearch, setPickerSearch] = useState("");
+  const [indicators, setIndicators] = useState(FALLBACK_INDICATORS);
+  const [selectedIndicator, setSelectedIndicator] = useState(FALLBACK_INDICATORS[0]?.code || "rsi");
 
   const quickActions = [
     { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
@@ -140,6 +160,34 @@ export default function HomePage({ t }) {
     };
   }, [marketKind]);
 
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadIndicators() {
+      try {
+        const data = await apiFetchJson("/api/indicators/options");
+        if (!isActive) return;
+        const nextIndicators = Array.isArray(data?.items) && data.items.length > 0 ? data.items : FALLBACK_INDICATORS;
+        setIndicators(nextIndicators);
+        setSelectedIndicator((prev) => (
+          prev && nextIndicators.some((item) => item?.code === prev)
+            ? prev
+            : (nextIndicators[0]?.code || FALLBACK_INDICATORS[0]?.code || "rsi")
+        ));
+      } catch (_error) {
+        if (!isActive) return;
+        setIndicators(FALLBACK_INDICATORS);
+        setSelectedIndicator((prev) => prev || FALLBACK_INDICATORS[0]?.code || "rsi");
+      }
+    }
+
+    loadIndicators();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
   const indicatorMarkets = useMemo(() => {
     if (!availableMarkets.length) return INDICATOR_MARKETS;
     const labels = new Map(INDICATOR_MARKETS.map((item) => [item.key, item.label]));
@@ -154,8 +202,10 @@ export default function HomePage({ t }) {
   const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
   const selectedMode = SIGNAL_MODES.find((item) => item.id === signalMode) || SIGNAL_MODES[0];
   const SelectedModeIcon = selectedMode.icon;
+  const isIndicatorsMode = signalMode === "indicators";
   const selectedPairMeta = pairs.find((item) => item?.pair === asset) || null;
   const selectedExpirationMeta = expirations.find((item) => item?.value === expiration) || null;
+  const selectedIndicatorMeta = indicators.find((item) => item?.code === selectedIndicator) || indicators[0] || FALLBACK_INDICATORS[0];
   const actionLabel = signalMode === "automatic"
     ? "Запустить авто режим"
     : signalMode === "indicators"
@@ -181,6 +231,9 @@ export default function HomePage({ t }) {
         return label.includes(pairSearchValue);
       })
     : pairs;
+  const filteredIndicators = pairSearchValue
+    ? indicators.filter((item) => `${item?.title || ""} ${item?.description || ""} ${item?.code || ""}`.toLowerCase().includes(pairSearchValue))
+    : indicators;
 
   function openPickerSheet(type) {
     setPickerSearch("");
@@ -204,18 +257,30 @@ export default function HomePage({ t }) {
         </button>
       </div>
 
-      <button className="upload-zone" type="button" onClick={() => setIsActionSheetOpen(true)}>
+      <button
+        className={`upload-zone ${isIndicatorsMode ? "upload-zone-indicator" : ""}`}
+        type="button"
+        onClick={() => (isIndicatorsMode ? openPickerSheet("indicator") : setIsActionSheetOpen(true))}
+      >
         <span className="frame-corner tl" />
         <span className="frame-corner tr" />
         <span className="frame-corner bl" />
         <span className="frame-corner br" />
 
         <div className="upload-icon" aria-hidden="true">
-          <UploadScanAnimation />
+          {isIndicatorsMode ? <IndicatorModeIcon /> : <UploadScanAnimation />}
         </div>
-        <div className="upload-title">{t.home.upload || "Upload chart"}</div>
-        <div className="upload-hint">{t.home.uploadHint || "JPG, PNG or HEIC"}</div>
-        <div className="upload-subhint">{t.home.sourceHint || "Выберите источник загрузки"}</div>
+        <div className="upload-title">{isIndicatorsMode ? (selectedIndicatorMeta?.title || "RSI") : (t.home.upload || "Upload chart")}</div>
+        <div className="upload-hint">
+          {isIndicatorsMode
+            ? (selectedIndicatorMeta?.description || "Choose indicator for manual signal")
+            : (t.home.uploadHint || "JPG, PNG or HEIC")}
+        </div>
+        <div className="upload-subhint">
+          {isIndicatorsMode
+            ? (t.home.indicatorZoneHint || "Нажмите, чтобы выбрать индикатор")
+            : (t.home.sourceHint || "Р’С‹Р±РµСЂРёС‚Рµ РёСЃС‚РѕС‡РЅРёРє Р·Р°РіСЂСѓР·РєРё")}
+        </div>
       </button>
 
       <div className="signal-panel">
@@ -397,50 +462,73 @@ export default function HomePage({ t }) {
             onClick={closePickerSheet}
           />
           <div
-            className={`action-sheet picker-sheet ${pickerSheet === "asset" ? "picker-sheet-assets" : "picker-sheet-expirations"}`}
+            className={`action-sheet picker-sheet ${
+              pickerSheet === "asset"
+                ? "picker-sheet-assets"
+                : pickerSheet === "indicator"
+                  ? "picker-sheet-indicators"
+                  : "picker-sheet-expirations"
+            }`}
             role="dialog"
             aria-modal="true"
-            aria-label={pickerSheet === "asset" ? "Выбор валютной пары" : "Выбор экспирации"}
+            aria-label={pickerSheet === "asset"
+              ? "Р’С‹Р±РѕСЂ РІР°Р»СЋС‚РЅРѕР№ РїР°СЂС‹"
+              : pickerSheet === "indicator"
+                ? "Р’С‹Р±РѕСЂ РёРЅРґРёРєР°С‚РѕСЂР°"
+                : "Р’С‹Р±РѕСЂ СЌРєСЃРїРёСЂР°С†РёРё"}
           >
             <div className="action-sheet-handle" aria-hidden="true" />
             <div className="action-sheet-head">
               <div className="action-sheet-title">
-                {pickerSheet === "asset" ? (t.home.assetSheetTitle || "Валютные пары") : (t.home.expirationSheetTitle || "Время экспирации")}
+                {pickerSheet === "asset"
+                  ? (t.home.assetSheetTitle || "Р’Р°Р»СЋС‚РЅС‹Рµ РїР°СЂС‹")
+                  : pickerSheet === "indicator"
+                    ? (t.home.indicatorSheetTitle || "РРЅРґРёРєР°С‚РѕСЂС‹")
+                    : (t.home.expirationSheetTitle || "Р’СЂРµРјСЏ СЌРєСЃРїРёСЂР°С†РёРё")}
               </div>
               <div className="action-sheet-copy">
                 {pickerSheet === "asset"
-                  ? (t.home.assetSheetHint || "Выберите активную пару из локально синхронизированного списка.")
-                  : (t.home.expirationSheetHint || "Выберите время, которое будем использовать для сигнала.")}
+                  ? (t.home.assetSheetHint || "Р’С‹Р±РµСЂРёС‚Рµ Р°РєС‚РёРІРЅСѓСЋ РїР°СЂСѓ РёР· Р»РѕРєР°Р»СЊРЅРѕ СЃРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°РЅРЅРѕРіРѕ СЃРїРёСЃРєР°.")
+                  : pickerSheet === "indicator"
+                    ? (t.home.indicatorSheetHint || "Р’С‹Р±РµСЂРёС‚Рµ РёРЅРґРёРєР°С‚РѕСЂ, РєРѕС‚РѕСЂС‹Р№ Р±СѓРґРµРј РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РґР»СЏ СЃРёРіРЅР°Р»Р°.")
+                    : (t.home.expirationSheetHint || "Р’С‹Р±РµСЂРёС‚Рµ РІСЂРµРјСЏ, РєРѕС‚РѕСЂРѕРµ Р±СѓРґРµРј РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РґР»СЏ СЃРёРіРЅР°Р»Р°.")}
               </div>
             </div>
 
-            {pickerSheet === "asset" && (
+            {(pickerSheet === "asset" || pickerSheet === "indicator") && (
               <div className="picker-search-wrap">
                 <input
                   className="field-input ref-input picker-search-input"
                   type="text"
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.target.value)}
-                  placeholder={t.home.assetSearchPlaceholder || "Поиск пары, например AUD или EUR/USD"}
+                  placeholder={pickerSheet === "asset"
+                    ? (t.home.assetSearchPlaceholder || "РџРѕРёСЃРє РїР°СЂС‹, РЅР°РїСЂРёРјРµСЂ AUD РёР»Рё EUR/USD")
+                    : (t.home.indicatorSearchPlaceholder || "РџРѕРёСЃРє РёРЅРґРёРєР°С‚РѕСЂР°, РЅР°РїСЂРёРјРµСЂ RSI РёР»Рё MACD")}
                 />
               </div>
             )}
 
-            <div className={`picker-sheet-list ${pickerSheet === "asset" ? "cards-grid" : "cards-grid compact-grid"}`}>
-              {(pickerSheet === "asset" ? filteredPairs : expirations).map((item) => {
+            <div className={`picker-sheet-list ${pickerSheet === "expiration" ? "cards-grid compact-grid" : "cards-grid"}`}>
+              {(pickerSheet === "asset" ? filteredPairs : pickerSheet === "indicator" ? filteredIndicators : expirations).map((item) => {
                 const isPair = pickerSheet === "asset";
-                const isActive = isPair ? asset === item.pair : expiration === item.value;
+                const isIndicator = pickerSheet === "indicator";
+                const isActive = isPair ? asset === item.pair : isIndicator ? selectedIndicator === item.code : expiration === item.value;
                 const title = isPair
                   ? `${item.pair}${typeof item.payout === "number" ? ` (${item.payout}%)` : ""}`
-                  : item.label;
+                  : isIndicator
+                    ? item.title
+                    : item.label;
                 return (
                   <button
-                    key={isPair ? item.pair : item.value}
+                    key={isPair ? item.pair : isIndicator ? item.code : item.value}
                     className={`action-sheet-option picker-sheet-option ${isActive ? "active" : ""}`}
                     type="button"
                     onClick={() => {
                       if (isPair) {
                         setAsset(item.pair);
+                      } else if (isIndicator) {
+                        setSelectedIndicator(item.code);
                       } else {
                         setExpiration(item.value);
                       }
@@ -449,14 +537,17 @@ export default function HomePage({ t }) {
                   >
                     <span className="action-sheet-option-copy">
                       <strong>{title}</strong>
+                      {isIndicator && item.description ? <small>{item.description}</small> : null}
                     </span>
                   </button>
                 );
               })}
 
-              {pickerSheet === "asset" && filteredPairs.length === 0 && (
+              {(pickerSheet === "asset" || pickerSheet === "indicator") && (pickerSheet === "asset" ? filteredPairs.length === 0 : filteredIndicators.length === 0) && (
                 <div className="picker-sheet-empty">
-                  {t.home.assetSearchEmpty || "Ничего не найдено по этому запросу."}
+                  {pickerSheet === "asset"
+                    ? (t.home.assetSearchEmpty || "РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ РїРѕ СЌС‚РѕРјСѓ Р·Р°РїСЂРѕСЃСѓ.")
+                    : (t.home.indicatorSearchEmpty || "РРЅРґРёРєР°С‚РѕСЂ РїРѕ СЌС‚РѕРјСѓ Р·Р°РїСЂРѕСЃСѓ РЅРµ РЅР°Р№РґРµРЅ.")}
                 </div>
               )}
             </div>

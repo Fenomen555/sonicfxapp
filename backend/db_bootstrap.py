@@ -83,6 +83,39 @@ async def _seed_feature_flags(conn) -> None:
             )
 
 
+async def _seed_signal_indicators(conn) -> None:
+    defaults: Tuple[Tuple[str, str, str, int], ...] = (
+        ("rsi", "RSI", "Relative Strength Index", 1),
+        ("stochastic_oscillator", "Stochastic Oscillator", "Momentum oscillator", 2),
+        ("cci", "CCI", "Commodity Channel Index", 3),
+        ("williams_r", "Williams %R", "Overbought / oversold oscillator", 4),
+        ("macd", "MACD", "Trend and momentum convergence", 5),
+        ("ema_9_50_200", "Moving Average (EMA 9 / 50 / 200)", "EMA stack for trend alignment", 6),
+        ("adx", "ADX", "Average Directional Index", 7),
+        ("atr", "ATR", "Average True Range", 8),
+        ("bollinger_bands", "Bollinger Bands", "Volatility envelope", 9),
+        ("keltner_channel", "Keltner Channel", "ATR-based channel", 10),
+        ("supertrend", "SuperTrend", "Trend-following overlay", 11),
+        ("parabolic_sar", "Parabolic SAR", "Stop and reverse trend marker", 12),
+        ("vortex", "Vortex", "Directional trend strength", 13),
+        ("momentum", "Momentum", "Raw momentum oscillator", 14),
+        ("rate_of_change", "Rate Of Change", "ROC momentum percentage", 15),
+    )
+    async with conn.cursor() as cur:
+        for code, title, description, order in defaults:
+            await cur.execute(
+                """
+                INSERT INTO signal_indicators (`code`, title, description, is_enabled, sort_order)
+                VALUES (%s, %s, %s, 1, %s)
+                ON DUPLICATE KEY UPDATE
+                    title = VALUES(title),
+                    description = VALUES(description),
+                    sort_order = VALUES(sort_order)
+                """,
+                (code, title, description, int(order)),
+            )
+
+
 def _parse_default_admin_ids() -> list[int]:
     raw_values = [
         "7097261848",
@@ -287,6 +320,22 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                 """
             )
 
+            await cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS signal_indicators (
+                    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    `code` VARCHAR(64) NOT NULL,
+                    title VARCHAR(255) NOT NULL,
+                    description VARCHAR(255) NULL,
+                    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    sort_order INT NOT NULL DEFAULT 100,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_signal_indicators_code (`code`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
         await _ensure_column(conn, db_name, "users", "theme", "ALTER TABLE users ADD COLUMN theme VARCHAR(16) NOT NULL DEFAULT 'dark'")
         await _ensure_column(conn, db_name, "users", "lang", "ALTER TABLE users ADD COLUMN lang VARCHAR(8) NOT NULL DEFAULT 'ru'")
         await _ensure_column(conn, db_name, "users", "timezone", "ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev'")
@@ -316,6 +365,9 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "market_pairs", "is_active", "ALTER TABLE market_pairs ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "market_pairs", "source", "ALTER TABLE market_pairs ADD COLUMN source VARCHAR(32) NOT NULL DEFAULT 'devsbite'")
         await _ensure_column(conn, db_name, "market_pairs", "last_seen_at", "ALTER TABLE market_pairs ADD COLUMN last_seen_at TIMESTAMP NULL DEFAULT NULL")
+        await _ensure_column(conn, db_name, "signal_indicators", "description", "ALTER TABLE signal_indicators ADD COLUMN description VARCHAR(255) NULL")
+        await _ensure_column(conn, db_name, "signal_indicators", "is_enabled", "ALTER TABLE signal_indicators ADD COLUMN is_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "signal_indicators", "sort_order", "ALTER TABLE signal_indicators ADD COLUMN sort_order INT NOT NULL DEFAULT 100")
 
         await _ensure_index(conn, db_name, "signals", "idx_signals_user_created", "CREATE INDEX idx_signals_user_created ON signals (user_id, created_at)")
         await _ensure_index(conn, db_name, "signals", "idx_signals_status", "CREATE INDEX idx_signals_status ON signals (status)")
@@ -326,8 +378,10 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "users", "idx_users_activation_status", "CREATE INDEX idx_users_activation_status ON users (activation_status)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_kind_active", "CREATE INDEX idx_market_pairs_kind_active ON market_pairs (pair_kind, is_active)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_last_seen", "CREATE INDEX idx_market_pairs_last_seen ON market_pairs (last_seen_at)")
+        await _ensure_index(conn, db_name, "signal_indicators", "idx_signal_indicators_enabled_order", "CREATE INDEX idx_signal_indicators_enabled_order ON signal_indicators (is_enabled, sort_order)")
 
         await _seed_feature_flags(conn)
+        await _seed_signal_indicators(conn)
         await _seed_app_settings(conn)
         await _seed_default_admin(conn)
 

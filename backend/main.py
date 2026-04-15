@@ -772,6 +772,34 @@ async def get_market_options_payload(kind: str, min_payout: int) -> Dict[str, An
     return payload
 
 
+async def get_enabled_indicators_payload() -> Dict[str, Any]:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT `code`, title, description
+                FROM signal_indicators
+                WHERE is_enabled = 1
+                ORDER BY sort_order ASC, title ASC
+                """
+            )
+            rows = await cur.fetchall()
+    items = [
+        {
+            "code": str(row.get("code") or ""),
+            "title": str(row.get("title") or ""),
+            "description": str(row.get("description") or ""),
+        }
+        for row in rows
+        if row.get("code") and row.get("title")
+    ]
+    return {
+        "items": items,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @app.get("/api/health")
 async def api_health():
     return {"status": "ok", "service": "sonicfx-api"}
@@ -857,6 +885,12 @@ async def get_market_options(
 ):
     await upsert_user_from_telegram(user)
     return await get_market_options_payload(kind=kind, min_payout=min_payout)
+
+
+@app.get("/api/indicators/options")
+async def get_indicator_options(user: Dict[str, Any] = Depends(get_telegram_user)):
+    await upsert_user_from_telegram(user)
+    return await get_enabled_indicators_payload()
 
 
 @app.get("/api/pairs/forex")

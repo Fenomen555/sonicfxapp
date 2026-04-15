@@ -182,6 +182,11 @@ class AdminMarketSettingsUpdateRequest(BaseModel):
     market_pairs_sync_interval_min: int = Field(ge=2, le=30)
 
 
+class AdminIndicatorUpdateRequest(BaseModel):
+    code: str
+    is_enabled: int
+
+
 def _normalize_tg_language(raw: str) -> str:
     lang = (raw or "").strip().lower()
     if "-" in lang:
@@ -796,6 +801,43 @@ async def get_enabled_indicators_payload() -> Dict[str, Any]:
     ]
     return {
         "items": items,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+async def get_admin_indicators_payload() -> Dict[str, Any]:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT `code`, title, description, is_enabled, sort_order, updated_at
+                FROM signal_indicators
+                ORDER BY sort_order ASC, title ASC, `code` ASC
+                """
+            )
+            rows = await cur.fetchall()
+
+    items = [
+        {
+            "code": str(row.get("code") or ""),
+            "title": str(row.get("title") or ""),
+            "description": str(row.get("description") or ""),
+            "is_enabled": int(row.get("is_enabled") or 0),
+            "sort_order": int(row.get("sort_order") or 100),
+            "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
+        }
+        for row in rows
+        if row.get("code") and row.get("title")
+    ]
+    enabled_total = sum(1 for item in items if item["is_enabled"] == 1)
+    return {
+        "items": items,
+        "summary": {
+            "total": len(items),
+            "enabled": enabled_total,
+            "disabled": max(len(items) - enabled_total, 0),
+        },
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -1785,6 +1827,43 @@ async def admin_update_market_settings(
         {"market_pairs_sync_interval_min": interval_min},
     )
     return {"status": "success", "market_pairs_sync_interval_min": interval_min}
+
+
+@app.get("/api/admin/indicators")
+async def admin_get_indicators(admin: Dict[str, Any] = Depends(get_admin_user)):
+    return await get_admin_indicators_payload()
+
+
+@app.post("/api/admin/indicators")
+async def admin_update_indicator(
+    payload: AdminIndicatorUpdateRequest,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    code = str(payload.code or "").strip().lower()
+    if not code:
+        raise HTTPException(status_code=400, detail="Indicator code is required")
+
+    is_enabled = 1 if int(payload.is_enabled or 0) == 1 else 0
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE signal_indicators
+                SET is_enabled = %s
+                WHERE `code` = %s
+                """,
+                (is_enabled, code),
+            )
+            if cur.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Indicator not found")
+
+    await add_admin_audit(
+        int(admin["user_id"]),
+        "admin_update_indicator",
+        {"code": code, "is_enabled": is_enabled},
+    )
+    return {"status": "success", "code": code, "is_enabled": is_enabled}
 
 
 @dp.message(CommandStart())

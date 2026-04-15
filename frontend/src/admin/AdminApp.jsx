@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { apiAdminFetchJson } from "../lib/api";
+import { getDeviceProfile } from "../lib/device";
+import { getIndicatorMeta } from "../lib/indicatorMeta";
 import "./admin.css";
 
 const TABS = [
-  { id: "stats", label: "Обзор", subtitle: "Статистика и активность", accent: "A" },
-  { id: "users", label: "Пользователи", subtitle: "Карточки, поиск и фильтры", accent: "U" },
-  { id: "flags", label: "Функции", subtitle: "Управление режимами", accent: "F" },
-  { id: "market", label: "Рынок", subtitle: "Пары и синхронизация", accent: "M" }
+  { id: "stats", label: "\u041e\u0431\u0437\u043e\u0440", subtitle: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u0438 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c" },
+  { id: "users", label: "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438", subtitle: "\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0438, \u043f\u043e\u0438\u0441\u043a \u0438 \u0444\u0438\u043b\u044c\u0442\u0440\u044b" },
+  { id: "flags", label: "\u0424\u0443\u043d\u043a\u0446\u0438\u0438", subtitle: "\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0440\u0435\u0436\u0438\u043c\u0430\u043c\u0438" },
+  { id: "market", label: "\u0420\u044b\u043d\u043e\u043a", subtitle: "\u041f\u0430\u0440\u044b \u0438 \u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f" },
+  { id: "indicators", label: "\u0418\u043d\u0434\u0438\u043a\u0430\u0442\u043e\u0440\u044b", subtitle: "\u041a\u0430\u0442\u0430\u043b\u043e\u0433 \u0438 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c" }
 ];
 
 const FLAG_META = {
@@ -47,6 +50,15 @@ const EMPTY_MARKET_SETTINGS = {
   items: []
 };
 
+const EMPTY_INDICATOR_SETTINGS = {
+  items: [],
+  summary: {
+    total: 0,
+    enabled: 0,
+    disabled: 0
+  }
+};
+
 function TabGlyph({ kind }) {
   if (kind === "stats") {
     return (
@@ -73,6 +85,19 @@ function TabGlyph({ kind }) {
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <path d="M7 6.5h10l-2.4 3.2L17 13H7V6.5Z" />
         <path d="M7 5v14" />
+      </svg>
+    );
+  }
+  if (kind === "indicators") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 18h12" />
+        <path d="M8 16V8" />
+        <path d="M12 16V5" />
+        <path d="M16 16v-6" />
+        <path d="M5 10.5h3" />
+        <path d="M11 8.5h3" />
+        <path d="M15 12.5h3" />
       </svg>
     );
   }
@@ -183,12 +208,18 @@ export default function AdminApp({ authError }) {
   const [tab, setTab] = useState("stats");
   const [menuExpanded, setMenuExpanded] = useState(true);
   const [marketDetailsExpanded, setMarketDetailsExpanded] = useState(false);
+  const [device, setDevice] = useState(() => getDeviceProfile());
+  const [safeAreaTop, setSafeAreaTop] = useState(0);
+  const [contentAreaTop, setContentAreaTop] = useState(56);
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [flags, setFlags] = useState([]);
   const [marketSettings, setMarketSettings] = useState(EMPTY_MARKET_SETTINGS);
+  const [indicatorSettings, setIndicatorSettings] = useState(EMPTY_INDICATOR_SETTINGS);
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
+  const [indicatorSearch, setIndicatorSearch] = useState("");
+  const [indicatorSavingCode, setIndicatorSavingCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [toastItems, setToastItems] = useState([]);
   const [userSearch, setUserSearch] = useState("");
@@ -210,6 +241,66 @@ export default function AdminApp({ authError }) {
     () => users.find((item) => item.user_id === selectedUserId) || null,
     [users, selectedUserId]
   );
+
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+
+    const updateDevice = () => {
+      setDevice(getDeviceProfile());
+    };
+
+    updateDevice();
+    window.addEventListener("resize", updateDevice);
+    if (tg?.onEvent) tg.onEvent("viewportChanged", updateDevice);
+
+    return () => {
+      window.removeEventListener("resize", updateDevice);
+      if (tg?.offEvent) tg.offEvent("viewportChanged", updateDevice);
+    };
+  }, []);
+
+  useEffect(() => {
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+
+    const updateInsets = () => {
+      const root = window.getComputedStyle(document.documentElement);
+      const cssSafeTop = parseFloat(root.getPropertyValue("--tg-safe-area-inset-top")) || 0;
+      const cssContentTop = parseFloat(root.getPropertyValue("--tg-content-safe-area-inset-top")) || 0;
+
+      const platform = (tg?.platform || "").toLowerCase();
+      const isDesktopPlatform = platform === "tdesktop" || platform === "web" || platform === "macos";
+
+      let sTop = Number(tg?.safeAreaInset?.top ?? cssSafeTop ?? 0);
+      let cTop = Number(tg?.contentSafeAreaInset?.top ?? cssContentTop ?? 0);
+
+      if (isDesktopPlatform) {
+        if (!sTop) sTop = 0;
+        if (!cTop) cTop = 0;
+      } else if (!cTop || cTop <= sTop) {
+        cTop = Math.max(sTop + 56, 60);
+      }
+
+      setSafeAreaTop(sTop);
+      setContentAreaTop(cTop);
+    };
+
+    if (typeof tg.requestSafeArea === "function") tg.requestSafeArea();
+    if (typeof tg.requestContentSafeArea === "function") tg.requestContentSafeArea();
+    updateInsets();
+
+    if (tg.onEvent) {
+      tg.onEvent("contentSafeAreaChanged", updateInsets);
+      tg.onEvent("safeAreaChanged", updateInsets);
+    }
+
+    return () => {
+      if (tg.offEvent) {
+        tg.offEvent("contentSafeAreaChanged", updateInsets);
+        tg.offEvent("safeAreaChanged", updateInsets);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedUser) return;
@@ -238,6 +329,10 @@ export default function AdminApp({ authError }) {
         const data = await apiAdminFetchJson("/api/admin/market-settings");
         setMarketSettings(data || EMPTY_MARKET_SETTINGS);
         setMarketInterval(String(data?.market_pairs_sync_interval_min || 5));
+      }
+      if (targetTab === "indicators") {
+        const data = await apiAdminFetchJson("/api/admin/indicators");
+        setIndicatorSettings(data || EMPTY_INDICATOR_SETTINGS);
       }
     } catch (error) {
       pushToast("error", "Не удалось загрузить раздел", error.message || "Попробуйте обновить данные ещё раз.");
@@ -326,18 +421,21 @@ export default function AdminApp({ authError }) {
   const tabCards = useMemo(() => {
     return TABS.map((item) => {
       if (item.id === "stats") {
-        return { ...item, metric: `${formatNumber(stats?.users_total || 0)} пользователей` };
+        return { ...item, metric: `${formatNumber(stats?.users_total || 0)} \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439` };
       }
       if (item.id === "users") {
-        return { ...item, metric: `${formatNumber(users.length)} карточек` };
+        return { ...item, metric: `${formatNumber(users.length)} \u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a` };
       }
       if (item.id === "flags") {
-        return { ...item, metric: `${formatNumber(flags.filter((flag) => flag.is_enabled === 1).length)} активных` };
+        return { ...item, metric: `${formatNumber(flags.filter((flag) => flag.is_enabled === 1).length)} \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445` };
       }
-      const marketCount = (marketSettings.items || []).length;
-      return { ...item, metric: `${formatNumber(marketCount)} рынков` };
+      if (item.id === "indicators") {
+        return { ...item, metric: `${formatNumber(indicatorSettings.summary?.enabled || 0)} \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u043e` };
+      }
+      const marketCount = marketSettings.items?.length || 0;
+      return { ...item, metric: `${formatNumber(marketCount)} \u0440\u044b\u043d\u043a\u043e\u0432` };
     });
-  }, [flags, marketSettings.items, stats?.users_total, users.length]);
+  }, [flags, indicatorSettings.summary?.enabled, marketSettings.items, stats?.users_total, users.length]);
 
   const marketSummary = useMemo(() => {
     const items = marketSettings.items || [];
@@ -360,6 +458,48 @@ export default function AdminApp({ authError }) {
       { key: "last_sync", label: "Последний sync", value: totals.lastSeenAt ? formatDateTime(totals.lastSeenAt) : "-", note: "Время последнего обновления" }
     ];
   }, [marketSettings.items]);
+
+  const indicatorItems = useMemo(() => {
+    const query = indicatorSearch.trim().toLowerCase();
+    return (indicatorSettings.items || []).filter((item) => {
+      const meta = getIndicatorMeta(item.code, item.title, item.description);
+      const haystack = `${item.code || ""} ${item.title || ""} ${item.description || ""} ${meta.short} ${meta.title}`.toLowerCase();
+      return !query || haystack.includes(query);
+    });
+  }, [indicatorSearch, indicatorSettings.items]);
+
+  const indicatorSummaryCards = useMemo(() => {
+    const summary = indicatorSettings.summary || EMPTY_INDICATOR_SETTINGS.summary;
+    return [
+      {
+        key: "total",
+        label: "Всего индикаторов",
+        value: formatNumber(summary.total),
+        note: "Полный каталог для режима индикаторов"
+      },
+      {
+        key: "enabled",
+        label: "Включено",
+        value: formatNumber(summary.enabled),
+        note: "Показываются пользователю в Mini App"
+      },
+      {
+        key: "disabled",
+        label: "Скрыто",
+        value: formatNumber(summary.disabled),
+        note: "Отключены и не выдаются на фронт"
+      }
+    ];
+  }, [indicatorSettings.summary]);
+
+  const headerTopOffset = device.isDesktop
+    ? 8
+    : Math.max(contentAreaTop - (device.isCompactPhone ? 34 : 36), safeAreaTop + 8);
+  const shellTopPadding = Math.max(
+    headerTopOffset + (device.isDesktop ? 56 : 60),
+    device.isDesktop ? 84 : safeAreaTop + 72
+  );
+
   const toggleFlag = async (item) => {
     setFlagSavingKey(item.key);
     try {
@@ -375,6 +515,29 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось изменить функцию", error.message || "Попробуйте ещё раз.");
     } finally {
       setFlagSavingKey("");
+    }
+  };
+
+  const toggleIndicator = async (item) => {
+    const enabled = Number(item?.is_enabled || 0) === 1;
+    setIndicatorSavingCode(item.code);
+    try {
+      await apiAdminFetchJson("/api/admin/indicators", {
+        method: "POST",
+        body: JSON.stringify({ code: item.code, is_enabled: enabled ? 0 : 1 })
+      });
+      const data = await apiAdminFetchJson("/api/admin/indicators");
+      setIndicatorSettings(data || EMPTY_INDICATOR_SETTINGS);
+      const meta = getIndicatorMeta(item.code, item.title, item.description);
+      pushToast(
+        "success",
+        enabled ? "Индикатор скрыт" : "Индикатор включён",
+        `${meta.short} ${meta.title} ${enabled ? "убран из выдачи" : "снова доступен пользователям"}.`
+      );
+    } catch (error) {
+      pushToast("error", "Не удалось обновить индикатор", error.message || "Попробуйте ещё раз.");
+    } finally {
+      setIndicatorSavingCode("");
     }
   };
 
@@ -421,14 +584,31 @@ export default function AdminApp({ authError }) {
       setUserSaving(false);
     }
   };
-
   if (authError) {
     return (
-      <div className="admin-shell">
+      <div
+        className={`admin-shell ${device.isDesktop ? "admin-shell-desktop" : "admin-shell-mobile"}`}
+        style={{
+          "--admin-top-padding": `${shellTopPadding}px`,
+          "--admin-header-top": `${headerTopOffset}px`
+        }}
+      >
+        <header className="app-header admin-app-header">
+          <button
+            type="button"
+            className="brand-pill brand-pill-button"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            aria-label="SonicFX admin"
+          >
+            <span className="brand-main">Sonic</span>
+            <span className="brand-fx">fx</span>
+          </button>
+        </header>
+
         <div className="admin-card admin-empty-state">
           <div className="admin-empty-icon">!</div>
           <div className="admin-empty-copy">
-            <strong>Админ-панель недоступна</strong>
+            <strong>\u0410\u0434\u043c\u0438\u043d-\u043f\u0430\u043d\u0435\u043b\u044c \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430</strong>
             <span>{authError}</span>
           </div>
         </div>
@@ -437,19 +617,37 @@ export default function AdminApp({ authError }) {
   }
 
   return (
-    <div className="admin-shell">
-      <section className="admin-topbar admin-card">
-        <div className="admin-topbar-copy">
-          <span className="admin-kicker">Управление SonicFX</span>
-          <h1>Админка mini app</h1>
-          <p>Собранный центр управления пользователями, режимами и рыночными данными.</p>
+    <div
+      className={`admin-shell ${device.isDesktop ? "admin-shell-desktop" : "admin-shell-mobile"}`}
+      style={{
+        "--admin-top-padding": `${shellTopPadding}px`,
+        "--admin-header-top": `${headerTopOffset}px`
+      }}
+    >
+      <header className="app-header admin-app-header">
+        <button
+          type="button"
+          className="brand-pill brand-pill-button"
+          onClick={() => setTab("stats")}
+          aria-label="\u041e\u0431\u0437\u043e\u0440 \u0430\u0434\u043c\u0438\u043d\u043a\u0438"
+        >
+          <span className="brand-main">Sonic</span>
+          <span className="brand-fx">fx</span>
+        </button>
+      </header>
+
+      <section className="admin-toolbar admin-card">
+        <div className="admin-toolbar-copy">
+          <span className="admin-kicker">SonicFX Control</span>
+          <h1>\u0426\u0435\u043d\u0442\u0440 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f</h1>
+          <p>\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438, \u0440\u0435\u0436\u0438\u043c\u044b, \u0440\u044b\u043d\u043e\u043a \u0438 \u0438\u043d\u0434\u0438\u043a\u0430\u0442\u043e\u0440\u044b \u0432 \u043e\u0434\u043d\u043e\u043c \u043c\u0435\u0441\u0442\u0435.</p>
         </div>
-        <div className="admin-topbar-actions">
+        <div className="admin-toolbar-actions">
           <button className="admin-ghost-button" type="button" onClick={() => setMenuExpanded((prev) => !prev)}>
-            {menuExpanded ? "Свернуть разделы" : "Развернуть разделы"}
+            {menuExpanded ? "\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b\u044b" : "\u0420\u0430\u0437\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b\u044b"}
           </button>
           <button className="admin-primary-button" type="button" onClick={refreshActiveTab}>
-            Обновить данные
+            \u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435
           </button>
         </div>
       </section>
@@ -655,6 +853,85 @@ export default function AdminApp({ authError }) {
               );
             })}
           </section>
+        )}
+        {!loading && tab === "indicators" && (
+          <>
+            <section className="admin-kpi-grid admin-indicator-summary-grid">
+              {indicatorSummaryCards.map((item) => (
+                <article className="admin-card admin-kpi-card tone-info" key={item.key}>
+                  <span className="admin-kpi-label">{item.label}</span>
+                  <strong className="admin-kpi-value small">{item.value}</strong>
+                  <span className="admin-kpi-note">{item.note}</span>
+                </article>
+              ))}
+            </section>
+
+            <section className="admin-card admin-indicator-filter-card">
+              <div className="admin-filter-head">
+                <div>
+                  <div className="admin-section-title">Управление индикаторами</div>
+                  <div className="admin-muted-text">Короткий код, понятное название и моментальное включение или скрытие из режима индикаторов.</div>
+                </div>
+                <div className="admin-filter-meta">Показываем: {indicatorItems.length}</div>
+              </div>
+
+              <label className="admin-field">
+                <span>Поиск по коду, названию или описанию</span>
+                <input
+                  className="admin-input"
+                  type="text"
+                  placeholder="Например: RSI, MACD, Bollinger"
+                  value={indicatorSearch}
+                  onChange={(e) => setIndicatorSearch(e.target.value)}
+                />
+              </label>
+            </section>
+
+            {indicatorItems.length === 0 && (
+              <section className="admin-card admin-empty-state">
+                <div className="admin-empty-icon">0</div>
+                <div className="admin-empty-copy">
+                  <strong>Индикаторы не найдены</strong>
+                  <span>Попробуй изменить поисковый запрос или проверь, что каталог уже проинициализирован в базе.</span>
+                </div>
+              </section>
+            )}
+
+            <section className="admin-indicator-grid">
+              {indicatorItems.map((item) => {
+                const meta = getIndicatorMeta(item.code, item.title, item.description);
+                const enabled = Number(item.is_enabled || 0) === 1;
+                return (
+                  <article className={`admin-card admin-indicator-card ${enabled ? "is-enabled" : "is-disabled"}`} key={item.code}>
+                    <div className="admin-indicator-head">
+                      <div className="admin-indicator-copy">
+                        <span className={`admin-indicator-badge tone-${meta.tone}`}>{meta.short}</span>
+                        <div>
+                          <strong>{meta.title}</strong>
+                          <span>{item.description || "Индикатор доступен для ручной генерации сигнала."}</span>
+                        </div>
+                      </div>
+                      <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
+                        {enabled ? "Включён" : "Скрыт"}
+                      </span>
+                    </div>
+
+                    <div className="admin-indicator-footer">
+                      <span className="admin-muted-text">Обновлён: {formatDateTime(item.updated_at)}</span>
+                      <button
+                        className={enabled ? "admin-ghost-button" : "admin-primary-button"}
+                        disabled={indicatorSavingCode === item.code}
+                        onClick={() => toggleIndicator(item)}
+                        type="button"
+                      >
+                        {indicatorSavingCode === item.code ? "Сохраняем..." : enabled ? "Отключить" : "Включить"}
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+          </>
         )}
         {!loading && tab === "market" && (
           <>

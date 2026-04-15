@@ -11,6 +11,7 @@ import {
 import lightningCtaIcon from "../assets/cta-lightning.png";
 import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetchJson } from "../lib/api";
+import { getIndicatorMeta } from "../lib/indicatorMeta";
 
 const FALLBACK_EXPIRATIONS = [
   { value: "5s", label: "5s" },
@@ -206,6 +207,11 @@ export default function HomePage({ t }) {
   const selectedPairMeta = pairs.find((item) => item?.pair === asset) || null;
   const selectedExpirationMeta = expirations.find((item) => item?.value === expiration) || null;
   const selectedIndicatorMeta = indicators.find((item) => item?.code === selectedIndicator) || indicators[0] || FALLBACK_INDICATORS[0];
+  const selectedIndicatorDisplay = getIndicatorMeta(
+    selectedIndicatorMeta?.code,
+    selectedIndicatorMeta?.title,
+    selectedIndicatorMeta?.description
+  );
   const actionLabel = signalMode === "automatic"
     ? "Запустить авто режим"
     : signalMode === "indicators"
@@ -232,7 +238,10 @@ export default function HomePage({ t }) {
       })
     : pairs;
   const filteredIndicators = pairSearchValue
-    ? indicators.filter((item) => `${item?.title || ""} ${item?.description || ""} ${item?.code || ""}`.toLowerCase().includes(pairSearchValue))
+    ? indicators.filter((item) => {
+        const meta = getIndicatorMeta(item?.code, item?.title, item?.description);
+        return `${item?.title || ""} ${item?.description || ""} ${item?.code || ""} ${meta.short} ${meta.title}`.toLowerCase().includes(pairSearchValue);
+      })
     : indicators;
 
   function openPickerSheet(type) {
@@ -270,7 +279,14 @@ export default function HomePage({ t }) {
         <div className="upload-icon" aria-hidden="true">
           {isIndicatorsMode ? <IndicatorModeIcon /> : <UploadScanAnimation />}
         </div>
-        <div className="upload-title">{isIndicatorsMode ? (selectedIndicatorMeta?.title || "RSI") : (t.home.upload || "Upload chart")}</div>
+        {isIndicatorsMode ? (
+          <div className="upload-indicator-hero">
+            <span className={`indicator-inline-code tone-${selectedIndicatorDisplay.tone}`}>{selectedIndicatorDisplay.short}</span>
+            <div className="upload-title">{selectedIndicatorDisplay.title}</div>
+          </div>
+        ) : (
+          <div className="upload-title">{t.home.upload || "Upload chart"}</div>
+        )}
         <div className="upload-hint">
           {isIndicatorsMode
             ? (selectedIndicatorMeta?.description || "Choose indicator for manual signal")
@@ -514,10 +530,11 @@ export default function HomePage({ t }) {
                 const isPair = pickerSheet === "asset";
                 const isIndicator = pickerSheet === "indicator";
                 const isActive = isPair ? asset === item.pair : isIndicator ? selectedIndicator === item.code : expiration === item.value;
+                const indicatorMeta = isIndicator ? getIndicatorMeta(item.code, item.title, item.description) : null;
                 const title = isPair
                   ? `${item.pair}${typeof item.payout === "number" ? ` (${item.payout}%)` : ""}`
                   : isIndicator
-                    ? item.title
+                    ? indicatorMeta.title
                     : item.label;
                 return (
                   <button
@@ -536,8 +553,17 @@ export default function HomePage({ t }) {
                     }}
                   >
                     <span className="action-sheet-option-copy">
-                      <strong>{title}</strong>
-                      {isIndicator && item.description ? <small>{item.description}</small> : null}
+                      {isIndicator ? (
+                        <span className="indicator-option-line">
+                          <span className={`indicator-inline-code tone-${indicatorMeta.tone}`}>{indicatorMeta.short}</span>
+                          <span className="indicator-option-copy">
+                            <strong>{title}</strong>
+                            {item.description ? <small>{item.description}</small> : null}
+                          </span>
+                        </span>
+                      ) : (
+                        <strong>{title}</strong>
+                      )}
                     </span>
                   </button>
                 );

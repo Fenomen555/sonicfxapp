@@ -168,12 +168,17 @@
 
 .profile-settings-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .profile-setting-block {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  padding: 14px;
+  background:
+    linear-gradient(180deg, rgba(13, 19, 29, 0.72), rgba(10, 16, 24, 0.68));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .profile-setting-block-wide {
@@ -380,12 +385,20 @@
   color: rgba(216, 226, 246, 0.92);
 }
 
+.profile-theme-section-head span {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
 .profile-theme-switch {
-  width: 100%;
+  width: min(100%, 280px);
   padding: 0;
   border: 0;
   background: none;
   cursor: pointer;
+  margin-top: 2px;
 }
 
 .profile-theme-switch-track {
@@ -393,8 +406,8 @@
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 88px;
-  padding: 10px 18px;
+  min-height: 58px;
+  padding: 6px 14px;
   border-radius: 999px;
   overflow: hidden;
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease;
@@ -402,45 +415,45 @@
 
 .profile-theme-switch.is-light .profile-theme-switch-track {
   background:
-    radial-gradient(circle at 16% 50%, rgba(255, 255, 255, 0.48), transparent 26%),
-    linear-gradient(135deg, #ff6ba8 0%, #ff9f43 44%, #ffd25f 100%);
+    radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.34), transparent 24%),
+    linear-gradient(135deg, #ff8db5 0%, #ffb14b 54%, #ffc95a 100%);
   box-shadow:
-    0 18px 28px rgba(255, 164, 96, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+    0 14px 24px rgba(255, 164, 96, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .profile-theme-switch.is-dark .profile-theme-switch-track {
   background:
-    radial-gradient(circle at 84% 50%, rgba(255, 255, 255, 0.18), transparent 26%),
-    linear-gradient(135deg, #0b0d13 0%, #17181f 48%, #0b0c11 100%);
+    radial-gradient(circle at 82% 50%, rgba(255, 255, 255, 0.12), transparent 24%),
+    linear-gradient(135deg, #11131a 0%, #181b22 52%, #0c0e13 100%);
   box-shadow:
-    0 18px 28px rgba(6, 9, 15, 0.24),
+    0 14px 24px rgba(6, 9, 15, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .profile-theme-thumb {
   position: absolute;
   top: 50%;
-  width: 68px;
-  height: 68px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.92);
   box-shadow:
-    0 12px 24px rgba(11, 16, 25, 0.2),
+    0 10px 18px rgba(11, 16, 25, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
   transform: translateY(-50%);
   transition: left 0.2s ease, transform 0.2s ease, background 0.2s ease;
 }
 
 .profile-theme-switch.is-light .profile-theme-thumb {
-  left: 10px;
+  left: 6px;
 }
 
 .profile-theme-switch.is-dark .profile-theme-thumb {
-  left: calc(100% - 78px);
+  left: calc(100% - 52px);
   background: rgba(248, 250, 255, 0.98);
 }
 
@@ -452,11 +465,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
-  font-size: 28px;
+  font-size: 18px;
   line-height: 1;
 }
 
@@ -471,37 +484,30 @@
 .profile-theme-copy {
   min-width: 0;
   display: grid;
-  gap: 4px;
-  padding-left: 84px;
-  text-align: left;
+  gap: 1px;
+  padding-inline: 58px;
+  text-align: center;
   font-weight: 700;
 }
 
 .profile-theme-copy strong {
   display: block;
   margin-bottom: 0;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .profile-theme-copy small {
   margin-bottom: 0;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.03em;
 }
 
 .profile-theme-switch.is-light .profile-theme-copy strong,
 .profile-theme-switch.is-light .profile-theme-copy small {
   color: rgba(124, 39, 46, 0.86);
-}
-
-.profile-theme-switch.is-dark .profile-theme-copy {
-  padding-left: 0;
-  padding-right: 84px;
-  text-align: right;
 }
 
 .profile-theme-switch.is-dark .profile-theme-copy strong,
@@ -660,13 +666,13 @@
 
 :root[data-theme="light"] .profile-theme-switch.is-light .profile-theme-switch-track {
   box-shadow:
-    0 18px 28px rgba(255, 164, 96, 0.16),
+    0 12px 22px rgba(255, 164, 96, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.32);
 }
 
 :root[data-theme="light"] .profile-theme-switch.is-dark .profile-theme-switch-track {
   box-shadow:
-    0 18px 28px rgba(20, 30, 52, 0.16),
+    0 12px 22px rgba(20, 30, 52, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
@@ -716,32 +722,36 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .profile-setting-block {
+    padding: 12px;
+  }
+
   .profile-theme-switch-track {
-    min-height: 76px;
-    padding: 8px 14px;
+    min-height: 54px;
+    padding: 5px 12px;
   }
 
   .profile-theme-copy strong {
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .profile-theme-copy small {
-    font-size: 11px;
+    font-size: 9px;
   }
 
   .profile-theme-thumb {
-    width: 58px;
-    height: 58px;
+    width: 42px;
+    height: 42px;
   }
 
   .profile-theme-switch.is-dark .profile-theme-thumb {
-    left: calc(100% - 66px);
+    left: calc(100% - 47px);
   }
 
   .profile-theme-badge {
-    width: 40px;
-    height: 40px;
-    font-size: 24px;
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
   }
 
   .profile-timezone-summary {

@@ -334,6 +334,9 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
 
           <div className="profile-setting-block profile-setting-block-wide">
             <label className="field-label">{t.profile.theme || "Тема"}</label>
+            <div className="profile-theme-section-head">
+              <span>{t.profile.themeSwitchHint || "Переключай внешний вид одним тапом."}</span>
+            </div>
             <button
               type="button"
               className={`profile-theme-switch ${theme === "dark" ? "is-dark" : "is-light"}`}

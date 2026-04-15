@@ -3,11 +3,12 @@ import ReactCountryFlag from "react-country-flag";
 import { apiFetchJson } from "../lib/api";
 
 const TIMEZONE_OPTIONS = [
-  { id: "Europe/Kiev", city: "Kyiv", offset: "UTC+2 / UTC+3", flag: "UA" },
-  { id: "Europe/London", city: "London", offset: "UTC+0 / UTC+1", flag: "GB" },
-  { id: "Europe/Berlin", city: "Berlin", offset: "UTC+1 / UTC+2", flag: "DE" },
-  { id: "America/New_York", city: "New York", offset: "UTC-5 / UTC-4", flag: "US" },
-  { id: "Asia/Dubai", city: "Dubai", offset: "UTC+4", flag: "AE" }
+  { id: "Europe/Kiev", city: "Kyiv", flag: "UA" },
+  { id: "Europe/London", city: "London", flag: "GB" },
+  { id: "Europe/Berlin", city: "Berlin", flag: "DE" },
+  { id: "Europe/Moscow", city: "Moscow", flag: "RU" },
+  { id: "America/New_York", city: "New York", flag: "US" },
+  { id: "Asia/Dubai", city: "Dubai", flag: "AE" }
 ];
 
 function getInitials(user, fallback) {
@@ -21,18 +22,48 @@ function getInitials(user, fallback) {
     .toUpperCase();
 }
 
+function getLocale(lang) {
+  if (lang === "en") return "en-GB";
+  if (lang === "uk") return "uk-UA";
+  return "ru-RU";
+}
+
 function formatProfileDate(value, lang) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  const locale = lang === "en" ? "en-GB" : lang === "uk" ? "uk-UA" : "ru-RU";
-  return date.toLocaleString(locale, {
+  return date.toLocaleString(getLocale(lang), {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit"
   });
+}
+
+function formatTimezoneNow(timeZone, lang) {
+  try {
+    return new Intl.DateTimeFormat(getLocale(lang), {
+      timeZone,
+      hour: "2-digit",
+      minute: "2-digit"
+    }).format(new Date());
+  } catch (_error) {
+    return "--:--";
+  }
+}
+
+function formatTimezoneOffset(timeZone) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "shortOffset"
+    }).formatToParts(new Date());
+    const offset = parts.find((part) => part.type === "timeZoneName")?.value || "GMT";
+    return offset.replace("GMT", "UTC");
+  } catch (_error) {
+    return "UTC";
+  }
 }
 
 function getStatusMeta(status, t) {
@@ -62,12 +93,14 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   const [statusTone, setStatusTone] = useState("success");
   const [saving, setSaving] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [isTimezoneExpanded, setIsTimezoneExpanded] = useState(false);
 
   useEffect(() => {
     setLang(user?.lang || "ru");
     setTheme(user?.theme || "dark");
     setTimezone(user?.timezone || "Europe/Kiev");
     setAvatarFailed(false);
+    setIsTimezoneExpanded(false);
   }, [user]);
 
   const profileName = useMemo(() => {
@@ -114,20 +147,34 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
     () => [
       {
         id: "light",
-        label: t.profile.themeDayMode || "Day mode",
+        label: t.profile.themeDayMode || "DAY MODE",
         hint: t.profile.themeLight || "Светлая",
         tone: "light",
-        symbol: "☀"
+        symbol: "\u2600"
       },
       {
         id: "dark",
-        label: t.profile.themeNightMode || "Night mode",
+        label: t.profile.themeNightMode || "NIGHT MODE",
         hint: t.profile.themeDark || "Темная",
         tone: "dark",
-        symbol: "☾"
+        symbol: "\u263E"
       }
     ],
     [t.profile.themeDark, t.profile.themeLight, t.profile.themeDayMode, t.profile.themeNightMode]
+  );
+
+  const timezoneOptions = useMemo(
+    () => TIMEZONE_OPTIONS.map((item) => ({
+      ...item,
+      currentTime: formatTimezoneNow(item.id, lang),
+      currentOffset: formatTimezoneOffset(item.id)
+    })),
+    [lang]
+  );
+
+  const selectedTimezoneOption = useMemo(
+    () => timezoneOptions.find((item) => item.id === timezone) || timezoneOptions[0] || TIMEZONE_OPTIONS[0],
+    [timezone, timezoneOptions]
   );
 
   const handleSave = async () => {
@@ -210,22 +257,59 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         <div className="profile-settings-grid">
           <div className="profile-setting-block profile-setting-block-wide">
             <label className="field-label">{t.profile.timezone || "Часовой пояс"}</label>
-            <div className="profile-timezone-grid">
-              {TIMEZONE_OPTIONS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`profile-timezone-chip ${timezone === item.id ? "active" : ""}`}
-                  onClick={() => setTimezone(item.id)}
-                >
-                  <span className="profile-timezone-top">
-                    <ReactCountryFlag svg countryCode={item.flag} aria-hidden="true" className="profile-timezone-flag" />
-                    <span className="profile-timezone-city">{item.city}</span>
+            <div className="profile-timezone-selector">
+              <button
+                type="button"
+                className={`profile-timezone-summary ${isTimezoneExpanded ? "expanded" : ""}`}
+                onClick={() => setIsTimezoneExpanded((prev) => !prev)}
+              >
+                <span className="profile-timezone-summary-copy">
+                  <span className="profile-timezone-summary-top">
+                    <ReactCountryFlag svg countryCode={selectedTimezoneOption.flag} aria-hidden="true" className="profile-timezone-flag" />
+                    <strong>{selectedTimezoneOption.city}</strong>
                   </span>
-                  <span className="profile-timezone-zone">{item.id}</span>
-                  <span className="profile-timezone-offset">{item.offset}</span>
-                </button>
-              ))}
+                  <span className="profile-timezone-summary-meta">
+                    <span>{selectedTimezoneOption.id}</span>
+                    <span>{selectedTimezoneOption.currentOffset} · {selectedTimezoneOption.currentTime}</span>
+                  </span>
+                </span>
+                <span className="profile-timezone-summary-side">
+                  <span className="profile-timezone-summary-state">
+                    {isTimezoneExpanded
+                      ? (t.profile.timezoneCollapse || "Свернуть")
+                      : (t.profile.timezoneChoose || "Выбрать")}
+                  </span>
+                  <span className={`profile-timezone-chevron ${isTimezoneExpanded ? "expanded" : ""}`} aria-hidden="true" />
+                </span>
+              </button>
+
+              {isTimezoneExpanded && (
+                <div className="profile-timezone-grid">
+                  {timezoneOptions.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`profile-timezone-chip ${timezone === item.id ? "active" : ""}`}
+                      onClick={() => {
+                        setTimezone(item.id);
+                        setIsTimezoneExpanded(false);
+                      }}
+                    >
+                      <span className="profile-timezone-top">
+                        <ReactCountryFlag svg countryCode={item.flag} aria-hidden="true" className="profile-timezone-flag" />
+                        <span className="profile-timezone-city">{item.city}</span>
+                      </span>
+                      <span className="profile-timezone-zone">{item.id}</span>
+                      <span className="profile-timezone-current-row">
+                        <span className="profile-timezone-offset">{item.currentOffset}</span>
+                        <span className="profile-timezone-current">
+                          {(t.profile.timezoneCurrent || "Сейчас")}: {item.currentTime}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -251,7 +335,7 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
 
           <div className="profile-setting-block profile-setting-block-wide">
             <label className="field-label">{t.profile.theme || "Тема"}</label>
-            <div className="profile-theme-switch">
+            <div className="profile-theme-switch" role="tablist" aria-label={t.profile.theme || "Тема"}>
               {themeOptions.map((item) => (
                 <button
                   key={item.id}
@@ -261,6 +345,8 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
                     setTheme(item.id);
                     onThemePreview(item.id);
                   }}
+                  role="tab"
+                  aria-selected={theme === item.id}
                 >
                   <span className={`profile-theme-visual ${item.tone}`} aria-hidden="true">
                     <span className={`profile-theme-badge ${item.tone}`}>{item.symbol}</span>

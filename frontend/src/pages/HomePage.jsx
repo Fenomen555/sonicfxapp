@@ -53,26 +53,6 @@ const FALLBACK_INDICATORS = [
   { code: "rate_of_change", title: "Rate Of Change", description: "ROC momentum percentage" }
 ];
 
-const SIGNAL_MODES = [
-  {
-    id: "scanner",
-    label: "Сканер",
-    hint: "Скриншот + AI разбор",
-    icon: ScannerModeIcon
-  },
-  {
-    id: "automatic",
-    label: "Автоматический",
-    hint: "AI ведет поток сигнала",
-    icon: AutoModeIcon
-  },
-  {
-    id: "indicators",
-    label: "Индикаторы",
-    hint: "Рынок, тикер и экспирация",
-    icon: IndicatorModeIcon
-  }
-];
 
 export default function HomePage({ t }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -96,6 +76,30 @@ export default function HomePage({ t }) {
     { id: "camera", label: t.home.camera || "Camera", icon: CameraIcon },
     { id: "link", label: t.home.link || "Link", icon: LinkIcon }
   ];
+
+  const signalModes = useMemo(
+    () => [
+      {
+        id: "scanner",
+        label: t.home.signalModeScannerLabel || "Scanner",
+        hint: t.home.signalModeScannerHint || "Screenshot + AI breakdown",
+        icon: ScannerModeIcon
+      },
+      {
+        id: "automatic",
+        label: t.home.signalModeAutomaticLabel || "Automatic",
+        hint: t.home.signalModeAutomaticHint || "AI drives the signal flow",
+        icon: AutoModeIcon
+      },
+      {
+        id: "indicators",
+        label: t.home.signalModeIndicatorsLabel || "Indicators",
+        hint: t.home.signalModeIndicatorsHint || "Market, symbol and expiration",
+        icon: IndicatorModeIcon
+      }
+    ],
+    [t.home]
+  );
 
   const allowedMarkets = useMemo(
     () => (signalMode === "indicators" ? INDICATOR_MARKETS : BASIC_MARKETS),
@@ -201,7 +205,7 @@ export default function HomePage({ t }) {
   }, [availableMarkets]);
 
   const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
-  const selectedMode = SIGNAL_MODES.find((item) => item.id === signalMode) || SIGNAL_MODES[0];
+  const selectedMode = signalModes.find((item) => item.id === signalMode) || signalModes[0];
   const SelectedModeIcon = selectedMode.icon;
   const isIndicatorsMode = signalMode === "indicators";
   const selectedPairMeta = pairs.find((item) => item?.pair === asset) || null;
@@ -213,22 +217,22 @@ export default function HomePage({ t }) {
     selectedIndicatorMeta?.description
   );
   const actionLabel = signalMode === "automatic"
-    ? "Запустить авто режим"
+    ? (t.home.automaticAction || "Start auto mode")
     : signalMode === "indicators"
-      ? "Получить сигнал"
-      : (t.home.analyze || "Анализировать");
+      ? (t.home.indicatorAction || "Get signal")
+      : (t.home.analyze || "Analyze");
 
   const configTitle = signalMode === "automatic"
-    ? "Автоматический поток"
+    ? (t.home.automaticConfigTitle || "Automatic flow")
     : signalMode === "indicators"
-      ? "Режим по индикаторам"
-      : "Параметры сканера";
+      ? (t.home.indicatorsConfigTitle || "Indicator mode")
+      : (t.home.scannerConfigTitle || "Scanner settings");
 
   const configHint = signalMode === "automatic"
-    ? "Подберем актив и время для автоматического сценария."
+    ? (t.home.automaticConfigHint || "We will pick the asset and timing for the automated scenario.")
     : signalMode === "indicators"
-      ? "Выберите рынок, тикер и экспирацию для ручного сигнала."
-      : "Сканер остается главным режимом и работает вместе с загрузкой графика.";
+      ? (t.home.indicatorsConfigHint || "Choose market, symbol and expiration for the manual signal.")
+      : (t.home.scannerConfigHint || "Scanner stays the primary mode and works together with chart upload.");
 
   const pairSearchValue = pickerSearch.trim().toLowerCase();
   const filteredPairs = pairSearchValue
@@ -294,8 +298,8 @@ export default function HomePage({ t }) {
         </div>
         <div className="upload-subhint">
           {isIndicatorsMode
-            ? (t.home.indicatorZoneHint || "Нажмите, чтобы выбрать индикатор")
-            : (t.home.sourceHint || "Р’С‹Р±РµСЂРёС‚Рµ РёСЃС‚РѕС‡РЅРёРє Р·Р°РіСЂСѓР·РєРё")}
+            ? (t.home.indicatorZoneHint || "Tap to choose an indicator")
+            : (t.home.sourceHint || "Choose a chart source")}
         </div>
       </button>
 
@@ -306,7 +310,7 @@ export default function HomePage({ t }) {
           onClick={() => setIsSignalModeExpanded((prev) => !prev)}
         >
           <span className="signal-panel-toggle-copy">
-            <span className="signal-panel-label">{t.home.signalModeLabel || "Режим генерации сигнала"}</span>
+            <span className="signal-panel-label">{t.home.signalModeLabel || "Signal generation mode"}</span>
             <span className="signal-panel-selected">
               <span className="signal-panel-selected-icon" aria-hidden="true">
                 <SelectedModeIcon />
@@ -318,14 +322,14 @@ export default function HomePage({ t }) {
             </span>
           </span>
           <span className="signal-panel-toggle-meta">
-            <span className="signal-panel-state">{isSignalModeExpanded ? "Свернуть" : "Выбрать"}</span>
+            <span className="signal-panel-state">{isSignalModeExpanded ? (t.home.signalModeCollapse || "Collapse") : (t.home.signalModeChoose || "Choose")}</span>
             <span className={`signal-panel-chevron ${isSignalModeExpanded ? "expanded" : ""}`} aria-hidden="true" />
           </span>
         </button>
 
         {isSignalModeExpanded && (
           <div className="signal-mode-grid">
-            {SIGNAL_MODES.filter((item) => item.id !== signalMode).map((item) => {
+            {signalModes.filter((item) => item.id !== signalMode).map((item) => {
               const Icon = item.icon;
               return (
                 <button
@@ -341,7 +345,7 @@ export default function HomePage({ t }) {
                     <strong>{item.label}</strong>
                     <small>{item.hint}</small>
                   </span>
-                  <span className="signal-mode-cta">Выбрать</span>
+                  <span className="signal-mode-cta">{t.home.signalModeChoose || "Choose"}</span>
                 </button>
               );
             })}
@@ -363,7 +367,7 @@ export default function HomePage({ t }) {
           <span className="generator-panel-badge">{selectedMode.label}</span>
         </div>
 
-        <label className="field-label">{t.home.marketLabel || "Рынок"}</label>
+        <label className="field-label">{t.home.marketLabel || "Market"}</label>
         <div className={`market-chip-grid ${signalMode === "indicators" ? "indicators" : "basic"}`}>
           {currentMarkets.map((item) => (
             <button
@@ -394,7 +398,7 @@ export default function HomePage({ t }) {
                       ? (t.home.loading || "Loading...")
                       : (t.home.emptyPairs || "No pairs available")}
                 </strong>
-                <small>{t.home.assetPickerHint || "Нажмите, чтобы выбрать валютную пару"}</small>
+                <small>{t.home.assetPickerHint || "Tap to choose a currency pair"}</small>
               </span>
               <span className="field-picker-chevron" aria-hidden="true" />
             </button>
@@ -409,7 +413,7 @@ export default function HomePage({ t }) {
             >
               <span className="field-picker-copy">
                 <strong>{selectedExpirationMeta?.label || expiration || "5m"}</strong>
-                <small>{t.home.expirationPickerHint || "Выбрать время"}</small>
+                <small>{t.home.expirationPickerHint || "Choose time"}</small>
               </span>
               <span className="field-picker-chevron" aria-hidden="true" />
             </button>
@@ -424,14 +428,14 @@ export default function HomePage({ t }) {
           <button
             className="action-sheet-backdrop"
             type="button"
-            aria-label="Закрыть выбор источника"
+            aria-label={t.home.close || "Close"}
             onClick={() => setIsActionSheetOpen(false)}
           />
-          <div className="action-sheet" role="dialog" aria-modal="true" aria-label="Выбор источника">
+          <div className="action-sheet" role="dialog" aria-modal="true" aria-label={t.home.sourceSheetTitle || "Upload source"}>
             <div className="action-sheet-handle" aria-hidden="true" />
             <div className="action-sheet-head">
-              <div className="action-sheet-title">Источник загрузки</div>
-              <div className="action-sheet-copy">Выберите способ загрузки графика.</div>
+              <div className="action-sheet-title">{t.home.sourceSheetTitle || "Upload source"}</div>
+              <div className="action-sheet-copy">{t.home.sourceSheetHint || "Choose how to upload the chart."}</div>
             </div>
 
             <div className="action-sheet-grid">
@@ -451,10 +455,10 @@ export default function HomePage({ t }) {
                       <strong>{item.label}</strong>
                       <small>
                         {item.id === "gallery"
-                          ? "Выбрать файл"
+                          ? (t.home.sourceGalleryHint || "Choose file")
                           : item.id === "camera"
-                            ? "Сделать снимок"
-                            : "Вставить URL"}
+                            ? (t.home.sourceCameraHint || "Take a shot")
+                            : (t.home.sourceLinkHint || "Paste URL")}
                       </small>
                     </span>
                   </button>
@@ -463,7 +467,7 @@ export default function HomePage({ t }) {
             </div>
 
             <button className="action-sheet-close" type="button" onClick={() => setIsActionSheetOpen(false)}>
-              Закрыть
+              {t.home.close || "Close"}
             </button>
           </div>
         </div>
@@ -474,7 +478,7 @@ export default function HomePage({ t }) {
           <button
             className="action-sheet-backdrop"
             type="button"
-            aria-label="Закрыть выбор"
+            aria-label={t.home.close || "Close"}
             onClick={closePickerSheet}
           />
           <div
@@ -488,26 +492,26 @@ export default function HomePage({ t }) {
             role="dialog"
             aria-modal="true"
             aria-label={pickerSheet === "asset"
-              ? "Р’С‹Р±РѕСЂ РІР°Р»СЋС‚РЅРѕР№ РїР°СЂС‹"
+              ? (t.home.assetSheetTitle || "Currency pairs")
               : pickerSheet === "indicator"
-                ? "Р’С‹Р±РѕСЂ РёРЅРґРёРєР°С‚РѕСЂР°"
-                : "Р’С‹Р±РѕСЂ СЌРєСЃРїРёСЂР°С†РёРё"}
+                ? (t.home.indicatorSheetTitle || "Indicators")
+                : (t.home.expirationSheetTitle || "Expiration time")}
           >
             <div className="action-sheet-handle" aria-hidden="true" />
             <div className="action-sheet-head">
               <div className="action-sheet-title">
                 {pickerSheet === "asset"
-                  ? (t.home.assetSheetTitle || "Р’Р°Р»СЋС‚РЅС‹Рµ РїР°СЂС‹")
+                  ? (t.home.assetSheetTitle || "Currency pairs")
                   : pickerSheet === "indicator"
-                    ? (t.home.indicatorSheetTitle || "РРЅРґРёРєР°С‚РѕСЂС‹")
-                    : (t.home.expirationSheetTitle || "Р’СЂРµРјСЏ СЌРєСЃРїРёСЂР°С†РёРё")}
+                    ? (t.home.indicatorSheetTitle || "Indicators")
+                    : (t.home.expirationSheetTitle || "Expiration time")}
               </div>
               <div className="action-sheet-copy">
                 {pickerSheet === "asset"
-                  ? (t.home.assetSheetHint || "Р’С‹Р±РµСЂРёС‚Рµ Р°РєС‚РёРІРЅСѓСЋ РїР°СЂСѓ РёР· Р»РѕРєР°Р»СЊРЅРѕ СЃРёРЅС…СЂРѕРЅРёР·РёСЂРѕРІР°РЅРЅРѕРіРѕ СЃРїРёСЃРєР°.")
+                  ? (t.home.assetSheetHint || "Choose an active pair from the locally synced list.")
                   : pickerSheet === "indicator"
-                    ? (t.home.indicatorSheetHint || "Р’С‹Р±РµСЂРёС‚Рµ РёРЅРґРёРєР°С‚РѕСЂ, РєРѕС‚РѕСЂС‹Р№ Р±СѓРґРµРј РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РґР»СЏ СЃРёРіРЅР°Р»Р°.")
-                    : (t.home.expirationSheetHint || "Р’С‹Р±РµСЂРёС‚Рµ РІСЂРµРјСЏ, РєРѕС‚РѕСЂРѕРµ Р±СѓРґРµРј РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РґР»СЏ СЃРёРіРЅР°Р»Р°.")}
+                    ? (t.home.indicatorSheetHint || "Choose the indicator used for the signal.")
+                    : (t.home.expirationSheetHint || "Choose the time used for the signal.")}
               </div>
             </div>
 
@@ -519,8 +523,8 @@ export default function HomePage({ t }) {
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.target.value)}
                   placeholder={pickerSheet === "asset"
-                    ? (t.home.assetSearchPlaceholder || "РџРѕРёСЃРє РїР°СЂС‹, РЅР°РїСЂРёРјРµСЂ AUD РёР»Рё EUR/USD")
-                    : (t.home.indicatorSearchPlaceholder || "РџРѕРёСЃРє РёРЅРґРёРєР°С‚РѕСЂР°, РЅР°РїСЂРёРјРµСЂ RSI РёР»Рё MACD")}
+                    ? (t.home.assetSearchPlaceholder || "Search pair, for example AUD or EUR/USD")
+                    : (t.home.indicatorSearchPlaceholder || "Search indicator, for example RSI or MACD")}
                 />
               </div>
             )}
@@ -572,14 +576,14 @@ export default function HomePage({ t }) {
               {(pickerSheet === "asset" || pickerSheet === "indicator") && (pickerSheet === "asset" ? filteredPairs.length === 0 : filteredIndicators.length === 0) && (
                 <div className="picker-sheet-empty">
                   {pickerSheet === "asset"
-                    ? (t.home.assetSearchEmpty || "РќРёС‡РµРіРѕ РЅРµ РЅР°Р№РґРµРЅРѕ РїРѕ СЌС‚РѕРјСѓ Р·Р°РїСЂРѕСЃСѓ.")
-                    : (t.home.indicatorSearchEmpty || "РРЅРґРёРєР°С‚РѕСЂ РїРѕ СЌС‚РѕРјСѓ Р·Р°РїСЂРѕСЃСѓ РЅРµ РЅР°Р№РґРµРЅ.")}
+                    ? (t.home.assetSearchEmpty || "Nothing found for this query.")
+                    : (t.home.indicatorSearchEmpty || "No indicator found for this query.")}
                 </div>
               )}
             </div>
 
             <button className="action-sheet-close" type="button" onClick={closePickerSheet}>
-              Закрыть
+              {t.home.close || "Close"}
             </button>
           </div>
         </div>

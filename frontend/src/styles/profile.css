@@ -129,7 +129,9 @@
 
 .profile-identity-list span,
 .profile-summary-card span,
-.profile-theme-copy small {
+.profile-theme-copy small,
+.profile-timezone-zone,
+.profile-timezone-offset {
   display: block;
   font-size: 12px;
   color: var(--text-muted);
@@ -218,67 +220,195 @@
   flex: 0 0 auto;
 }
 
-.profile-theme-switch {
+.profile-timezone-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.profile-theme-chip {
-  min-height: 60px;
-  padding: 0 14px;
+.profile-timezone-chip {
+  display: grid;
+  gap: 6px;
+  min-height: 86px;
+  padding: 12px 14px;
   border-radius: 18px;
   border: 1px solid rgba(77, 96, 128, 0.34);
-  background: rgba(10, 16, 25, 0.58);
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.1), transparent 42%),
+    rgba(10, 16, 25, 0.58);
+  color: var(--text-soft);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.profile-timezone-chip.active {
+  border-color: rgba(143, 184, 255, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.18), transparent 44%),
+    linear-gradient(180deg, rgba(29, 40, 61, 0.98), rgba(15, 23, 35, 0.96));
+  box-shadow:
+    0 14px 24px rgba(9, 15, 24, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.profile-timezone-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-timezone-flag {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  overflow: hidden;
+  flex: 0 0 auto;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.profile-timezone-city {
+  font-size: 15px;
+  font-weight: 800;
+  color: #f6f9ff;
+}
+
+.profile-theme-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-theme-chip {
+  min-height: 92px;
+  padding: 14px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(77, 96, 128, 0.34);
+  background: linear-gradient(135deg, rgba(18, 27, 41, 0.92), rgba(12, 18, 29, 0.94));
   color: var(--text-soft);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
   transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .profile-theme-chip.active {
-  border-color: rgba(143, 184, 255, 0.34);
-  background:
-    radial-gradient(circle at top left, rgba(143, 184, 255, 0.16), transparent 42%),
-    linear-gradient(180deg, rgba(22, 31, 47, 0.98), rgba(13, 20, 31, 0.94));
   color: #f6f9ff;
   box-shadow:
-    0 14px 24px rgba(9, 15, 24, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    0 18px 28px rgba(9, 15, 24, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
-.profile-theme-swatch {
-  width: 32px;
-  height: 32px;
-  border-radius: 12px;
+.profile-theme-chip.light {
+  border-color: rgba(255, 181, 105, 0.24);
+}
+
+.profile-theme-chip.dark {
+  border-color: rgba(88, 134, 255, 0.24);
+}
+
+.profile-theme-chip.light.active {
+  border-color: rgba(255, 196, 131, 0.4);
+  background:
+    radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.34), transparent 26%),
+    linear-gradient(135deg, #ff62a1 0%, #ff9b43 42%, #ffcf62 100%);
+}
+
+.profile-theme-chip.dark.active {
+  border-color: rgba(137, 176, 255, 0.4);
+  background:
+    radial-gradient(circle at 18% 50%, rgba(255, 255, 255, 0.24), transparent 26%),
+    linear-gradient(135deg, #0a87d8 0%, #2f6ce0 40%, #4546c6 100%);
+}
+
+.profile-theme-chip:not(.active).light {
+  background: linear-gradient(135deg, rgba(255, 120, 156, 0.16), rgba(255, 185, 86, 0.16));
+}
+
+.profile-theme-chip:not(.active).dark {
+  background: linear-gradient(135deg, rgba(28, 111, 214, 0.14), rgba(69, 70, 198, 0.18));
+}
+
+.profile-theme-visual {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 10px 18px rgba(12, 18, 29, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
   flex: 0 0 auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.profile-theme-swatch.dark {
-  background:
-    radial-gradient(circle at 30% 30%, rgba(143, 184, 255, 0.22), transparent 42%),
-    linear-gradient(180deg, #1b2638, #0c1420);
+.profile-theme-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 24px;
+  line-height: 1;
 }
 
-.profile-theme-swatch.light {
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), transparent 42%),
-    linear-gradient(180deg, #ffffff, #dfe8fb);
-  border-color: rgba(120, 140, 180, 0.18);
+.profile-theme-badge.light {
+  color: #ffbf1f;
+}
+
+.profile-theme-badge.dark {
+  color: #2d6fe9;
 }
 
 .profile-theme-copy {
+  min-width: 0;
   font-size: 14px;
   font-weight: 700;
+}
+
+.profile-theme-copy strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 25px;
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+}
+
+.profile-theme-copy small {
+  margin-bottom: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.profile-theme-chip.light .profile-theme-copy strong,
+.profile-theme-chip.light .profile-theme-copy small {
+  color: rgba(124, 39, 46, 0.86);
+}
+
+.profile-theme-chip.dark .profile-theme-copy strong,
+.profile-theme-chip.dark .profile-theme-copy small {
+  color: rgba(228, 240, 255, 0.92);
+}
+
+.profile-theme-chip:not(.active) .profile-theme-copy strong {
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.profile-theme-chip:not(.active) .profile-theme-copy small {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .profile-save-btn {
   width: 100%;
   min-height: 54px;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .form-status {
@@ -347,33 +477,81 @@
 }
 
 :root[data-theme="light"] .profile-chip,
+:root[data-theme="light"] .profile-timezone-chip,
 :root[data-theme="light"] .profile-theme-chip {
   border-color: rgba(106, 129, 168, 0.18);
-  background: rgba(244, 247, 253, 0.96);
   color: #30435f;
 }
 
-:root[data-theme="light"] .profile-chip.active,
-:root[data-theme="light"] .profile-theme-chip.active {
+:root[data-theme="light"] .profile-chip {
+  background: rgba(244, 247, 253, 0.96);
+}
+
+:root[data-theme="light"] .profile-chip.active {
   border-color: rgba(56, 104, 246, 0.24);
   background: linear-gradient(180deg, rgba(226, 236, 255, 0.96), rgba(212, 227, 255, 0.96));
   color: #2547b7;
 }
 
-:root[data-theme="light"] .profile-chip-flag {
+:root[data-theme="light"] .profile-chip-flag,
+:root[data-theme="light"] .profile-timezone-flag {
   box-shadow: 0 0 0 1px rgba(120, 140, 180, 0.14);
 }
 
-:root[data-theme="light"] .profile-theme-swatch.dark {
+:root[data-theme="light"] .profile-timezone-chip {
   background:
-    radial-gradient(circle at 30% 30%, rgba(143, 184, 255, 0.18), transparent 42%),
-    linear-gradient(180deg, #1f2d43, #121b29);
+    radial-gradient(circle at top right, rgba(56, 104, 246, 0.08), transparent 42%),
+    rgba(244, 247, 253, 0.96);
 }
 
-:root[data-theme="light"] .profile-theme-swatch.light {
+:root[data-theme="light"] .profile-timezone-chip.active {
+  border-color: rgba(56, 104, 246, 0.24);
   background:
-    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.84), transparent 42%),
-    linear-gradient(180deg, #ffffff, #e6eefc);
+    radial-gradient(circle at top right, rgba(56, 104, 246, 0.12), transparent 44%),
+    linear-gradient(180deg, rgba(232, 239, 255, 0.98), rgba(220, 232, 255, 0.98));
+  box-shadow:
+    0 16px 26px rgba(108, 132, 176, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+:root[data-theme="light"] .profile-timezone-city {
+  color: #223656;
+}
+
+:root[data-theme="light"] .profile-theme-chip:not(.active).light {
+  background: linear-gradient(135deg, rgba(255, 120, 156, 0.18), rgba(255, 185, 86, 0.2));
+}
+
+:root[data-theme="light"] .profile-theme-chip:not(.active).dark {
+  background: linear-gradient(135deg, rgba(46, 138, 234, 0.16), rgba(77, 82, 211, 0.2));
+}
+
+:root[data-theme="light"] .profile-theme-chip.light.active {
+  border-color: rgba(255, 179, 87, 0.34);
+}
+
+:root[data-theme="light"] .profile-theme-chip.dark.active {
+  border-color: rgba(56, 104, 246, 0.28);
+}
+
+:root[data-theme="light"] .profile-theme-visual {
+  box-shadow:
+    0 12px 18px rgba(108, 132, 176, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+:root[data-theme="light"] .profile-theme-badge {
+  background: rgba(255, 255, 255, 0.96);
+}
+
+:root[data-theme="light"] .profile-theme-chip.light .profile-theme-copy strong,
+:root[data-theme="light"] .profile-theme-chip.light .profile-theme-copy small {
+  color: rgba(147, 54, 71, 0.86);
+}
+
+:root[data-theme="light"] .profile-theme-chip.dark .profile-theme-copy strong,
+:root[data-theme="light"] .profile-theme-chip.dark .profile-theme-copy small {
+  color: rgba(240, 247, 255, 0.92);
 }
 
 :root[data-theme="light"] .form-status.success {
@@ -401,7 +579,16 @@
 
   .profile-identity-list,
   .profile-summary-grid,
+  .profile-timezone-grid,
   .profile-theme-switch {
     grid-template-columns: 1fr;
+  }
+
+  .profile-theme-chip {
+    min-height: 84px;
+  }
+
+  .profile-theme-copy strong {
+    font-size: 22px;
   }
 }

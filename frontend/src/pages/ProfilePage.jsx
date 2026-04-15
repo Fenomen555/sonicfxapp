@@ -2,6 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import ReactCountryFlag from "react-country-flag";
 import { apiFetchJson } from "../lib/api";
 
+const TIMEZONE_OPTIONS = [
+  { id: "Europe/Kiev", city: "Kyiv", offset: "UTC+2 / UTC+3", flag: "UA" },
+  { id: "Europe/London", city: "London", offset: "UTC+0 / UTC+1", flag: "GB" },
+  { id: "Europe/Berlin", city: "Berlin", offset: "UTC+1 / UTC+2", flag: "DE" },
+  { id: "America/New_York", city: "New York", offset: "UTC-5 / UTC-4", flag: "US" },
+  { id: "Asia/Dubai", city: "Dubai", offset: "UTC+4", flag: "AE" }
+];
+
 function getInitials(user, fallback) {
   const source = [user?.first_name, user?.last_name, user?.tg_username].filter(Boolean).join(" ").trim();
   if (!source) return fallback;
@@ -97,17 +105,29 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
     () => [
       { id: "ru", label: t.profile.langRu || "Русский", flag: "RU" },
       { id: "en", label: t.profile.langEn || "English", flag: "GB" },
-      { id: "uk", label: t.profile.langUk || "Український", flag: "UA" }
+      { id: "uk", label: t.profile.langUk || "Українська", flag: "UA" }
     ],
     [t.profile.langEn, t.profile.langRu, t.profile.langUk]
   );
 
   const themeOptions = useMemo(
     () => [
-      { id: "dark", label: t.profile.themeDark || "Темная", tone: "dark" },
-      { id: "light", label: t.profile.themeLight || "Светлая", tone: "light" }
+      {
+        id: "light",
+        label: t.profile.themeDayMode || "Day mode",
+        hint: t.profile.themeLight || "Светлая",
+        tone: "light",
+        symbol: "☀"
+      },
+      {
+        id: "dark",
+        label: t.profile.themeNightMode || "Night mode",
+        hint: t.profile.themeDark || "Темная",
+        tone: "dark",
+        symbol: "☾"
+      }
     ],
-    [t.profile.themeDark, t.profile.themeLight]
+    [t.profile.themeDark, t.profile.themeLight, t.profile.themeDayMode, t.profile.themeNightMode]
   );
 
   const handleSave = async () => {
@@ -190,7 +210,23 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         <div className="profile-settings-grid">
           <div className="profile-setting-block profile-setting-block-wide">
             <label className="field-label">{t.profile.timezone || "Часовой пояс"}</label>
-            <input className="field-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
+            <div className="profile-timezone-grid">
+              {TIMEZONE_OPTIONS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`profile-timezone-chip ${timezone === item.id ? "active" : ""}`}
+                  onClick={() => setTimezone(item.id)}
+                >
+                  <span className="profile-timezone-top">
+                    <ReactCountryFlag svg countryCode={item.flag} aria-hidden="true" className="profile-timezone-flag" />
+                    <span className="profile-timezone-city">{item.city}</span>
+                  </span>
+                  <span className="profile-timezone-zone">{item.id}</span>
+                  <span className="profile-timezone-offset">{item.offset}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="profile-setting-block profile-setting-block-wide">
@@ -220,14 +256,19 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
                 <button
                   key={item.id}
                   type="button"
-                  className={`profile-theme-chip ${theme === item.id ? "active" : ""}`}
+                  className={`profile-theme-chip ${item.tone} ${theme === item.id ? "active" : ""}`}
                   onClick={() => {
                     setTheme(item.id);
                     onThemePreview(item.id);
                   }}
                 >
-                  <span className={`profile-theme-swatch ${item.tone}`} aria-hidden="true" />
-                  <span className="profile-theme-copy">{item.label}</span>
+                  <span className={`profile-theme-visual ${item.tone}`} aria-hidden="true">
+                    <span className={`profile-theme-badge ${item.tone}`}>{item.symbol}</span>
+                  </span>
+                  <span className="profile-theme-copy">
+                    <strong>{item.label}</strong>
+                    <small>{item.hint}</small>
+                  </span>
                 </button>
               ))}
             </div>

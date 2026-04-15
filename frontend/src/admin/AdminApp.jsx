@@ -5,11 +5,11 @@ import { getIndicatorMeta } from "../lib/indicatorMeta";
 import "./admin.css";
 
 const TABS = [
-  { id: "stats", label: "\u041e\u0431\u0437\u043e\u0440", subtitle: "\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u0438 \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c" },
-  { id: "users", label: "\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438", subtitle: "\u041a\u0430\u0440\u0442\u043e\u0447\u043a\u0438, \u043f\u043e\u0438\u0441\u043a \u0438 \u0444\u0438\u043b\u044c\u0442\u0440\u044b" },
-  { id: "flags", label: "\u0424\u0443\u043d\u043a\u0446\u0438\u0438", subtitle: "\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0440\u0435\u0436\u0438\u043c\u0430\u043c\u0438" },
-  { id: "market", label: "\u0420\u044b\u043d\u043e\u043a", subtitle: "\u041f\u0430\u0440\u044b \u0438 \u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f" },
-  { id: "indicators", label: "\u0418\u043d\u0434\u0438\u043a\u0430\u0442\u043e\u0440\u044b", subtitle: "\u041a\u0430\u0442\u0430\u043b\u043e\u0433 \u0438 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e\u0441\u0442\u044c" }
+  { id: "stats", label: "Обзор", subtitle: "Статистика и активность" },
+  { id: "users", label: "Пользователи", subtitle: "Карточки, поиск и фильтры" },
+  { id: "flags", label: "Функции", subtitle: "Управление режимами" },
+  { id: "market", label: "Рынок", subtitle: "Пары и синхронизация" },
+  { id: "indicators", label: "Индикаторы", subtitle: "Каталог и доступность" }
 ];
 
 const FLAG_META = {
@@ -421,19 +421,19 @@ export default function AdminApp({ authError }) {
   const tabCards = useMemo(() => {
     return TABS.map((item) => {
       if (item.id === "stats") {
-        return { ...item, metric: `${formatNumber(stats?.users_total || 0)} \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0435\u0439` };
+        return { ...item, metric: `${formatNumber(stats?.users_total || 0)} пользователей` };
       }
       if (item.id === "users") {
-        return { ...item, metric: `${formatNumber(users.length)} \u043a\u0430\u0440\u0442\u043e\u0447\u0435\u043a` };
+        return { ...item, metric: `${formatNumber(users.length)} карточек` };
       }
       if (item.id === "flags") {
-        return { ...item, metric: `${formatNumber(flags.filter((flag) => flag.is_enabled === 1).length)} \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445` };
+        return { ...item, metric: `${formatNumber(flags.filter((flag) => flag.is_enabled === 1).length)} активных` };
       }
       if (item.id === "indicators") {
-        return { ...item, metric: `${formatNumber(indicatorSettings.summary?.enabled || 0)} \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u043e` };
+        return { ...item, metric: `${formatNumber(indicatorSettings.summary?.enabled || 0)} включено` };
       }
       const marketCount = marketSettings.items?.length || 0;
-      return { ...item, metric: `${formatNumber(marketCount)} \u0440\u044b\u043d\u043a\u043e\u0432` };
+      return { ...item, metric: `${formatNumber(marketCount)} рынков` };
     });
   }, [flags, indicatorSettings.summary?.enabled, marketSettings.items, stats?.users_total, users.length]);
 
@@ -608,7 +608,7 @@ export default function AdminApp({ authError }) {
         <div className="admin-card admin-empty-state">
           <div className="admin-empty-icon">!</div>
           <div className="admin-empty-copy">
-            <strong>\u0410\u0434\u043c\u0438\u043d-\u043f\u0430\u043d\u0435\u043b\u044c \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430</strong>
+            <strong>Админ-панель недоступна</strong>
             <span>{authError}</span>
           </div>
         </div>
@@ -629,7 +629,7 @@ export default function AdminApp({ authError }) {
           type="button"
           className="brand-pill brand-pill-button"
           onClick={() => setTab("stats")}
-          aria-label="\u041e\u0431\u0437\u043e\u0440 \u0430\u0434\u043c\u0438\u043d\u043a\u0438"
+          aria-label="Обзор админки"
         >
           <span className="brand-main">Sonic</span>
           <span className="brand-fx">fx</span>
@@ -639,15 +639,15 @@ export default function AdminApp({ authError }) {
       <section className="admin-toolbar admin-card">
         <div className="admin-toolbar-copy">
           <span className="admin-kicker">SonicFX Control</span>
-          <h1>\u0426\u0435\u043d\u0442\u0440 \u0443\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u044f</h1>
-          <p>\u041f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u0438, \u0440\u0435\u0436\u0438\u043c\u044b, \u0440\u044b\u043d\u043e\u043a \u0438 \u0438\u043d\u0434\u0438\u043a\u0430\u0442\u043e\u0440\u044b \u0432 \u043e\u0434\u043d\u043e\u043c \u043c\u0435\u0441\u0442\u0435.</p>
+          <h1>Центр управления</h1>
+          <p>Пользователи, режимы, рынок и индикаторы в одном месте.</p>
         </div>
         <div className="admin-toolbar-actions">
           <button className="admin-ghost-button" type="button" onClick={() => setMenuExpanded((prev) => !prev)}>
-            {menuExpanded ? "\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b\u044b" : "\u0420\u0430\u0437\u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b\u044b"}
+            {menuExpanded ? "Свернуть разделы" : "Развернуть разделы"}
           </button>
           <button className="admin-primary-button" type="button" onClick={refreshActiveTab}>
-            \u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435
+            Обновить данные
           </button>
         </div>
       </section>

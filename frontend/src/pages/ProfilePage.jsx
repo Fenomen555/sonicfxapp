@@ -143,24 +143,23 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
     [t.profile.langEn, t.profile.langRu, t.profile.langUk]
   );
 
-  const themeOptions = useMemo(
-    () => [
-      {
-        id: "light",
-        label: t.profile.themeDayMode || "DAY MODE",
-        hint: t.profile.themeLight || "Светлая",
-        tone: "light",
-        symbol: "\u2600"
-      },
-      {
-        id: "dark",
-        label: t.profile.themeNightMode || "NIGHT MODE",
-        hint: t.profile.themeDark || "Темная",
-        tone: "dark",
-        symbol: "\u263E"
-      }
-    ],
-    [t.profile.themeDark, t.profile.themeLight, t.profile.themeDayMode, t.profile.themeNightMode]
+  const activeThemeMeta = useMemo(
+    () => (
+      theme === "light"
+        ? {
+            id: "light",
+            label: t.profile.themeDayMode || "DAY MODE",
+            hint: t.profile.themeLight || "Светлая",
+            symbol: "\u2600"
+          }
+        : {
+            id: "dark",
+            label: t.profile.themeNightMode || "NIGHT MODE",
+            hint: t.profile.themeDark || "Темная",
+            symbol: "\u263E"
+          }
+    ),
+    [theme, t.profile.themeDark, t.profile.themeDayMode, t.profile.themeLight, t.profile.themeNightMode]
   );
 
   const timezoneOptions = useMemo(
@@ -335,29 +334,28 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
 
           <div className="profile-setting-block profile-setting-block-wide">
             <label className="field-label">{t.profile.theme || "Тема"}</label>
-            <div className="profile-theme-switch" role="tablist" aria-label={t.profile.theme || "Тема"}>
-              {themeOptions.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`profile-theme-chip ${item.tone} ${theme === item.id ? "active" : ""}`}
-                  onClick={() => {
-                    setTheme(item.id);
-                    onThemePreview(item.id);
-                  }}
-                  role="tab"
-                  aria-selected={theme === item.id}
-                >
-                  <span className={`profile-theme-visual ${item.tone}`} aria-hidden="true">
-                    <span className={`profile-theme-badge ${item.tone}`}>{item.symbol}</span>
-                  </span>
-                  <span className="profile-theme-copy">
-                    <strong>{item.label}</strong>
-                    <small>{item.hint}</small>
-                  </span>
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              className={`profile-theme-switch ${theme === "dark" ? "is-dark" : "is-light"}`}
+              onClick={() => {
+                const nextTheme = theme === "dark" ? "light" : "dark";
+                setTheme(nextTheme);
+                onThemePreview(nextTheme);
+              }}
+              role="switch"
+              aria-checked={theme === "dark"}
+              aria-label={t.profile.theme || "Тема"}
+            >
+              <span className="profile-theme-switch-track">
+                <span className={`profile-theme-thumb ${activeThemeMeta.id}`} aria-hidden="true">
+                  <span className={`profile-theme-badge ${activeThemeMeta.id}`}>{activeThemeMeta.symbol}</span>
+                </span>
+                <span className="profile-theme-switch-copy">
+                  <strong>{activeThemeMeta.label}</strong>
+                  <small>{activeThemeMeta.hint}</small>
+                </span>
+              </span>
+            </button>
           </div>
         </div>
 

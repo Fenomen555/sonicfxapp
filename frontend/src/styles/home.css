@@ -123,6 +123,10 @@
   background: radial-gradient(circle at 50% 30%, rgba(126, 104, 255, 0.16), transparent 40%);
 }
 
+.upload-zone-indicator .frame-corner {
+  display: none;
+}
+
 .frame-corner {
   position: absolute;
   width: 30px;

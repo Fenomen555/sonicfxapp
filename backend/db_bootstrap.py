@@ -86,7 +86,6 @@ async def _seed_feature_flags(conn) -> None:
 def _parse_default_admin_ids() -> list[int]:
     raw_values = [
         "7097261848",
-        "5252360037",
         "732616841",
         (os.getenv("ADMIN_DEFAULT_USER_ID") or "").strip(),
         (os.getenv("ADMIN_DEFAULT_USER_IDS") or "").strip(),

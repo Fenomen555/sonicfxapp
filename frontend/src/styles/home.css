@@ -291,7 +291,7 @@
 }
 
 .primary-btn-top {
-  margin: 30px auto 24px;
+  margin: 36px auto 24px;
 }
 
 .primary-btn.primary-btn-scanner {
@@ -344,6 +344,9 @@
 .primary-btn.primary-btn-scanner span:last-child {
   position: relative;
   z-index: 1;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .signal-panel {

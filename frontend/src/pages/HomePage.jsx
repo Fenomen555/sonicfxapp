@@ -53,6 +53,21 @@ const FALLBACK_INDICATORS = [
   { code: "rate_of_change", title: "Rate Of Change", description: "ROC momentum percentage" }
 ];
 
+function normalizeIndicatorCopy(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[%/()+-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getUniqueIndicatorDescription(description, ...titles) {
+  const normalizedDescription = normalizeIndicatorCopy(description);
+  if (!normalizedDescription) return "";
+  const normalizedTitles = titles.map(normalizeIndicatorCopy).filter(Boolean);
+  return normalizedTitles.includes(normalizedDescription) ? "" : description;
+}
+
 
 export default function HomePage({ t }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -216,6 +231,11 @@ export default function HomePage({ t }) {
     selectedIndicatorMeta?.title,
     selectedIndicatorMeta?.description
   );
+  const selectedIndicatorHint = getUniqueIndicatorDescription(
+    selectedIndicatorMeta?.description,
+    selectedIndicatorMeta?.title,
+    selectedIndicatorDisplay.title
+  );
   const actionLabel = signalMode === "automatic"
     ? (t.home.automaticAction || "Start auto mode")
     : signalMode === "indicators"
@@ -291,11 +311,13 @@ export default function HomePage({ t }) {
         ) : (
           <div className="upload-title">{t.home.upload || "Upload chart"}</div>
         )}
-        <div className="upload-hint">
-          {isIndicatorsMode
-            ? (selectedIndicatorMeta?.description || "Choose indicator for manual signal")
-            : (t.home.uploadHint || "JPG, PNG or HEIC")}
-        </div>
+        {(!isIndicatorsMode || selectedIndicatorHint) && (
+          <div className="upload-hint">
+            {isIndicatorsMode
+              ? selectedIndicatorHint
+              : (t.home.uploadHint || "JPG, PNG or HEIC")}
+          </div>
+        )}
         <div className="upload-subhint">
           {isIndicatorsMode
             ? (t.home.indicatorZoneHint || "Tap to choose an indicator")
@@ -535,6 +557,9 @@ export default function HomePage({ t }) {
                 const isIndicator = pickerSheet === "indicator";
                 const isActive = isPair ? asset === item.pair : isIndicator ? selectedIndicator === item.code : expiration === item.value;
                 const indicatorMeta = isIndicator ? getIndicatorMeta(item.code, item.title, item.description) : null;
+                const indicatorDescription = isIndicator
+                  ? getUniqueIndicatorDescription(item.description, item.title, indicatorMeta.title)
+                  : "";
                 const title = isPair
                   ? `${item.pair}${typeof item.payout === "number" ? ` (${item.payout}%)` : ""}`
                   : isIndicator
@@ -562,7 +587,7 @@ export default function HomePage({ t }) {
                           <span className={`indicator-inline-code tone-${indicatorMeta.tone}`}>{indicatorMeta.short}</span>
                           <span className="indicator-option-copy">
                             <strong>{title}</strong>
-                            {item.description ? <small>{item.description}</small> : null}
+                            {indicatorDescription ? <small>{indicatorDescription}</small> : null}
                           </span>
                         </span>
                       ) : (

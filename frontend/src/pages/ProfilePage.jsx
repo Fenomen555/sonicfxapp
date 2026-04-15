@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import ReactCountryFlag from "react-country-flag";
 import { apiFetchJson } from "../lib/api";
-
-const LANGS = ["ru", "en", "uk"];
-const THEMES = ["dark", "light"];
 
 function getInitials(user, fallback) {
   const source = [user?.first_name, user?.last_name, user?.tg_username].filter(Boolean).join(" ").trim();
@@ -95,6 +93,23 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
     [lang, t, user]
   );
 
+  const languageOptions = useMemo(
+    () => [
+      { id: "ru", label: t.profile.langRu || "Русский", flag: "RU" },
+      { id: "en", label: t.profile.langEn || "English", flag: "GB" },
+      { id: "uk", label: t.profile.langUk || "Український", flag: "UA" }
+    ],
+    [t.profile.langEn, t.profile.langRu, t.profile.langUk]
+  );
+
+  const themeOptions = useMemo(
+    () => [
+      { id: "dark", label: t.profile.themeDark || "Темная", tone: "dark" },
+      { id: "light", label: t.profile.themeLight || "Светлая", tone: "light" }
+    ],
+    [t.profile.themeDark, t.profile.themeLight]
+  );
+
   const handleSave = async () => {
     setSaving(true);
     setStatusMessage("");
@@ -111,7 +126,7 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
       onThemePreview(theme);
       onLangPreview(lang);
       setStatusTone("success");
-      setStatusMessage(t.profile.saved);
+      setStatusMessage(t.profile.saved || "Настройки сохранены");
     } catch (error) {
       setStatusTone("error");
       setStatusMessage(error.message || "Failed");
@@ -138,7 +153,6 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           </div>
 
           <div className="profile-hero-copy">
-            <span className="profile-kicker">{t.profile.title}</span>
             <h1 className="page-title">{profileName}</h1>
             <p>{user?.tg_username ? `@${user.tg_username}` : (t.profile.noUsername || "@username not set")}</p>
           </div>
@@ -148,12 +162,12 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
 
         <div className="profile-identity-list compact">
           <div>
-            <span>{t.profile.userId}</span>
+            <span>{t.profile.userId || "Telegram ID"}</span>
             <strong>{user?.user_id || "-"}</strong>
           </div>
           <div>
-            <span>{t.profile.username}</span>
-            <strong>{user?.tg_username ? `@${user.tg_username}` : "—"}</strong>
+            <span>{t.profile.username || "Username"}</span>
+            <strong>{user?.tg_username ? `@${user.tg_username}` : "-"}</strong>
           </div>
         </div>
 
@@ -167,58 +181,61 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         </div>
       </div>
 
-      <div className="card profile-section">
+      <div className="card profile-section profile-settings-shell">
         <div className="profile-section-head">
-          <strong>{t.profile.accountCardTitle || "Профиль в приложении"}</strong>
-          <span>{t.profile.profileHint || "Управляй основными данными аккаунта и внешним видом приложения."}</span>
+          <strong>{t.profile.settingsTitle || "Настройки"}</strong>
+          <span>{t.profile.settingsHint || "Язык, тема и часовой пояс применяются сразу."}</span>
         </div>
 
-        <label className="field-label">{t.profile.timezone}</label>
-        <input className="field-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
-      </div>
+        <div className="profile-settings-grid">
+          <div className="profile-setting-block profile-setting-block-wide">
+            <label className="field-label">{t.profile.timezone || "Часовой пояс"}</label>
+            <input className="field-input" value={timezone} onChange={(e) => setTimezone(e.target.value)} />
+          </div>
 
-      <div className="card profile-section">
-        <div className="profile-section-head">
-          <strong>{t.profile.appearanceTitle || "Интерфейс"}</strong>
-          <span>{t.profile.appearanceHint || "Выбери язык и тему. Предпросмотр меняется сразу."}</span>
-        </div>
+          <div className="profile-setting-block profile-setting-block-wide">
+            <label className="field-label">{t.profile.lang || "Язык"}</label>
+            <div className="profile-chip-group profile-chip-group-languages">
+              {languageOptions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`profile-chip profile-chip-language ${lang === item.id ? "active" : ""}`}
+                  onClick={() => {
+                    setLang(item.id);
+                    onLangPreview(item.id);
+                  }}
+                >
+                  <ReactCountryFlag svg countryCode={item.flag} aria-hidden="true" className="profile-chip-flag" />
+                  <span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <label className="field-label">{t.profile.lang}</label>
-        <div className="profile-chip-group">
-          {LANGS.map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={`profile-chip ${lang === item ? "active" : ""}`}
-              onClick={() => {
-                setLang(item);
-                onLangPreview(item);
-              }}
-            >
-              {item === "ru" ? t.profile.langRu : item === "en" ? t.profile.langEn : t.profile.langUk}
-            </button>
-          ))}
-        </div>
-
-        <label className="field-label">{t.profile.theme}</label>
-        <div className="profile-chip-group">
-          {THEMES.map((item) => (
-            <button
-              key={item}
-              type="button"
-              className={`profile-chip ${theme === item ? "active" : ""}`}
-              onClick={() => {
-                setTheme(item);
-                onThemePreview(item);
-              }}
-            >
-              {item === "dark" ? t.profile.themeDark : t.profile.themeLight}
-            </button>
-          ))}
+          <div className="profile-setting-block profile-setting-block-wide">
+            <label className="field-label">{t.profile.theme || "Тема"}</label>
+            <div className="profile-theme-switch">
+              {themeOptions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`profile-theme-chip ${theme === item.id ? "active" : ""}`}
+                  onClick={() => {
+                    setTheme(item.id);
+                    onThemePreview(item.id);
+                  }}
+                >
+                  <span className={`profile-theme-swatch ${item.tone}`} aria-hidden="true" />
+                  <span className="profile-theme-copy">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         <button className="primary-btn profile-save-btn" onClick={handleSave} disabled={saving}>
-          {saving ? (t.profile.saving || "Saving...") : t.profile.save}
+          {saving ? (t.profile.saving || "Saving...") : (t.profile.save || "Save")}
         </button>
         {statusMessage && <div className={`form-status ${statusTone}`}>{statusMessage}</div>}
       </div>

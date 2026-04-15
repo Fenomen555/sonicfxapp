@@ -334,11 +334,11 @@
   opacity: 0.98;
 }
 
-.primary-btn.primary-btn-scanner .primary-btn-icon-sonic {
-  width: 24px;
-  height: 24px;
+.primary-btn.primary-btn-scanner .primary-btn-icon-accent {
+  width: 22px;
+  height: 22px;
   object-fit: contain;
-  filter: drop-shadow(0 3px 8px rgba(63, 92, 150, 0.16));
+  filter: drop-shadow(0 3px 8px rgba(78, 98, 201, 0.18));
 }
 
 .primary-btn.primary-btn-scanner span:last-child {
@@ -994,7 +994,7 @@
   filter: drop-shadow(0 0 8px rgba(136, 171, 255, 0.18));
 }
 
-:root[data-theme="light"] .primary-btn.primary-btn-scanner .primary-btn-icon-sonic {
+:root[data-theme="light"] .primary-btn.primary-btn-scanner .primary-btn-icon-accent {
   filter: drop-shadow(0 3px 8px rgba(63, 92, 150, 0.14));
 }
 

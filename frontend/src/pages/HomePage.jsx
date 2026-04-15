@@ -8,7 +8,7 @@ import {
   ScannerModeIcon,
   SparkIcon
 } from "../components/AppIcons";
-import sonicCtaIcon from "../assets/sonic-cta.png";
+import lightningCtaIcon from "../assets/cta-lightning.png";
 import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetchJson } from "../lib/api";
 
@@ -270,7 +270,7 @@ export default function HomePage({ t }) {
 
       <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
         <span>{actionLabel}</span>
-        <img className="primary-btn-icon primary-btn-icon-sonic" src={sonicCtaIcon} alt="" loading="lazy" aria-hidden="true" />
+        <img className="primary-btn-icon primary-btn-icon-accent" src={lightningCtaIcon} alt="" loading="lazy" aria-hidden="true" />
       </button>
 
       <div className="card form-card ref-form-card generator-panel">

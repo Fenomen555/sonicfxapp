@@ -596,22 +596,22 @@
   color: #274bc4;
 }
 
-:root[data-theme="light"] .profile-status-chip.inactive {
-  border-color: rgba(106, 129, 168, 0.18);
-  background: rgba(106, 129, 168, 0.08);
-  color: #526581;
+:root[data-theme="light"] .profile-status-chip.trader {
+  border-color: rgba(56, 104, 246, 0.2);
+  background: linear-gradient(180deg, rgba(226, 236, 255, 0.96), rgba(212, 227, 255, 0.94));
+  color: #2547b7;
 }
 
-:root[data-theme="light"] .profile-status-chip.active {
-  border-color: rgba(21, 151, 101, 0.18);
-  background: rgba(21, 151, 101, 0.08);
-  color: #16734d;
-}
-
-:root[data-theme="light"] .profile-status-chip.scanner {
-  border-color: rgba(185, 140, 69, 0.18);
-  background: rgba(185, 140, 69, 0.08);
+:root[data-theme="light"] .profile-status-chip.pro {
+  border-color: rgba(185, 140, 69, 0.22);
+  background: linear-gradient(180deg, rgba(255, 242, 212, 0.98), rgba(245, 226, 182, 0.94));
   color: #946a2d;
+}
+
+:root[data-theme="light"] .profile-status-chip.vip {
+  border-color: rgba(162, 112, 225, 0.22);
+  background: linear-gradient(180deg, rgba(243, 230, 255, 0.96), rgba(232, 214, 255, 0.94));
+  color: #7442b0;
 }
 
 :root[data-theme="light"] .profile-identity-list div,
@@ -744,21 +744,33 @@
   }
 
   .profile-status-chip {
-    grid-column: 1 / -1;
     width: fit-content;
+    min-height: 34px;
+    padding: 0 14px;
   }
 
-  .profile-identity-list,
   .profile-summary-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .profile-timezone-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .profile-summary-card,
   .profile-setting-block {
-    padding: 12px;
+    padding: 10px;
+  }
+
+  .profile-summary-card span {
+    font-size: 11px;
+    margin-bottom: 5px;
+  }
+
+  .profile-summary-card strong {
+    font-size: 13px;
+    line-height: 1.18;
   }
 
   .profile-theme-switch-track {

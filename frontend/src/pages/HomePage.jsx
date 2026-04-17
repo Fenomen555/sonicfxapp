@@ -279,7 +279,7 @@ export default function HomePage({ t }) {
     selectedIndicatorDisplay.title
   );
   const actionLabel = signalMode === "automatic"
-    ? (t.home.automaticAction || "Start auto mode")
+    ? (t.home.analyze || "Analyze")
     : signalMode === "indicators"
       ? (t.home.indicatorAction || "Get signal")
       : (t.home.analyze || "Analyze");

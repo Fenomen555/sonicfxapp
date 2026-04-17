@@ -136,6 +136,9 @@ export default function LiveQuoteChart({
           <span className="live-quote-head-symbol">{displaySymbol}</span>
         </div>
         <div className={`live-quote-status ${state?.status || "idle"}`}>
+          {state?.status === "ready" || state?.status === "connected" || state?.status === "alive" ? (
+            <span className="live-quote-status-dot" aria-hidden="true" />
+          ) : null}
           {liveStateLabel}
         </div>
       </div>

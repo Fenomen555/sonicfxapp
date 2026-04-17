@@ -381,6 +381,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   min-width: 78px;
   min-height: 30px;
   padding: 0 12px;
@@ -390,6 +391,17 @@
   color: #dbe7ff;
   font-size: 12px;
   font-weight: 700;
+}
+
+.live-quote-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #57df72;
+  box-shadow:
+    0 0 0 4px rgba(87, 223, 114, 0.16),
+    0 0 10px rgba(87, 223, 114, 0.5);
+  animation: livePulse 1.6s ease-in-out infinite;
 }
 
 .live-quote-status.ready,
@@ -560,6 +572,12 @@
   border-color: rgba(97, 124, 176, 0.22);
   background: rgba(255, 255, 255, 0.78);
   color: #314766;
+}
+
+:root[data-theme="light"] .live-quote-status-dot {
+  box-shadow:
+    0 0 0 4px rgba(87, 223, 114, 0.12),
+    0 0 8px rgba(87, 223, 114, 0.28);
 }
 
 :root[data-theme="light"] .live-quote-status.ready,
@@ -1701,6 +1719,17 @@
   .signal-mode-icon img {
     width: 17px;
     height: 17px;
+  }
+}
+
+@keyframes livePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.72;
   }
 }
 

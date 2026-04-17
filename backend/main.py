@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from db_bootstrap import (
     ensure_database_schema,
+    normalize_account_tier,
     normalize_activation_status,
     normalize_user_lang,
     scanner_access_from_deposit,
@@ -408,6 +409,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "lang": normalize_user_lang(row.get("lang") or "ru"),
         "timezone": row.get("timezone") or "Europe/Kiev",
         "theme": _coerce_theme(row.get("theme") or "dark"),
+        "account_tier": normalize_account_tier(row.get("account_tier") or "trader"),
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
         "deposit_amount": float(row.get("deposit_amount") or 0),
         "scanner_access": int(row.get("scanner_access") or 0),

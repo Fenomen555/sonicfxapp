@@ -64,6 +64,13 @@ def _normalize_lang(value: str) -> str:
     return "ru"
 
 
+def _normalize_account_tier(value: str) -> str:
+    tier = (value or "").strip().lower()
+    if tier in {"trader", "pro", "vip"}:
+        return tier
+    return "trader"
+
+
 async def _seed_feature_flags(conn) -> None:
     defaults: Tuple[Tuple[str, int], ...] = (
         ("mode_ai_enabled", 1),
@@ -199,6 +206,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     lang VARCHAR(8) NOT NULL DEFAULT 'ru',
                     timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev',
                     theme VARCHAR(16) NOT NULL DEFAULT 'dark',
+                    account_tier VARCHAR(16) NOT NULL DEFAULT 'trader',
                     activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive',
                     deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
                     scanner_access TINYINT(1) NOT NULL DEFAULT 0,
@@ -341,6 +349,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "users", "timezone", "ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev'")
         await _ensure_column(conn, db_name, "users", "mini_username", "ALTER TABLE users ADD COLUMN mini_username VARCHAR(64) NULL")
         await _ensure_column(conn, db_name, "users", "photo_url", "ALTER TABLE users ADD COLUMN photo_url TEXT NULL")
+        await _ensure_column(conn, db_name, "users", "account_tier", "ALTER TABLE users ADD COLUMN account_tier VARCHAR(16) NOT NULL DEFAULT 'trader'")
         await _ensure_column(conn, db_name, "users", "activation_status", "ALTER TABLE users ADD COLUMN activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive'")
         await _ensure_column(conn, db_name, "users", "deposit_amount", "ALTER TABLE users ADD COLUMN deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "scanner_access", "ALTER TABLE users ADD COLUMN scanner_access TINYINT(1) NOT NULL DEFAULT 0")
@@ -376,6 +385,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "news_items", "idx_news_feed_visible_published", "CREATE INDEX idx_news_feed_visible_published ON news_items (feed_type, is_visible, published_at)")
         await _ensure_index(conn, db_name, "news_items", "idx_news_feed_category_visible", "CREATE INDEX idx_news_feed_category_visible ON news_items (feed_type, news_category, is_visible)")
         await _ensure_index(conn, db_name, "users", "idx_users_activation_status", "CREATE INDEX idx_users_activation_status ON users (activation_status)")
+        await _ensure_index(conn, db_name, "users", "idx_users_account_tier", "CREATE INDEX idx_users_account_tier ON users (account_tier)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_kind_active", "CREATE INDEX idx_market_pairs_kind_active ON market_pairs (pair_kind, is_active)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_last_seen", "CREATE INDEX idx_market_pairs_last_seen ON market_pairs (last_seen_at)")
         await _ensure_index(conn, db_name, "signal_indicators", "idx_signal_indicators_enabled_order", "CREATE INDEX idx_signal_indicators_enabled_order ON signal_indicators (is_enabled, sort_order)")
@@ -384,10 +394,22 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _seed_signal_indicators(conn)
         await _seed_app_settings(conn)
         await _seed_default_admin(conn)
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users
+                SET account_tier = 'trader'
+                WHERE account_tier IS NULL OR account_tier = '' OR account_tier NOT IN ('trader', 'pro', 'vip')
+                """
+            )
 
 
 def normalize_user_lang(raw_lang: Optional[str]) -> str:
     return _normalize_lang(raw_lang or "")
+
+
+def normalize_account_tier(raw_tier: Optional[str]) -> str:
+    return _normalize_account_tier(raw_tier or "")
 
 
 def normalize_activation_status(raw_status: str) -> str:

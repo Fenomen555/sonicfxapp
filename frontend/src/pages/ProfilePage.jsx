@@ -66,22 +66,22 @@ function formatTimezoneOffset(timeZone) {
   }
 }
 
-function getStatusMeta(status, t) {
-  if (status === "active_scanner") {
+function getStatusMeta(tier, t) {
+  if (tier === "vip") {
     return {
-      label: t.profile.statusScanner || "Сканер активен",
-      tone: "scanner"
+      label: t.profile.tierVip || "VIP",
+      tone: "vip"
     };
   }
-  if (status === "active") {
+  if (tier === "pro") {
     return {
-      label: t.profile.statusActive || "Активен",
-      tone: "active"
+      label: t.profile.tierPro || "PRO",
+      tone: "pro"
     };
   }
   return {
-    label: t.profile.statusInactive || "Не активирован",
-    tone: "inactive"
+    label: t.profile.tierTrader || "Trader",
+    tone: "trader"
   };
 }
 
@@ -109,8 +109,8 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   }, [t.profile.nameFallback, user]);
 
   const statusMeta = useMemo(
-    () => getStatusMeta(user?.activation_status || "inactive", t),
-    [t, user?.activation_status]
+    () => getStatusMeta(user?.account_tier || "trader", t),
+    [t, user?.account_tier]
   );
 
   const summaryCards = useMemo(
@@ -133,6 +133,11 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
     ],
     [lang, t, user]
   );
+
+  const handleUpgradeStatus = () => {
+    setStatusTone("success");
+    setStatusMessage(t.profile.upgradeStatusSoon || "Скоро здесь появится апгрейд статуса.");
+  };
 
   const languageOptions = useMemo(
     () => [
@@ -223,7 +228,10 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
             <p>{user?.tg_username ? `@${user.tg_username}` : (t.profile.noUsername || "@username not set")}</p>
           </div>
 
-          <div className={`profile-status-chip ${statusMeta.tone}`}>{statusMeta.label}</div>
+          <div className="profile-status-stack">
+            <span className="profile-status-kicker">{t.profile.status || "Статус"}</span>
+            <div className={`profile-status-chip ${statusMeta.tone}`}>{statusMeta.label}</div>
+          </div>
         </div>
 
         <div className="profile-identity-list compact">
@@ -245,6 +253,10 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
             </article>
           ))}
         </div>
+
+        <button type="button" className="profile-upgrade-btn" onClick={handleUpgradeStatus}>
+          {t.profile.upgradeStatus || "Повысить статус"}
+        </button>
       </div>
 
       <div className="card profile-section profile-settings-shell">

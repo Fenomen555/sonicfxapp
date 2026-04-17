@@ -134,6 +134,8 @@ export default function HomePage({ t }) {
   const [quoteState, setQuoteState] = useState({ status: "idle", detail: "" });
   const [quotePayload, setQuotePayload] = useState(null);
   const quoteClientRef = useRef(null);
+  const currentQuoteSubscriptionRef = useRef(null);
+  const lastQuoteSubscriptionKeyRef = useRef("");
 
   const quickActions = [
     { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
@@ -360,6 +362,10 @@ export default function HomePage({ t }) {
   }, [asset, isAutomaticMode, marketKind, quotesConfig.history_seconds, selectedPairMeta]);
 
   useEffect(() => {
+    currentQuoteSubscriptionRef.current = autoQuoteSubscription[0] || null;
+  }, [autoQuoteSubscription]);
+
+  useEffect(() => {
     if (!quotesConfig.enabled) {
       quoteClientRef.current?.destroy();
       quoteClientRef.current = null;
@@ -377,12 +383,12 @@ export default function HomePage({ t }) {
       replaceDebounceMs: quotesConfig.replace_debounce_ms,
       onStateChange: (nextState) => setQuoteState(nextState),
       onEvent: (payload) => {
-        const currentItem = autoQuoteSubscription[0] || null;
+        const currentItem = currentQuoteSubscriptionRef.current;
         const eventName = String(payload?.event || "").trim().toLowerCase();
         if ((eventName === "quote" || eventName === "snapshot" || eventName === "subscribed") && matchesQuotePayload(payload, currentItem)) {
           setQuotePayload(payload);
         }
-        if (eventName === "unsubscribed" && !isAutomaticMode) {
+        if (eventName === "unsubscribed" && !currentQuoteSubscriptionRef.current) {
           setQuotePayload(null);
         }
         if (eventName === "error") {
@@ -392,8 +398,8 @@ export default function HomePage({ t }) {
     });
 
     quoteClientRef.current = client;
-    if (autoQuoteSubscription.length) {
-      client.setSubscriptions(autoQuoteSubscription);
+    if (currentQuoteSubscriptionRef.current) {
+      client.setSubscriptions([currentQuoteSubscriptionRef.current]);
     }
 
     const handleBeforeUnload = () => client.destroy();
@@ -407,8 +413,6 @@ export default function HomePage({ t }) {
       }
     };
   }, [
-    autoQuoteSubscription,
-    isAutomaticMode,
     quotesConfig.enabled,
     quotesConfig.history_seconds,
     quotesConfig.replace_debounce_ms,
@@ -450,10 +454,18 @@ export default function HomePage({ t }) {
     if (!client) return;
 
     if (isAutomaticMode && autoQuoteSubscription.length) {
+      const currentItem = autoQuoteSubscription[0];
+      const nextKey = `${currentItem.category}::${currentItem.symbol}`;
+      if (lastQuoteSubscriptionKeyRef.current !== nextKey) {
+        lastQuoteSubscriptionKeyRef.current = nextKey;
+        setQuotePayload(null);
+        setQuoteState({ status: "connecting", detail: "" });
+      }
       client.setSubscriptions(autoQuoteSubscription);
       return;
     }
 
+    lastQuoteSubscriptionKeyRef.current = "";
     client.clearSubscriptions();
     setQuotePayload(null);
     setQuoteState({ status: "idle", detail: "" });

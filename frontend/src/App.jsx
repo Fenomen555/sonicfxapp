@@ -11,11 +11,14 @@ import ProfilePage from "./pages/ProfilePage";
 
 const THEME_STORAGE_KEY = "sonicfx_theme";
 
+function normalizeTheme(value) {
+  return value === "light" ? "light" : "dark";
+}
+
 function getStoredTheme() {
   if (typeof window === "undefined") return "dark";
   try {
-    const value = window.localStorage.getItem(THEME_STORAGE_KEY);
-    return value === "light" ? "light" : "dark";
+    return normalizeTheme(window.localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
     return "dark";
   }
@@ -70,7 +73,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const nextTheme = user.theme === "light" ? "light" : "dark";
+    const nextTheme = normalizeTheme(user.theme);
     document.documentElement.setAttribute("data-theme", nextTheme);
     try {
       window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
@@ -117,13 +120,21 @@ export default function App() {
           return;
         }
 
+        const storedTheme = getStoredTheme();
+        setUser((prev) => ({ ...prev, theme: storedTheme }));
+
         await apiFetchJson("/api/user/sync", { method: "POST" });
         const profile = await apiFetchJson("/api/user/profile", { method: "POST" });
         if (!isActive) return;
-        setUser({ ...FALLBACK_USER, ...(profile || {}), theme: (profile?.theme === "light" ? "light" : getStoredTheme()) });
+
+        setUser({
+          ...FALLBACK_USER,
+          ...(profile || {}),
+          theme: storedTheme
+        });
       } catch {
         if (!isActive) return;
-        setUser({ ...FALLBACK_USER, theme: getStoredTheme() });
+        setUser((prev) => ({ ...FALLBACK_USER, ...prev, theme: getStoredTheme() }));
       } finally {
         if (isActive) setIsLoading(false);
       }

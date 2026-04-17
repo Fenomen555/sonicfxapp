@@ -127,13 +127,12 @@
   display: none;
 }
 
-.upload-zone-live {
-  padding: 20px 18px 18px;
-  min-height: 208px;
-}
-
-.upload-zone-live .frame-corner {
-  display: none;
+.live-quote-stage {
+  display: grid;
+  gap: 12px;
+  margin-top: 2px;
+  animation: riseIn 0.45s ease both;
+  cursor: pointer;
 }
 
 .frame-corner {
@@ -394,7 +393,7 @@
 
 .live-quote-chart-shell {
   position: relative;
-  height: 118px;
+  height: 132px;
   border-radius: 18px;
   border: 1px solid rgba(111, 141, 193, 0.2);
   background:
@@ -1600,17 +1599,12 @@
 }
 
 @media (max-width: 560px) {
-  .upload-zone-live {
-    padding: 16px 14px 14px;
-    min-height: 214px;
-  }
-
   .live-quote-head {
     gap: 10px;
   }
 
   .live-quote-chart-shell {
-    height: 108px;
+    height: 118px;
   }
 
   .live-quote-metrics {

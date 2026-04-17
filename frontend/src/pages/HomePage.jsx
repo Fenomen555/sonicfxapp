@@ -401,6 +401,13 @@ export default function HomePage({ t }) {
     setPickerSheet(null);
   }
 
+  function handleAutomaticZoneKeyDown(event) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openPickerSheet("asset");
+    }
+  }
+
   return (
     <section className="page page-home-ref">
       <div className="home-quota">
@@ -413,36 +420,45 @@ export default function HomePage({ t }) {
         </button>
       </div>
 
-      <button
-        className={`upload-zone ${isIndicatorsMode ? "upload-zone-indicator" : isAutomaticMode ? "upload-zone-live" : ""}`}
-        type="button"
-        onClick={() => (isIndicatorsMode ? openPickerSheet("indicator") : isAutomaticMode ? openPickerSheet("asset") : setIsActionSheetOpen(true))}
-      >
-        <span className="frame-corner tl" />
-        <span className="frame-corner tr" />
-        <span className="frame-corner bl" />
-        <span className="frame-corner br" />
-
-        {isIndicatorsMode ? (
-          <>
-            <div className="upload-icon" aria-hidden="true">
-              <IndicatorModeIcon />
-            </div>
-          <div className="upload-indicator-hero">
-            <span className={`indicator-inline-code tone-${selectedIndicatorDisplay.tone}`}>{selectedIndicatorDisplay.short}</span>
-            <div className="upload-title">{selectedIndicatorDisplay.title}</div>
-          </div>
-          {selectedIndicatorHint ? <div className="upload-hint">{selectedIndicatorHint}</div> : null}
-          <div className="upload-subhint">{t.home.indicatorZoneHint || "Tap to choose an indicator"}</div>
-          </>
-        ) : isAutomaticMode ? (
+      {isAutomaticMode ? (
+        <div
+          className="live-quote-stage"
+          role="button"
+          tabIndex={0}
+          onClick={() => openPickerSheet("asset")}
+          onKeyDown={handleAutomaticZoneKeyDown}
+        >
           <LiveQuoteChart
             symbol={selectedPairMeta?.pair || asset || (t.home.quoteAwaitPair || "Choose a pair")}
             marketLabel={currentMarkets.find((item) => item.key === marketKind)?.label || marketKind.toUpperCase()}
             payload={quotePayload}
             state={quoteState}
           />
-        ) : (
+        </div>
+      ) : (
+        <button
+          className={`upload-zone ${isIndicatorsMode ? "upload-zone-indicator" : ""}`}
+          type="button"
+          onClick={() => (isIndicatorsMode ? openPickerSheet("indicator") : setIsActionSheetOpen(true))}
+        >
+          <span className="frame-corner tl" />
+          <span className="frame-corner tr" />
+          <span className="frame-corner bl" />
+          <span className="frame-corner br" />
+
+          {isIndicatorsMode ? (
+            <>
+              <div className="upload-icon" aria-hidden="true">
+                <IndicatorModeIcon />
+              </div>
+            <div className="upload-indicator-hero">
+              <span className={`indicator-inline-code tone-${selectedIndicatorDisplay.tone}`}>{selectedIndicatorDisplay.short}</span>
+              <div className="upload-title">{selectedIndicatorDisplay.title}</div>
+            </div>
+            {selectedIndicatorHint ? <div className="upload-hint">{selectedIndicatorHint}</div> : null}
+            <div className="upload-subhint">{t.home.indicatorZoneHint || "Tap to choose an indicator"}</div>
+            </>
+          ) : (
           <>
             <div className="upload-icon" aria-hidden="true">
               <UploadScanAnimation />
@@ -451,8 +467,9 @@ export default function HomePage({ t }) {
             <div className="upload-hint">{t.home.uploadHint || "JPG, PNG or HEIC"}</div>
             <div className="upload-subhint">{t.home.sourceHint || "Choose a chart source"}</div>
           </>
-        )}
-      </button>
+          )}
+        </button>
+      )}
 
       <div className="signal-panel">
         <button

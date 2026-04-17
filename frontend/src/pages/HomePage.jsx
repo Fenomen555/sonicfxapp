@@ -108,6 +108,23 @@ function matchesQuotePayload(payload, subscriptionItem) {
   return symbolCandidates.includes(expectedSymbol);
 }
 
+function getQuoteSubscriptionKey(item) {
+  if (!item) return "";
+  return `${String(item.category || "").trim().toLowerCase()}::${normalizeQuoteMatchValue(item.symbol)}`;
+}
+
+function payloadHasRenderableCandles(payload) {
+  const root = getQuotePayloadRoot(payload);
+  const candidates = [root?.candles, root?.history, payload?.candles, payload?.history];
+
+  return candidates.some((candidate) => (
+    Array.isArray(candidate) &&
+    candidate.some((item) => (
+      [item?.open, item?.high, item?.low, item?.close].every((value) => Number.isFinite(Number(value)))
+    ))
+  ));
+}
+
 
 export default function HomePage({ t }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -133,8 +150,13 @@ export default function HomePage({ t }) {
   });
   const [quoteState, setQuoteState] = useState({ status: "idle", detail: "" });
   const [quotePayload, setQuotePayload] = useState(null);
+  const [quoteRenderReady, setQuoteRenderReady] = useState(false);
   const quoteClientRef = useRef(null);
   const currentQuoteSubscriptionRef = useRef(null);
+  const quoteRenderReadyRef = useRef(false);
+  const pendingQuotePayloadRef = useRef(null);
+  const quoteUnlockTimerRef = useRef(null);
+  const currentQuoteLoadKeyRef = useRef("");
   const lastQuoteSubscriptionKeyRef = useRef("");
 
   const quickActions = [
@@ -366,6 +388,10 @@ export default function HomePage({ t }) {
   }, [autoQuoteSubscription]);
 
   useEffect(() => {
+    quoteRenderReadyRef.current = quoteRenderReady;
+  }, [quoteRenderReady]);
+
+  useEffect(() => {
     if (!quotesConfig.enabled) {
       quoteClientRef.current?.destroy();
       quoteClientRef.current = null;
@@ -385,11 +411,55 @@ export default function HomePage({ t }) {
       onEvent: (payload) => {
         const currentItem = currentQuoteSubscriptionRef.current;
         const eventName = String(payload?.event || "").trim().toLowerCase();
+
         if ((eventName === "quote" || eventName === "snapshot" || eventName === "subscribed") && matchesQuotePayload(payload, currentItem)) {
+          if (!payloadHasRenderableCandles(payload)) {
+            return;
+          }
+
+          pendingQuotePayloadRef.current = payload;
+          if (!quoteRenderReadyRef.current) {
+            if (quoteUnlockTimerRef.current) {
+              window.clearTimeout(quoteUnlockTimerRef.current);
+            }
+            const subscriptionKey = getQuoteSubscriptionKey(currentItem);
+            quoteUnlockTimerRef.current = window.setTimeout(() => {
+              quoteUnlockTimerRef.current = null;
+              if (quoteRenderReadyRef.current) return;
+
+              const activeItem = currentQuoteSubscriptionRef.current;
+              if (!activeItem || getQuoteSubscriptionKey(activeItem) !== subscriptionKey) {
+                return;
+              }
+
+              const pendingPayload = pendingQuotePayloadRef.current;
+              if (!pendingPayload || !matchesQuotePayload(pendingPayload, activeItem) || !payloadHasRenderableCandles(pendingPayload)) {
+                return;
+              }
+
+              setQuotePayload(pendingPayload);
+              setQuoteRenderReady(true);
+              quoteRenderReadyRef.current = true;
+              setQuoteState((prev) => (
+                prev.status === "error"
+                  ? prev
+                  : { status: "ready", detail: "" }
+              ));
+            }, Math.max(180, quotesConfig.replace_debounce_ms || 220));
+            return;
+          }
+
           setQuotePayload(payload);
         }
         if (eventName === "unsubscribed" && !currentQuoteSubscriptionRef.current) {
+          if (quoteUnlockTimerRef.current) {
+            window.clearTimeout(quoteUnlockTimerRef.current);
+            quoteUnlockTimerRef.current = null;
+          }
+          pendingQuotePayloadRef.current = null;
           setQuotePayload(null);
+          setQuoteRenderReady(false);
+          quoteRenderReadyRef.current = false;
         }
         if (eventName === "error") {
           setQuoteState({ status: "error", detail: payload?.detail || "Quote stream error" });
@@ -407,6 +477,10 @@ export default function HomePage({ t }) {
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      if (quoteUnlockTimerRef.current) {
+        window.clearTimeout(quoteUnlockTimerRef.current);
+        quoteUnlockTimerRef.current = null;
+      }
       client.destroy();
       if (quoteClientRef.current === client) {
         quoteClientRef.current = null;
@@ -434,8 +508,31 @@ export default function HomePage({ t }) {
           `/api/quotes/history?category=${encodeURIComponent(currentItem.category)}&symbol=${encodeURIComponent(currentItem.symbol)}&history_seconds=${encodeURIComponent(currentItem.history_seconds || quotesConfig.history_seconds || 300)}`
         );
         if (!isActive) return;
-        if (data && typeof data === "object" && matchesQuotePayload(data, currentItem)) {
-          setQuotePayload(data);
+        if (data && typeof data === "object" && matchesQuotePayload(data, currentItem) && payloadHasRenderableCandles(data)) {
+          if (currentQuoteLoadKeyRef.current !== getQuoteSubscriptionKey(currentItem)) {
+            return;
+          }
+          if (quoteUnlockTimerRef.current) {
+            window.clearTimeout(quoteUnlockTimerRef.current);
+            quoteUnlockTimerRef.current = null;
+          }
+          const pendingPayload = pendingQuotePayloadRef.current;
+          const nextPayload = (
+            pendingPayload &&
+            matchesQuotePayload(pendingPayload, currentItem) &&
+            payloadHasRenderableCandles(pendingPayload)
+          )
+            ? pendingPayload
+            : data;
+          setQuotePayload(nextPayload);
+          setQuoteRenderReady(true);
+          quoteRenderReadyRef.current = true;
+          pendingQuotePayloadRef.current = null;
+          setQuoteState((prev) => (
+            prev.status === "error"
+              ? prev
+              : { status: "ready", detail: "" }
+          ));
         }
       } catch (_error) {
         if (!isActive) return;
@@ -455,21 +552,37 @@ export default function HomePage({ t }) {
 
     if (isAutomaticMode && autoQuoteSubscription.length) {
       const currentItem = autoQuoteSubscription[0];
-      const nextKey = `${currentItem.category}::${currentItem.symbol}`;
+      const nextKey = getQuoteSubscriptionKey(currentItem);
       if (lastQuoteSubscriptionKeyRef.current !== nextKey) {
         lastQuoteSubscriptionKeyRef.current = nextKey;
+        currentQuoteLoadKeyRef.current = nextKey;
+        if (quoteUnlockTimerRef.current) {
+          window.clearTimeout(quoteUnlockTimerRef.current);
+          quoteUnlockTimerRef.current = null;
+        }
+        pendingQuotePayloadRef.current = null;
         setQuotePayload(null);
-        setQuoteState({ status: "connecting", detail: "" });
+        setQuoteRenderReady(false);
+        quoteRenderReadyRef.current = false;
+        setQuoteState({ status: "loading", detail: t.home.quoteLoading || "Идет загрузка графика..." });
       }
       client.setSubscriptions(autoQuoteSubscription);
       return;
     }
 
     lastQuoteSubscriptionKeyRef.current = "";
+    currentQuoteLoadKeyRef.current = "";
+    if (quoteUnlockTimerRef.current) {
+      window.clearTimeout(quoteUnlockTimerRef.current);
+      quoteUnlockTimerRef.current = null;
+    }
+    pendingQuotePayloadRef.current = null;
     client.clearSubscriptions();
     setQuotePayload(null);
+    setQuoteRenderReady(false);
+    quoteRenderReadyRef.current = false;
     setQuoteState({ status: "idle", detail: "" });
-  }, [autoQuoteSubscription, isAutomaticMode]);
+  }, [autoQuoteSubscription, isAutomaticMode, t.home.quoteLoading]);
 
   function openPickerSheet(type) {
     setPickerSearch("");
@@ -511,7 +624,7 @@ export default function HomePage({ t }) {
           <LiveQuoteChart
             symbol={selectedPairMeta?.pair || asset || (t.home.quoteAwaitPair || "Choose a pair")}
             marketLabel={currentMarkets.find((item) => item.key === marketKind)?.label || marketKind.toUpperCase()}
-            payload={quotePayload}
+            payload={quoteRenderReady ? quotePayload : null}
             state={quoteState}
           />
         </div>

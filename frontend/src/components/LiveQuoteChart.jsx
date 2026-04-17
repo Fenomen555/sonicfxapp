@@ -59,7 +59,8 @@ function extractCandles(payload) {
           low: toNumber(item?.low),
           close: toNumber(item?.close)
         }))
-        .filter((item) => [item.open, item.high, item.low, item.close].every((value) => value !== null));
+        .filter((item) => [item.open, item.high, item.low, item.close].every((value) => value !== null))
+        .slice(-48);
     }
   }
 
@@ -122,6 +123,8 @@ export default function LiveQuoteChart({
   const displaySymbol = symbol || root?.requested_symbol || root?.resolved_symbol;
   const liveStateLabel = state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
     ? "Live"
+    : state?.status === "loading" || state?.status === "connecting"
+      ? "Loading"
     : state?.status === "reconnecting"
       ? "Reconnecting"
       : state?.status === "error"
@@ -177,9 +180,9 @@ export default function LiveQuoteChart({
           <div className="live-quote-empty">
             <div className="live-quote-empty-title">{displaySymbol}</div>
             <div className="live-quote-empty-copy">
-              {state?.status === "error"
-                ? (state?.detail || "Quote feed is unavailable")
-                : "Preparing the live quote stream"}
+              {state?.detail || (state?.status === "error"
+                ? "Quote feed is unavailable"
+                : "Preparing the live quote stream")}
             </div>
           </div>
         )}

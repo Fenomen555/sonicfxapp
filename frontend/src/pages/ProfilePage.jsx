@@ -156,18 +156,10 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   const activeThemeMeta = useMemo(
     () => (
       theme === "light"
-        ? {
-            id: "light",
-            label: t.profile.themeLight || "Светлая",
-            symbol: "\u2600"
-          }
-        : {
-            id: "dark",
-            label: t.profile.themeDark || "Темная",
-            symbol: "\u263E"
-          }
+        ? { id: "light", symbol: "\u2600" }
+        : { id: "dark", symbol: "\u263E" }
     ),
-    [theme, t.profile.themeDark, t.profile.themeLight]
+    [theme]
   );
 
   const timezoneOptions = useMemo(
@@ -215,15 +207,11 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         <div className={`profile-ribbon profile-ribbon-${statusMeta.tone}`}>
           <span>{statusMeta.label}</span>
         </div>
+
         <div className="profile-hero-top">
           <div className="profile-avatar-shell">
             {user?.photo_url && !avatarFailed ? (
-              <img
-                className="profile-avatar-image"
-                src={user.photo_url}
-                alt={profileName}
-                onError={() => setAvatarFailed(true)}
-              />
+              <img className="profile-avatar-image" src={user.photo_url} alt="" onError={() => setAvatarFailed(true)} />
             ) : (
               <div className="profile-avatar-fallback">{getInitials(user, "SF")}</div>
             )}
@@ -231,7 +219,7 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
 
           <div className="profile-hero-copy">
             <h1 className="page-title">{profileName}</h1>
-            <p>{user?.tg_username ? `@${user.tg_username}` : (t.profile.noUsername || "@username not set")}</p>
+            <p>{user?.tg_username ? `@${user.tg_username}` : ""}</p>
           </div>
         </div>
 
@@ -243,100 +231,31 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
             </article>
           ))}
         </div>
-
-        <button type="button" className="profile-upgrade-btn" onClick={handleUpgradeStatus}>
-          {t.profile.upgradeStatus || "Повысить статус"}
-        </button>
       </div>
 
       <div className="card profile-section profile-settings-shell">
-        <div className="profile-section-head">
-          <strong>{t.profile.settingsTitle || "Настройки"}</strong>
-          <span>{t.profile.settingsHint || "Язык, тема и часовой пояс применяются сразу."}</span>
-        </div>
-
         <div className="profile-settings-grid">
-          <div className="profile-setting-block profile-setting-block-wide">
-            <label className="field-label">{t.profile.timezone || "Часовой пояс"}</label>
-            <div className="profile-timezone-selector">
-              <button
-                type="button"
-                className={`profile-timezone-summary ${isTimezoneExpanded ? "expanded" : ""}`}
-                onClick={() => setIsTimezoneExpanded((prev) => !prev)}
-              >
-                <span className="profile-timezone-summary-copy">
-                  <span className="profile-timezone-summary-top">
-                    <ReactCountryFlag svg countryCode={selectedTimezoneOption.flag} aria-hidden="true" className="profile-timezone-flag" />
-                    <strong>{selectedTimezoneOption.city}</strong>
-                  </span>
-                  <span className="profile-timezone-summary-meta">
-                    <span>{selectedTimezoneOption.id}</span>
-                    <span>{selectedTimezoneOption.currentOffset} · {selectedTimezoneOption.currentTime}</span>
-                  </span>
-                </span>
-                <span className="profile-timezone-summary-side">
-                  <span className="profile-timezone-summary-state">
-                    {isTimezoneExpanded
-                      ? (t.profile.timezoneCollapse || "Свернуть")
-                      : (t.profile.timezoneChoose || "Выбрать")}
-                  </span>
-                  <span className={`profile-timezone-chevron ${isTimezoneExpanded ? "expanded" : ""}`} aria-hidden="true" />
-                </span>
-              </button>
-
-              {isTimezoneExpanded && (
-                <div className="profile-timezone-grid">
-                  {timezoneOptions.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`profile-timezone-chip ${timezone === item.id ? "active" : ""}`}
-                      onClick={() => {
-                        setTimezone(item.id);
-                        setIsTimezoneExpanded(false);
-                      }}
-                    >
-                      <span className="profile-timezone-top">
-                        <ReactCountryFlag svg countryCode={item.flag} aria-hidden="true" className="profile-timezone-flag" />
-                        <span className="profile-timezone-city">{item.city}</span>
-                      </span>
-                      <span className="profile-timezone-zone">{item.id}</span>
-                      <span className="profile-timezone-current-row">
-                        <span className="profile-timezone-offset">{item.currentOffset}</span>
-                        <span className="profile-timezone-current">
-                          {(t.profile.timezoneCurrent || "Сейчас")}: {item.currentTime}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
 
           <div className="profile-setting-block profile-setting-block-wide">
-            <label className="field-label">{t.profile.lang || "Язык"}</label>
+            <label className="field-label">{t.profile.lang}</label>
             <div className="profile-chip-group profile-chip-group-languages">
               {languageOptions.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  className={`profile-chip profile-chip-language ${lang === item.id ? "active" : ""}`}
+                  className={`profile-chip ${lang === item.id ? "active" : ""}`}
                   onClick={() => {
                     setLang(item.id);
                     onLangPreview(item.id);
                   }}
                 >
-                  <ReactCountryFlag svg countryCode={item.flag} aria-hidden="true" className="profile-chip-flag" />
-                  <span>{item.label}</span>
+                  <ReactCountryFlag svg countryCode={item.flag} />
                 </button>
               ))}
             </div>
           </div>
 
           <div className="profile-setting-block profile-setting-block-wide">
-            <div className="profile-theme-row">
-              <label className="field-label">{t.profile.theme || "Тема"}</label>
             <button
               type="button"
               className={`profile-theme-switch ${theme === "dark" ? "is-dark" : "is-light"}`}
@@ -345,27 +264,18 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
                 setTheme(nextTheme);
                 onThemePreview(nextTheme);
               }}
-              role="switch"
-              aria-checked={theme === "dark"}
-              aria-label={t.profile.theme || "Тема"}
             >
-              <span className="profile-theme-switch-track">
-                <span className={`profile-theme-thumb ${activeThemeMeta.id}`} aria-hidden="true">
-                  <span className={`profile-theme-badge ${activeThemeMeta.id}`}>{activeThemeMeta.symbol}</span>
-                </span>
-                <span className="profile-theme-switch-copy">
-                  <strong>{activeThemeMeta.label}</strong>
-                </span>
+              <span className={`profile-theme-thumb ${activeThemeMeta.id}`}>
+                {activeThemeMeta.symbol}
               </span>
             </button>
-            </div>
           </div>
+
         </div>
 
-        <button className="primary-btn profile-save-btn" onClick={handleSave} disabled={saving}>
-          {saving ? (t.profile.saving || "Saving...") : (t.profile.save || "Save")}
+        <button className="primary-btn" onClick={handleSave} disabled={saving}>
+          Save
         </button>
-        {statusMessage && <div className={`form-status ${statusTone}`}>{statusMessage}</div>}
       </div>
     </section>
   );

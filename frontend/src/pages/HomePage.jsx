@@ -340,7 +340,7 @@ export default function HomePage({ t }) {
       onStateChange: (nextState) => setQuoteState(nextState),
       onEvent: (payload) => {
         const eventName = String(payload?.event || "").trim().toLowerCase();
-        if (eventName === "snapshot" || eventName === "subscribed") {
+        if (eventName === "quote" || eventName === "snapshot" || eventName === "subscribed") {
           setQuotePayload(payload);
         }
         if (eventName === "unsubscribed" && !isAutomaticMode) {

@@ -5,13 +5,25 @@ function toNumber(value) {
   return Number.isFinite(numeric) ? numeric : null;
 }
 
+function getPayloadRoot(payload) {
+  if (payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    return payload.data;
+  }
+  return payload || {};
+}
+
 function extractPoints(payload) {
+  const root = getPayloadRoot(payload);
   const directCandidates = [
+    root?.points,
+    root?.history,
+    root?.candles,
+    root?.ticks,
+    root?.data,
     payload?.points,
     payload?.history,
     payload?.candles,
-    payload?.ticks,
-    payload?.data
+    payload?.ticks
   ];
 
   for (const candidate of directCandidates) {
@@ -58,11 +70,14 @@ export default function LiveQuoteChart({
   title,
   hint
 }) {
+  const root = useMemo(() => getPayloadRoot(payload), [payload]);
   const points = useMemo(() => extractPoints(payload), [payload]);
   const line = useMemo(() => buildPolyline(points), [points]);
-  const lastPrice = points.length ? points[points.length - 1].y : null;
-  const change = points.length > 1 ? (points[points.length - 1].y - points[0].y) : 0;
+  const lastPrice = toNumber(root?.price) ?? (points.length ? points[points.length - 1].y : null);
+  const rawChange = toNumber(root?.change);
+  const change = rawChange ?? (points.length > 1 ? (points[points.length - 1].y - points[0].y) : 0);
   const isPositive = change >= 0;
+  const displaySymbol = root?.requested_symbol || root?.resolved_symbol || symbol;
 
   return (
     <div className="live-quote-zone">
@@ -96,7 +111,7 @@ export default function LiveQuoteChart({
           </svg>
         ) : (
           <div className="live-quote-empty">
-            <div className="live-quote-empty-title">{symbol}</div>
+            <div className="live-quote-empty-title">{displaySymbol}</div>
             <div className="live-quote-empty-copy">
               {state?.status === "error"
                 ? (state?.detail || "Quote feed is unavailable")
@@ -109,7 +124,7 @@ export default function LiveQuoteChart({
       <div className="live-quote-metrics">
         <div className="live-quote-metric">
           <span>Pair</span>
-          <strong>{symbol}</strong>
+          <strong>{displaySymbol}</strong>
         </div>
         <div className="live-quote-metric">
           <span>Price</span>
@@ -118,7 +133,7 @@ export default function LiveQuoteChart({
         <div className="live-quote-metric">
           <span>Move</span>
           <strong className={isPositive ? "up" : "down"}>
-            {points.length > 1 ? `${isPositive ? "+" : ""}${change.toFixed(4)}` : "--"}
+            {Number.isFinite(change) ? `${isPositive ? "+" : ""}${change.toFixed(4)}` : "--"}
           </strong>
         </div>
       </div>

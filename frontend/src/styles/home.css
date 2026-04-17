@@ -132,6 +132,10 @@
   min-height: 208px;
 }
 
+.upload-zone-live .frame-corner {
+  display: none;
+}
+
 .frame-corner {
   position: absolute;
   width: 30px;
@@ -324,20 +328,15 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 16px;
+  gap: 12px;
   text-align: left;
 }
 
 .live-quote-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-}
-
-.live-quote-copy {
-  display: grid;
-  gap: 6px;
+  gap: 10px;
 }
 
 .live-quote-badge {
@@ -395,7 +394,7 @@
 
 .live-quote-chart-shell {
   position: relative;
-  height: 82px;
+  height: 118px;
   border-radius: 18px;
   border: 1px solid rgba(111, 141, 193, 0.2);
   background:
@@ -433,6 +432,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  margin-top: 2px;
 }
 
 .live-quote-metric {
@@ -1602,19 +1602,15 @@
 @media (max-width: 560px) {
   .upload-zone-live {
     padding: 16px 14px 14px;
-    min-height: 190px;
+    min-height: 214px;
   }
 
   .live-quote-head {
     gap: 10px;
   }
 
-  .live-quote-title {
-    font-size: 17px;
-  }
-
   .live-quote-chart-shell {
-    height: 74px;
+    height: 108px;
   }
 
   .live-quote-metrics {

@@ -125,9 +125,7 @@ export default function LiveQuoteChart({
   return (
     <div className="live-quote-zone">
       <div className="live-quote-head">
-        <div className="live-quote-copy">
-          <span className="live-quote-badge">{marketLabel}</span>
-        </div>
+        <span className="live-quote-badge">{marketLabel}</span>
         <div className={`live-quote-status ${state?.status || "idle"}`}>
           {state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
             ? "Live"

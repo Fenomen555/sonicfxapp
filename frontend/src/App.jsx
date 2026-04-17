@@ -9,9 +9,6 @@ import HomePage from "./pages/HomePage";
 import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
 
-const THEME_STORAGE_KEY = "sonicfx_theme";
-const LANG_STORAGE_KEY = "sonicfx_lang";
-
 function normalizeTheme(value) {
   return value === "light" ? "light" : "dark";
 }
@@ -20,32 +17,14 @@ function normalizeLang(value) {
   return texts[value] ? value : "ru";
 }
 
-function getStoredTheme() {
-  if (typeof window === "undefined") return "dark";
-  try {
-    return normalizeTheme(window.localStorage.getItem(THEME_STORAGE_KEY));
-  } catch {
-    return "dark";
-  }
-}
-
-function getStoredLang() {
-  if (typeof window === "undefined") return "ru";
-  try {
-    return normalizeLang(window.localStorage.getItem(LANG_STORAGE_KEY));
-  } catch {
-    return "ru";
-  }
-}
-
 const FALLBACK_USER = {
   user_id: 0,
   tg_username: "",
   first_name: "",
   mini_username: "",
-  lang: getStoredLang(),
+  lang: "ru",
   timezone: "Europe/Kiev",
-  theme: getStoredTheme(),
+  theme: "dark",
   activation_status: "inactive",
   scanner_access: 0,
   deposit_amount: 0
@@ -87,22 +66,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const nextTheme = normalizeTheme(user.theme);
-    document.documentElement.setAttribute("data-theme", nextTheme);
-    try {
-      window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
-    } catch {}
+    document.documentElement.setAttribute("data-theme", normalizeTheme(user.theme));
   }, [user.theme]);
 
   useEffect(() => {
-    const nextLang = normalizeLang(user.lang);
-    try {
-      window.localStorage.setItem(LANG_STORAGE_KEY, nextLang);
-    } catch {}
-  }, [user.lang]);
-
-  useEffect(() => {
     let isActive = true;
+
     async function bootstrap() {
       const hasTg = isTelegramWebAppAvailable();
       if (!hasTg) {
@@ -119,6 +88,7 @@ export default function App() {
       }
 
       setIsTgWebApp(true);
+
       try {
         await initTelegramApp();
 
@@ -141,10 +111,6 @@ export default function App() {
           return;
         }
 
-        const storedTheme = getStoredTheme();
-        const storedLang = getStoredLang();
-        setUser((prev) => ({ ...prev, theme: storedTheme, lang: storedLang }));
-
         await apiFetchJson("/api/user/sync", { method: "POST" });
         const profile = await apiFetchJson("/api/user/profile", { method: "POST" });
         if (!isActive) return;
@@ -152,12 +118,12 @@ export default function App() {
         setUser({
           ...FALLBACK_USER,
           ...(profile || {}),
-          theme: storedTheme,
-          lang: storedLang
+          theme: normalizeTheme(profile?.theme),
+          lang: normalizeLang(profile?.lang)
         });
       } catch {
         if (!isActive) return;
-        setUser((prev) => ({ ...FALLBACK_USER, ...prev, theme: getStoredTheme(), lang: getStoredLang() }));
+        setUser(FALLBACK_USER);
       } finally {
         if (isActive) setIsLoading(false);
       }
@@ -283,8 +249,8 @@ export default function App() {
             t={t}
             user={user}
             onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
-            onThemePreview={(theme) => setUser((prev) => ({ ...prev, theme }))}
-            onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: nextLang }))}
+            onThemePreview={(theme) => setUser((prev) => ({ ...prev, theme: normalizeTheme(theme) }))}
+            onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: normalizeLang(nextLang) }))}
           />
         )}
       </main>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AutoModeIcon,
   CameraIcon,
@@ -9,9 +9,11 @@ import {
   SparkIcon
 } from "../components/AppIcons";
 import lightningCtaIcon from "../assets/cta-lightning.png";
+import LiveQuoteChart from "../components/LiveQuoteChart";
 import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetchJson } from "../lib/api";
 import { getIndicatorMeta } from "../lib/indicatorMeta";
+import { QuoteStreamClient } from "../lib/quoteStream";
 
 const FALLBACK_EXPIRATIONS = [
   { value: "5s", label: "5s" },
@@ -85,6 +87,15 @@ export default function HomePage({ t }) {
   const [pickerSearch, setPickerSearch] = useState("");
   const [indicators, setIndicators] = useState(FALLBACK_INDICATORS);
   const [selectedIndicator, setSelectedIndicator] = useState(FALLBACK_INDICATORS[0]?.code || "rsi");
+  const [quotesConfig, setQuotesConfig] = useState({
+    enabled: true,
+    websocket_url: "/api/ws/quotes",
+    history_seconds: 300,
+    replace_debounce_ms: 220
+  });
+  const [quoteState, setQuoteState] = useState({ status: "idle", detail: "" });
+  const [quotePayload, setQuotePayload] = useState(null);
+  const quoteClientRef = useRef(null);
 
   const quickActions = [
     { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
@@ -208,6 +219,37 @@ export default function HomePage({ t }) {
     };
   }, []);
 
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadQuotesConfig() {
+      try {
+        const data = await apiFetchJson("/api/quotes/config");
+        if (!isActive) return;
+        setQuotesConfig({
+          enabled: Boolean(data?.enabled),
+          websocket_url: data?.websocket_url || "/api/ws/quotes",
+          history_seconds: Number(data?.history_seconds) || 300,
+          replace_debounce_ms: Number(data?.replace_debounce_ms) || 220
+        });
+      } catch (_error) {
+        if (!isActive) return;
+        setQuotesConfig((prev) => ({
+          ...prev,
+          enabled: false
+        }));
+      }
+    }
+
+    loadQuotesConfig();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const isAutomaticMode = signalMode === "automatic";
+
   const indicatorMarkets = useMemo(() => {
     if (!availableMarkets.length) return INDICATOR_MARKETS;
     const labels = new Map(INDICATOR_MARKETS.map((item) => [item.key, item.label]));
@@ -268,6 +310,87 @@ export default function HomePage({ t }) {
       })
     : indicators;
 
+  const autoQuoteSubscription = useMemo(() => {
+    if (!isAutomaticMode) return [];
+    const symbol = selectedPairMeta?.pair || asset;
+    if (!symbol) return [];
+    return [{
+      category: marketKind,
+      symbol,
+      history_seconds: quotesConfig.history_seconds || 300
+    }];
+  }, [asset, isAutomaticMode, marketKind, quotesConfig.history_seconds, selectedPairMeta]);
+
+  useEffect(() => {
+    if (!quotesConfig.enabled) {
+      quoteClientRef.current?.destroy();
+      quoteClientRef.current = null;
+      setQuotePayload(null);
+      setQuoteState({
+        status: "error",
+        detail: t.home.quoteUnavailable || "Quote stream is unavailable right now"
+      });
+      return undefined;
+    }
+
+    const client = new QuoteStreamClient({
+      url: quotesConfig.websocket_url,
+      historySeconds: quotesConfig.history_seconds,
+      replaceDebounceMs: quotesConfig.replace_debounce_ms,
+      onStateChange: (nextState) => setQuoteState(nextState),
+      onEvent: (payload) => {
+        const eventName = String(payload?.event || "").trim().toLowerCase();
+        if (eventName === "snapshot" || eventName === "subscribed") {
+          setQuotePayload(payload);
+        }
+        if (eventName === "unsubscribed" && !isAutomaticMode) {
+          setQuotePayload(null);
+        }
+        if (eventName === "error") {
+          setQuoteState({ status: "error", detail: payload?.detail || "Quote stream error" });
+        }
+      }
+    });
+
+    quoteClientRef.current = client;
+    if (autoQuoteSubscription.length) {
+      client.setSubscriptions(autoQuoteSubscription);
+    }
+
+    const handleBeforeUnload = () => client.destroy();
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      client.destroy();
+      if (quoteClientRef.current === client) {
+        quoteClientRef.current = null;
+      }
+    };
+  }, [
+    autoQuoteSubscription,
+    isAutomaticMode,
+    quotesConfig.enabled,
+    quotesConfig.history_seconds,
+    quotesConfig.replace_debounce_ms,
+    quotesConfig.websocket_url,
+    t.home.quoteUnavailable
+  ]);
+
+  useEffect(() => {
+    const client = quoteClientRef.current;
+    if (!client) return;
+
+    if (isAutomaticMode && autoQuoteSubscription.length) {
+      client.setSubscriptions(autoQuoteSubscription);
+      return;
+    }
+
+    client.clearSubscriptions();
+    setQuotePayload(null);
+    setQuoteState({ status: "idle", detail: "" });
+  }, [autoQuoteSubscription, isAutomaticMode]);
+
   function openPickerSheet(type) {
     setPickerSearch("");
     setPickerSheet(type);
@@ -291,38 +414,46 @@ export default function HomePage({ t }) {
       </div>
 
       <button
-        className={`upload-zone ${isIndicatorsMode ? "upload-zone-indicator" : ""}`}
+        className={`upload-zone ${isIndicatorsMode ? "upload-zone-indicator" : isAutomaticMode ? "upload-zone-live" : ""}`}
         type="button"
-        onClick={() => (isIndicatorsMode ? openPickerSheet("indicator") : setIsActionSheetOpen(true))}
+        onClick={() => (isIndicatorsMode ? openPickerSheet("indicator") : isAutomaticMode ? openPickerSheet("asset") : setIsActionSheetOpen(true))}
       >
         <span className="frame-corner tl" />
         <span className="frame-corner tr" />
         <span className="frame-corner bl" />
         <span className="frame-corner br" />
 
-        <div className="upload-icon" aria-hidden="true">
-          {isIndicatorsMode ? <IndicatorModeIcon /> : <UploadScanAnimation />}
-        </div>
         {isIndicatorsMode ? (
+          <>
+            <div className="upload-icon" aria-hidden="true">
+              <IndicatorModeIcon />
+            </div>
           <div className="upload-indicator-hero">
             <span className={`indicator-inline-code tone-${selectedIndicatorDisplay.tone}`}>{selectedIndicatorDisplay.short}</span>
             <div className="upload-title">{selectedIndicatorDisplay.title}</div>
           </div>
+          {selectedIndicatorHint ? <div className="upload-hint">{selectedIndicatorHint}</div> : null}
+          <div className="upload-subhint">{t.home.indicatorZoneHint || "Tap to choose an indicator"}</div>
+          </>
+        ) : isAutomaticMode ? (
+          <LiveQuoteChart
+            symbol={selectedPairMeta?.pair || asset || (t.home.quoteAwaitPair || "Choose a pair")}
+            marketLabel={currentMarkets.find((item) => item.key === marketKind)?.label || marketKind.toUpperCase()}
+            payload={quotePayload}
+            state={quoteState}
+            title={t.home.automaticChartTitle || "Live quote stream"}
+            hint={quoteState?.detail || t.home.automaticChartHint || "Live chart preview for the selected pair"}
+          />
         ) : (
-          <div className="upload-title">{t.home.upload || "Upload chart"}</div>
+          <>
+            <div className="upload-icon" aria-hidden="true">
+              <UploadScanAnimation />
+            </div>
+            <div className="upload-title">{t.home.upload || "Upload chart"}</div>
+            <div className="upload-hint">{t.home.uploadHint || "JPG, PNG or HEIC"}</div>
+            <div className="upload-subhint">{t.home.sourceHint || "Choose a chart source"}</div>
+          </>
         )}
-        {(!isIndicatorsMode || selectedIndicatorHint) && (
-          <div className="upload-hint">
-            {isIndicatorsMode
-              ? selectedIndicatorHint
-              : (t.home.uploadHint || "JPG, PNG or HEIC")}
-          </div>
-        )}
-        <div className="upload-subhint">
-          {isIndicatorsMode
-            ? (t.home.indicatorZoneHint || "Tap to choose an indicator")
-            : (t.home.sourceHint || "Choose a chart source")}
-        </div>
       </button>
 
       <div className="signal-panel">

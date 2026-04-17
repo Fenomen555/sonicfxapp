@@ -7,6 +7,16 @@ export const getTelegramInitData = () => {
 
 export const isTelegramWebAppAvailable = () => Boolean(getTelegramWebApp() && getTelegramInitData());
 
+export const buildApiWebSocketUrl = (path) => {
+  const target = new URL(path || "/api/ws/quotes", window.location.origin);
+  target.protocol = target.protocol === "https:" ? "wss:" : "ws:";
+  const initData = getTelegramInitData();
+  if (initData) {
+    target.searchParams.set("tg_init_data", initData);
+  }
+  return target.toString();
+};
+
 export const getAdminTokenFromPath = () => {
   const pathname = (window.location.pathname || "").replace(/\/+$/, "");
   const parts = pathname.split("/").filter(Boolean);

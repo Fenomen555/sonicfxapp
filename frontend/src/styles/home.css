@@ -127,6 +127,11 @@
   display: none;
 }
 
+.upload-zone-live {
+  padding: 20px 18px 18px;
+  min-height: 208px;
+}
+
 .frame-corner {
   position: absolute;
   width: 30px;
@@ -315,6 +320,149 @@
   color: rgba(197, 213, 243, 0.82);
 }
 
+.live-quote-zone {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 16px;
+  text-align: left;
+}
+
+.live-quote-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.live-quote-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.live-quote-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(126, 166, 255, 0.18);
+  background: rgba(20, 30, 46, 0.58);
+  color: #d6e5ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.live-quote-title {
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.08;
+}
+
+.live-quote-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(111, 141, 193, 0.36);
+  background: rgba(10, 16, 25, 0.52);
+  color: #dbe7ff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.live-quote-status.ready,
+.live-quote-status.connected,
+.live-quote-status.alive {
+  border-color: rgba(123, 230, 178, 0.22);
+  color: #9ff1c8;
+}
+
+.live-quote-status.reconnecting {
+  border-color: rgba(255, 208, 115, 0.22);
+  color: #ffd58c;
+}
+
+.live-quote-status.error {
+  border-color: rgba(255, 154, 154, 0.24);
+  color: #ffb0b0;
+}
+
+.live-quote-chart-shell {
+  position: relative;
+  height: 82px;
+  border-radius: 18px;
+  border: 1px solid rgba(111, 141, 193, 0.2);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(143, 184, 255, 0.08), transparent 48%),
+    linear-gradient(180deg, rgba(11, 18, 30, 0.74), rgba(9, 14, 24, 0.76));
+  overflow: hidden;
+}
+
+.live-quote-chart {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.live-quote-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  text-align: center;
+  gap: 6px;
+}
+
+.live-quote-empty-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.live-quote-empty-copy {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.live-quote-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.live-quote-metric {
+  border-radius: 16px;
+  border: 1px solid rgba(111, 141, 193, 0.18);
+  background: rgba(11, 18, 30, 0.42);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.live-quote-metric span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.live-quote-metric strong {
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.live-quote-metric strong.up {
+  color: #8fe7b8;
+}
+
+.live-quote-metric strong.down {
+  color: #ffb4a1;
+}
+
 :root[data-theme="light"] .upload-zone {
   border-color: rgba(104, 127, 170, 0.2);
   background:
@@ -395,6 +543,53 @@
 
 :root[data-theme="light"] .upload-subhint {
   color: #51627c;
+}
+
+:root[data-theme="light"] .live-quote-badge {
+  border-color: rgba(86, 118, 181, 0.2);
+  background: rgba(242, 247, 255, 0.92);
+  color: #29427d;
+}
+
+:root[data-theme="light"] .live-quote-status {
+  border-color: rgba(97, 124, 176, 0.22);
+  background: rgba(255, 255, 255, 0.78);
+  color: #314766;
+}
+
+:root[data-theme="light"] .live-quote-status.ready,
+:root[data-theme="light"] .live-quote-status.connected,
+:root[data-theme="light"] .live-quote-status.alive {
+  color: #268d58;
+}
+
+:root[data-theme="light"] .live-quote-status.reconnecting {
+  color: #9a6b16;
+}
+
+:root[data-theme="light"] .live-quote-status.error {
+  color: #b64e4e;
+}
+
+:root[data-theme="light"] .live-quote-chart-shell,
+:root[data-theme="light"] .live-quote-metric {
+  border-color: rgba(102, 126, 168, 0.16);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(56, 104, 246, 0.05), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 255, 0.96));
+}
+
+:root[data-theme="light"] .live-quote-empty-copy,
+:root[data-theme="light"] .live-quote-metric span {
+  color: #6a7d99;
+}
+
+:root[data-theme="light"] .live-quote-metric strong.up {
+  color: #2c8e5e;
+}
+
+:root[data-theme="light"] .live-quote-metric strong.down {
+  color: #c86a57;
 }
 
 .primary-btn-top {
@@ -1405,6 +1600,35 @@
 }
 
 @media (max-width: 560px) {
+  .upload-zone-live {
+    padding: 16px 14px 14px;
+    min-height: 190px;
+  }
+
+  .live-quote-head {
+    gap: 10px;
+  }
+
+  .live-quote-title {
+    font-size: 17px;
+  }
+
+  .live-quote-chart-shell {
+    height: 74px;
+  }
+
+  .live-quote-metrics {
+    gap: 8px;
+  }
+
+  .live-quote-metric {
+    padding: 10px;
+  }
+
+  .live-quote-metric strong {
+    font-size: 13px;
+  }
+
   .signal-panel {
     gap: 10px;
     margin-bottom: 2px;
@@ -1485,6 +1709,10 @@
 }
 
 @media (max-width: 380px) {
+  .live-quote-metrics {
+    grid-template-columns: 1fr;
+  }
+
   .signal-panel-toggle {
     align-items: flex-start;
     gap: 8px;

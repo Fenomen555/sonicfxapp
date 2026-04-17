@@ -18,7 +18,7 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -29,7 +29,8 @@ from db_bootstrap import (
     normalize_user_lang,
     scanner_access_from_deposit,
 )
-from telegram_auth import get_telegram_user
+from quotes_hub import DevsbiteQuotesHub, SUPPORTED_QUOTE_CATEGORIES
+from telegram_auth import get_telegram_user, verify_telegram_init_data
 
 load_dotenv()
 
@@ -66,7 +67,13 @@ THEMES = {"dark", "light"}
 ACTIVATION_STATUSES = {"inactive", "active", "active_scanner"}
 DEVSBITE_API_BASE_URL = (os.getenv("DEVSBITE_API_BASE_URL") or "https://api.devsbite.com").strip().rstrip("/")
 DEVSBITE_TOKEN = (os.getenv("DEVSBITE_TOKEN") or "").strip()
+DEVSBITE_CLIENT_TOKEN = (os.getenv("DEVSBITE_CLIENT_TOKEN") or DEVSBITE_TOKEN).strip()
 DEVSBITE_MIN_PAYOUT = int((os.getenv("DEVSBITE_MIN_PAYOUT") or "60").strip() or "60")
+DEVSBITE_QUOTES_WS_URL = (
+    os.getenv("DEVSBITE_QUOTES_WS_URL") or "wss://api.devsbite.com/ws/quotes/live/multi"
+).strip()
+QUOTE_HISTORY_SECONDS = int((os.getenv("QUOTE_HISTORY_SECONDS") or "300").strip() or "300")
+QUOTE_REPLACE_DEBOUNCE_MS = int((os.getenv("QUOTE_REPLACE_DEBOUNCE_MS") or "220").strip() or "220")
 MARKET_SYNC_INTERVAL_SEC = int((os.getenv("MARKET_SYNC_INTERVAL_SEC") or "300").strip() or "300")
 EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,5m,15m,1h").strip()
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
@@ -115,6 +122,12 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 db_pool: Optional[aiomysql.Pool] = None
 bot: Optional[Bot] = None
 dp = Dispatcher()
+quotes_hub = DevsbiteQuotesHub(
+    DEVSBITE_QUOTES_WS_URL,
+    DEVSBITE_CLIENT_TOKEN,
+    history_seconds=QUOTE_HISTORY_SECONDS,
+    debounce_ms=QUOTE_REPLACE_DEBOUNCE_MS,
+)
 
 media_dir = Path(__file__).resolve().parent / "media"
 media_dir.mkdir(parents=True, exist_ok=True)
@@ -276,6 +289,18 @@ async def get_admin_user(
     if not await is_admin_user(int(user["user_id"])):
         raise HTTPException(status_code=403, detail="Admin access denied")
     return user
+
+
+def get_ws_quote_backend_url(websocket: Optional[WebSocket] = None) -> str:
+    if websocket is not None:
+        scheme = "wss" if websocket.url.scheme == "https" else "ws"
+        return f"{scheme}://{websocket.url.netloc}/api/ws/quotes"
+    if WEB_APP_URL:
+        if WEB_APP_URL.startswith("https://"):
+            return f"wss://{WEB_APP_URL.removeprefix('https://')}/api/ws/quotes"
+        if WEB_APP_URL.startswith("http://"):
+            return f"ws://{WEB_APP_URL.removeprefix('http://')}/api/ws/quotes"
+    return "/api/ws/quotes"
 
 
 async def upsert_user_from_telegram(tg_user: Dict[str, Any], forced_lang: Optional[str] = None) -> None:
@@ -933,6 +958,86 @@ async def get_market_options(
 async def get_indicator_options(user: Dict[str, Any] = Depends(get_telegram_user)):
     await upsert_user_from_telegram(user)
     return await get_enabled_indicators_payload()
+
+
+@app.get("/api/quotes/config")
+async def get_quotes_config(user: Dict[str, Any] = Depends(get_telegram_user)):
+    await upsert_user_from_telegram(user)
+    return {
+        "enabled": quotes_hub.enabled,
+        "websocket_url": get_ws_quote_backend_url(),
+        "transport": {
+            "upstream": DEVSBITE_QUOTES_WS_URL,
+            "mode": "fanout",
+        },
+        "supported_categories": sorted(SUPPORTED_QUOTE_CATEGORIES),
+        "history_seconds": QUOTE_HISTORY_SECONDS,
+        "replace_debounce_ms": QUOTE_REPLACE_DEBOUNCE_MS,
+        "ping_interval_sec": 25,
+        "state": quotes_hub.snapshot_state(),
+    }
+
+
+@app.websocket("/api/ws/quotes")
+async def quotes_stream_socket(websocket: WebSocket):
+    init_data = (
+        (websocket.query_params.get("tg_init_data") or "").strip()
+        or (websocket.headers.get("x-tg-init-data") or "").strip()
+    )
+    try:
+        tg_user = verify_telegram_init_data(init_data)
+    except HTTPException:
+        await websocket.close(code=4401, reason="Telegram auth required")
+        return
+
+    await websocket.accept()
+    await upsert_user_from_telegram(tg_user)
+
+    if not quotes_hub.enabled:
+        await websocket.send_json({"event": "error", "detail": "Quote stream token is not configured"})
+        await websocket.close(code=1011)
+        return
+
+    client_id = await quotes_hub.register_client(websocket)
+    await websocket.send_json(
+        {
+            "event": "ready",
+            "client_id": client_id,
+            "history_seconds": QUOTE_HISTORY_SECONDS,
+            "supported_categories": sorted(SUPPORTED_QUOTE_CATEGORIES),
+        }
+    )
+
+    try:
+        while True:
+            try:
+                payload = await websocket.receive_json()
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                await websocket.send_json({"event": "error", "detail": "Malformed websocket payload"})
+                continue
+
+            if not isinstance(payload, dict):
+                await websocket.send_json({"event": "error", "detail": "Websocket payload must be an object"})
+                continue
+
+            action = str(payload.get("action") or "").strip().lower()
+            if action == "ping":
+                await websocket.send_json({"event": "pong", "ts": int(time.time())})
+                continue
+
+            try:
+                error_payload = await quotes_hub.handle_client_action(client_id, action, payload)
+            except ValueError as exc:
+                error_payload = {"event": "error", "detail": str(exc)}
+            except Exception:
+                error_payload = {"event": "error", "detail": "Unable to process quote subscription command"}
+
+            if error_payload:
+                await websocket.send_json(error_payload)
+    finally:
+        await quotes_hub.unregister_client(client_id)
 
 
 @app.get("/api/pairs/forex")
@@ -1955,6 +2060,7 @@ async def main(mode: str = "all"):
     await bootstrap_database()
     try:
         if mode in {"all", "api"}:
+            await quotes_hub.start()
             await sync_market_pairs_once()
             await sync_news_once()
     except Exception:
@@ -1971,6 +2077,7 @@ async def main(mode: str = "all"):
             raise RuntimeError(f"Unsupported runtime mode: {mode}")
         await asyncio.gather(*tasks)
     finally:
+        await quotes_hub.shutdown()
         await shutdown_database()
         if bot is not None:
             await bot.session.close()

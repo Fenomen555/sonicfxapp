@@ -158,18 +158,16 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
       theme === "light"
         ? {
             id: "light",
-            label: t.profile.themeDayMode || "DAY MODE",
-            hint: t.profile.themeLight || "Светлая",
+            label: t.profile.themeLight || "Светлая",
             symbol: "\u2600"
           }
         : {
             id: "dark",
-            label: t.profile.themeNightMode || "NIGHT MODE",
-            hint: t.profile.themeDark || "Темная",
+            label: t.profile.themeDark || "Темная",
             symbol: "\u263E"
           }
     ),
-    [theme, t.profile.themeDark, t.profile.themeDayMode, t.profile.themeLight, t.profile.themeNightMode]
+    [theme, t.profile.themeDark, t.profile.themeLight]
   );
 
   const timezoneOptions = useMemo(
@@ -338,10 +336,8 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           </div>
 
           <div className="profile-setting-block profile-setting-block-wide">
-            <label className="field-label">{t.profile.theme || "Тема"}</label>
-            <div className="profile-theme-section-head">
-              <span>{t.profile.themeSwitchHint || "Переключай внешний вид одним тапом."}</span>
-            </div>
+            <div className="profile-theme-row">
+              <label className="field-label">{t.profile.theme || "Тема"}</label>
             <button
               type="button"
               className={`profile-theme-switch ${theme === "dark" ? "is-dark" : "is-light"}`}
@@ -360,10 +356,10 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
                 </span>
                 <span className="profile-theme-switch-copy">
                   <strong>{activeThemeMeta.label}</strong>
-                  <small>{activeThemeMeta.hint}</small>
                 </span>
               </span>
             </button>
+            </div>
           </div>
         </div>
 

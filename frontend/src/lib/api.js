@@ -9,7 +9,11 @@ export const isTelegramWebAppAvailable = () => Boolean(getTelegramWebApp() && ge
 
 export const buildApiWebSocketUrl = (path) => {
   const target = new URL(path || "/api/ws/quotes", window.location.origin);
-  target.protocol = target.protocol === "https:" ? "wss:" : "ws:";
+  if (target.protocol === "https:") {
+    target.protocol = "wss:";
+  } else if (target.protocol === "http:") {
+    target.protocol = "ws:";
+  }
   const initData = getTelegramInitData();
   if (initData) {
     target.searchParams.set("tg_init_data", initData);

@@ -125,7 +125,10 @@ export default function LiveQuoteChart({
   return (
     <div className="live-quote-zone">
       <div className="live-quote-head">
-        <span className="live-quote-badge">{marketLabel}</span>
+        <div className="live-quote-head-copy">
+          <span className="live-quote-badge">{marketLabel}</span>
+          <span className="live-quote-head-symbol">{displaySymbol}</span>
+        </div>
         <div className={`live-quote-status ${state?.status || "idle"}`}>
           {state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
             ? "Live"
@@ -138,6 +141,11 @@ export default function LiveQuoteChart({
       </div>
 
       <div className="live-quote-chart-shell">
+        {Number.isFinite(lastPrice) ? (
+          <div className="live-quote-price-tag">
+            {formatPrice(lastPrice)}
+          </div>
+        ) : null}
         {chartCandles.length ? (
           <svg className="live-quote-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             {chartCandles.map((candle, index) => (
@@ -176,17 +184,19 @@ export default function LiveQuoteChart({
 
       <div className="live-quote-metrics">
         <div className="live-quote-metric">
-          <span>Pair</span>
-          <strong>{displaySymbol}</strong>
-        </div>
-        <div className="live-quote-metric">
           <span>Price</span>
           <strong>{formatPrice(lastPrice)}</strong>
         </div>
-        <div className="live-quote-metric">
-          <span>Move</span>
+        <div className="live-quote-metric live-quote-metric-span">
+          <span>Status</span>
           <strong className={isPositive ? "up" : "down"}>
-            {Number.isFinite(change) ? `${isPositive ? "+" : ""}${change.toFixed(4)}` : "--"}
+            {state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
+              ? "Streaming"
+              : state?.status === "reconnecting"
+                ? "Reconnecting"
+                : state?.status === "error"
+                  ? "Issue"
+                  : "Standby"}
           </strong>
         </div>
       </div>

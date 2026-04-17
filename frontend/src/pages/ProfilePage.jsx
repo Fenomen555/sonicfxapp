@@ -212,6 +212,9 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   return (
     <section className="page page-profile page-profile-ref">
       <div className="card profile-hero">
+        <div className={`profile-ribbon profile-ribbon-${statusMeta.tone}`}>
+          <span>{statusMeta.label}</span>
+        </div>
         <div className="profile-hero-top">
           <div className="profile-avatar-shell">
             {user?.photo_url && !avatarFailed ? (
@@ -229,10 +232,6 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           <div className="profile-hero-copy">
             <h1 className="page-title">{profileName}</h1>
             <p>{user?.tg_username ? `@${user.tg_username}` : (t.profile.noUsername || "@username not set")}</p>
-            <div className="profile-status-inline">
-              <span className="profile-status-kicker">{t.profile.status || "Статус"}</span>
-              <div className={`profile-status-chip ${statusMeta.tone}`}>{statusMeta.label}</div>
-            </div>
           </div>
         </div>
 

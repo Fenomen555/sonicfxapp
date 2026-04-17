@@ -10,6 +10,8 @@
 }
 
 .profile-hero {
+  position: relative;
+  overflow: hidden;
   background:
     radial-gradient(circle at top right, rgba(228, 196, 134, 0.16), transparent 28%),
     radial-gradient(circle at top left, rgba(143, 184, 255, 0.16), transparent 34%),
@@ -67,14 +69,6 @@
   gap: 6px;
 }
 
-.profile-status-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
 .profile-hero-copy .page-title {
   margin: 0;
   font-size: 30px;
@@ -90,45 +84,53 @@
   line-height: 1.45;
 }
 
-.profile-status-kicker {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(197, 213, 243, 0.62);
-  margin-right: 2px;
-}
-
-.profile-status-chip {
+.profile-ribbon {
+  position: absolute;
+  top: 20px;
+  right: -52px;
+  z-index: 2;
+  width: 190px;
+  min-height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 38px;
-  padding: 0 16px;
-  border-radius: 999px;
+  transform: rotate(42deg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 16px 28px rgba(8, 13, 22, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.profile-ribbon span {
+  display: block;
   font-size: 12px;
   font-weight: 800;
-  white-space: nowrap;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.profile-status-chip.trader {
-  border: 1px solid rgba(106, 156, 255, 0.24);
-  background: linear-gradient(180deg, rgba(106, 156, 255, 0.18), rgba(69, 109, 182, 0.1));
-  color: #e4efff;
+.profile-ribbon-trader {
+  background: linear-gradient(180deg, rgba(106, 156, 255, 0.34), rgba(58, 96, 174, 0.2));
 }
 
-.profile-status-chip.pro {
-  border: 1px solid rgba(228, 196, 134, 0.28);
-  background: linear-gradient(180deg, rgba(228, 196, 134, 0.2), rgba(170, 131, 61, 0.12));
-  color: #fae6b6;
+.profile-ribbon-trader span {
+  color: #eaf2ff;
 }
 
-.profile-status-chip.vip {
-  border: 1px solid rgba(198, 141, 255, 0.28);
-  background: linear-gradient(180deg, rgba(182, 108, 255, 0.24), rgba(98, 54, 180, 0.14));
-  color: #f1d8ff;
+.profile-ribbon-pro {
+  background: linear-gradient(180deg, rgba(228, 196, 134, 0.4), rgba(168, 125, 49, 0.18));
+}
+
+.profile-ribbon-pro span {
+  color: #fff0c6;
+}
+
+.profile-ribbon-vip {
+  background: linear-gradient(180deg, rgba(182, 108, 255, 0.42), rgba(99, 54, 181, 0.2));
+}
+
+.profile-ribbon-vip span {
+  color: #f4deff;
 }
 
 .profile-summary-grid {
@@ -589,22 +591,35 @@
   color: #274bc4;
 }
 
-:root[data-theme="light"] .profile-status-chip.trader {
-  border-color: rgba(56, 104, 246, 0.2);
-  background: linear-gradient(180deg, rgba(226, 236, 255, 0.96), rgba(212, 227, 255, 0.94));
-  color: #2547b7;
+:root[data-theme="light"] .profile-ribbon {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 16px 24px rgba(108, 132, 176, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
-:root[data-theme="light"] .profile-status-chip.pro {
-  border-color: rgba(185, 140, 69, 0.22);
-  background: linear-gradient(180deg, rgba(255, 242, 212, 0.98), rgba(245, 226, 182, 0.94));
-  color: #946a2d;
+:root[data-theme="light"] .profile-ribbon-trader {
+  background: linear-gradient(180deg, rgba(210, 227, 255, 0.98), rgba(171, 201, 255, 0.96));
 }
 
-:root[data-theme="light"] .profile-status-chip.vip {
-  border-color: rgba(162, 112, 225, 0.22);
-  background: linear-gradient(180deg, rgba(243, 230, 255, 0.96), rgba(232, 214, 255, 0.94));
-  color: #7442b0;
+:root[data-theme="light"] .profile-ribbon-trader span {
+  color: #2147b0;
+}
+
+:root[data-theme="light"] .profile-ribbon-pro {
+  background: linear-gradient(180deg, rgba(255, 239, 208, 0.98), rgba(246, 217, 160, 0.96));
+}
+
+:root[data-theme="light"] .profile-ribbon-pro span {
+  color: #8a631e;
+}
+
+:root[data-theme="light"] .profile-ribbon-vip {
+  background: linear-gradient(180deg, rgba(241, 225, 255, 0.98), rgba(220, 191, 255, 0.96));
+}
+
+:root[data-theme="light"] .profile-ribbon-vip span {
+  color: #6f3fa9;
 }
 
 :root[data-theme="light"] .profile-identity-list div,
@@ -738,6 +753,18 @@
     width: fit-content;
     min-height: 34px;
     padding: 0 14px;
+  }
+
+  .profile-ribbon {
+    top: 16px;
+    right: -60px;
+    width: 168px;
+    min-height: 34px;
+  }
+
+  .profile-ribbon span {
+    font-size: 11px;
+    letter-spacing: 0.1em;
   }
 
   .profile-summary-grid {

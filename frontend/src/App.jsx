@@ -9,6 +9,18 @@ import HomePage from "./pages/HomePage";
 import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
 
+const THEME_STORAGE_KEY = "sonicfx_theme";
+
+function getStoredTheme() {
+  if (typeof window === "undefined") return "dark";
+  try {
+    const value = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return value === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
 const FALLBACK_USER = {
   user_id: 0,
   tg_username: "",
@@ -16,7 +28,7 @@ const FALLBACK_USER = {
   mini_username: "",
   lang: "ru",
   timezone: "Europe/Kiev",
-  theme: "dark",
+  theme: getStoredTheme(),
   activation_status: "inactive",
   scanner_access: 0,
   deposit_amount: 0
@@ -58,7 +70,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", user.theme === "light" ? "light" : "dark");
+    const nextTheme = user.theme === "light" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch {}
   }, [user.theme]);
 
   useEffect(() => {
@@ -104,10 +120,10 @@ export default function App() {
         await apiFetchJson("/api/user/sync", { method: "POST" });
         const profile = await apiFetchJson("/api/user/profile", { method: "POST" });
         if (!isActive) return;
-        setUser({ ...FALLBACK_USER, ...(profile || {}) });
+        setUser({ ...FALLBACK_USER, ...(profile || {}), theme: (profile?.theme === "light" ? "light" : getStoredTheme()) });
       } catch {
         if (!isActive) return;
-        setUser(FALLBACK_USER);
+        setUser({ ...FALLBACK_USER, theme: getStoredTheme() });
       } finally {
         if (isActive) setIsLoading(false);
       }

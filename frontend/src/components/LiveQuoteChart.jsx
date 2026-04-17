@@ -40,19 +40,63 @@ function extractPoints(payload) {
   return [];
 }
 
-function buildPolyline(points) {
-  if (points.length < 2) return "";
-  const values = points.map((point) => point.y);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+function extractCandles(payload) {
+  const root = getPayloadRoot(payload);
+  const directCandidates = [
+    root?.candles,
+    root?.history,
+    payload?.candles,
+    payload?.history
+  ];
+
+  for (const candidate of directCandidates) {
+    if (Array.isArray(candidate)) {
+      return candidate
+        .map((item, index) => ({
+          ts: toNumber(item?.ts ?? item?.time ?? item?.t ?? index) ?? index,
+          open: toNumber(item?.open),
+          high: toNumber(item?.high),
+          low: toNumber(item?.low),
+          close: toNumber(item?.close)
+        }))
+        .filter((item) => [item.open, item.high, item.low, item.close].every((value) => value !== null));
+    }
+  }
+
+  return [];
+}
+
+function buildCandles(candles) {
+  if (!candles.length) return [];
+
+  const highs = candles.map((item) => item.high);
+  const lows = candles.map((item) => item.low);
+  const min = Math.min(...lows);
+  const max = Math.max(...highs);
   const range = Math.max(max - min, 0.000001);
-  return points
-    .map((point, index) => {
-      const x = (index / Math.max(points.length - 1, 1)) * 100;
-      const y = 100 - ((point.y - min) / range) * 100;
-      return `${x},${y}`;
-    })
-    .join(" ");
+  const step = 100 / Math.max(candles.length, 1);
+  const bodyWidth = Math.min(Math.max(step * 0.56, 3), 7);
+
+  const scaleY = (value) => 100 - ((value - min) / range) * 100;
+
+  return candles.map((item, index) => {
+    const centerX = step * index + step / 2;
+    const openY = scaleY(item.open);
+    const closeY = scaleY(item.close);
+    const highY = scaleY(item.high);
+    const lowY = scaleY(item.low);
+    const top = Math.min(openY, closeY);
+    const height = Math.max(Math.abs(closeY - openY), 1.5);
+    return {
+      x: centerX,
+      wickTop: highY,
+      wickBottom: lowY,
+      bodyY: top,
+      bodyHeight: height,
+      bodyWidth,
+      bullish: item.close >= item.open
+    };
+  });
 }
 
 function formatPrice(value) {
@@ -66,26 +110,23 @@ export default function LiveQuoteChart({
   symbol,
   marketLabel,
   payload,
-  state,
-  title,
-  hint
+  state
 }) {
   const root = useMemo(() => getPayloadRoot(payload), [payload]);
+  const candles = useMemo(() => extractCandles(payload), [payload]);
   const points = useMemo(() => extractPoints(payload), [payload]);
-  const line = useMemo(() => buildPolyline(points), [points]);
+  const chartCandles = useMemo(() => buildCandles(candles), [candles]);
   const lastPrice = toNumber(root?.price) ?? (points.length ? points[points.length - 1].y : null);
   const rawChange = toNumber(root?.change);
   const change = rawChange ?? (points.length > 1 ? (points[points.length - 1].y - points[0].y) : 0);
   const isPositive = change >= 0;
-  const displaySymbol = root?.requested_symbol || root?.resolved_symbol || symbol;
+  const displaySymbol = symbol || root?.requested_symbol || root?.resolved_symbol;
 
   return (
     <div className="live-quote-zone">
       <div className="live-quote-head">
         <div className="live-quote-copy">
           <span className="live-quote-badge">{marketLabel}</span>
-          <div className="live-quote-title">{title || symbol}</div>
-          <div className="live-quote-subhint">{hint}</div>
         </div>
         <div className={`live-quote-status ${state?.status || "idle"}`}>
           {state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
@@ -99,15 +140,29 @@ export default function LiveQuoteChart({
       </div>
 
       <div className="live-quote-chart-shell">
-        {line ? (
+        {chartCandles.length ? (
           <svg className="live-quote-chart" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="liveQuoteLine" x1="0%" x2="100%" y1="0%" y2="0%">
-                <stop offset="0%" stopColor={isPositive ? "#7be6b2" : "#ff8f8f"} />
-                <stop offset="100%" stopColor={isPositive ? "#8fb8ff" : "#ffc18a"} />
-              </linearGradient>
-            </defs>
-            <polyline fill="none" stroke="url(#liveQuoteLine)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" points={line} />
+            {chartCandles.map((candle, index) => (
+              <g key={`${displaySymbol || "pair"}-${index}`}>
+                <line
+                  x1={candle.x}
+                  x2={candle.x}
+                  y1={candle.wickTop}
+                  y2={candle.wickBottom}
+                  stroke={candle.bullish ? "#62d96b" : "#ff6c5c"}
+                  strokeWidth="0.5"
+                  strokeLinecap="round"
+                />
+                <rect
+                  x={candle.x - candle.bodyWidth / 2}
+                  y={candle.bodyY}
+                  width={candle.bodyWidth}
+                  height={candle.bodyHeight}
+                  rx="0.45"
+                  fill={candle.bullish ? "#5fd14f" : "#ff5b44"}
+                />
+              </g>
+            ))}
           </svg>
         ) : (
           <div className="live-quote-empty">

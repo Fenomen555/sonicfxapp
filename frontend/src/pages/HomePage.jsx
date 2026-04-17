@@ -441,8 +441,6 @@ export default function HomePage({ t }) {
             marketLabel={currentMarkets.find((item) => item.key === marketKind)?.label || marketKind.toUpperCase()}
             payload={quotePayload}
             state={quoteState}
-            title={t.home.automaticChartTitle || "Live quote stream"}
-            hint={quoteState?.detail || t.home.automaticChartHint || "Live chart preview for the selected pair"}
           />
         ) : (
           <>

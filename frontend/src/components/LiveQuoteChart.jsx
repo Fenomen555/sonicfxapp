@@ -74,13 +74,15 @@ function buildCandles(candles) {
   const min = Math.min(...lows);
   const max = Math.max(...highs);
   const range = Math.max(max - min, 0.000001);
-  const step = 100 / Math.max(candles.length, 1);
-  const bodyWidth = Math.min(Math.max(step * 0.56, 3), 7);
+  const plotStart = 2;
+  const plotWidth = 86;
+  const step = plotWidth / Math.max(candles.length, 1);
+  const bodyWidth = Math.min(Math.max(step * 0.5, 2.1), 5.2);
 
   const scaleY = (value) => 100 - ((value - min) / range) * 100;
 
   return candles.map((item, index) => {
-    const centerX = step * index + step / 2;
+    const centerX = plotStart + step * index + step / 2;
     const openY = scaleY(item.open);
     const closeY = scaleY(item.close);
     const highY = scaleY(item.high);
@@ -117,10 +119,14 @@ export default function LiveQuoteChart({
   const points = useMemo(() => extractPoints(payload), [payload]);
   const chartCandles = useMemo(() => buildCandles(candles), [candles]);
   const lastPrice = toNumber(root?.price) ?? (points.length ? points[points.length - 1].y : null);
-  const rawChange = toNumber(root?.change);
-  const change = rawChange ?? (points.length > 1 ? (points[points.length - 1].y - points[0].y) : 0);
-  const isPositive = change >= 0;
   const displaySymbol = symbol || root?.requested_symbol || root?.resolved_symbol;
+  const liveStateLabel = state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
+    ? "Live"
+    : state?.status === "reconnecting"
+      ? "Reconnecting"
+      : state?.status === "error"
+        ? "Issue"
+        : "Standby";
 
   return (
     <div className="live-quote-zone">
@@ -130,13 +136,7 @@ export default function LiveQuoteChart({
           <span className="live-quote-head-symbol">{displaySymbol}</span>
         </div>
         <div className={`live-quote-status ${state?.status || "idle"}`}>
-          {state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
-            ? "Live"
-            : state?.status === "reconnecting"
-              ? "Reconnecting"
-              : state?.status === "error"
-                ? "Issue"
-                : "Standby"}
+          {liveStateLabel}
         </div>
       </div>
 
@@ -180,25 +180,6 @@ export default function LiveQuoteChart({
             </div>
           </div>
         )}
-      </div>
-
-      <div className="live-quote-metrics">
-        <div className="live-quote-metric">
-          <span>Price</span>
-          <strong>{formatPrice(lastPrice)}</strong>
-        </div>
-        <div className="live-quote-metric live-quote-metric-span">
-          <span>Status</span>
-          <strong className={isPositive ? "up" : "down"}>
-            {state?.status === "ready" || state?.status === "connected" || state?.status === "alive"
-              ? "Streaming"
-              : state?.status === "reconnecting"
-                ? "Reconnecting"
-                : state?.status === "error"
-                  ? "Issue"
-                  : "Standby"}
-          </strong>
-        </div>
       </div>
     </div>
   );

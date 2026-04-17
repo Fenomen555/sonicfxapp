@@ -327,7 +327,7 @@
   position: relative;
   z-index: 1;
   display: grid;
-  gap: 12px;
+  gap: 10px;
   text-align: left;
 }
 
@@ -411,7 +411,7 @@
 
 .live-quote-chart-shell {
   position: relative;
-  height: 132px;
+  height: 176px;
   border-radius: 18px;
   border: 1px solid rgba(111, 141, 193, 0.2);
   background:
@@ -462,45 +462,6 @@
 .live-quote-empty-copy {
   font-size: 12px;
   color: var(--text-muted);
-}
-
-.live-quote-metrics {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 2px;
-}
-
-.live-quote-metric {
-  border-radius: 16px;
-  border: 1px solid rgba(111, 141, 193, 0.18);
-  background: rgba(11, 18, 30, 0.42);
-  padding: 12px;
-  display: grid;
-  gap: 4px;
-}
-
-.live-quote-metric span {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.live-quote-metric strong {
-  font-size: 14px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.live-quote-metric strong.up {
-  color: #8fe7b8;
-}
-
-.live-quote-metric strong.down {
-  color: #ffb4a1;
-}
-
-.live-quote-metric-span {
-  grid-column: span 1;
 }
 
 :root[data-theme="light"] .upload-zone {
@@ -615,8 +576,7 @@
   color: #b64e4e;
 }
 
-:root[data-theme="light"] .live-quote-chart-shell,
-:root[data-theme="light"] .live-quote-metric {
+:root[data-theme="light"] .live-quote-chart-shell {
   border-color: rgba(102, 126, 168, 0.16);
   background:
     radial-gradient(circle at 50% 0%, rgba(56, 104, 246, 0.05), transparent 48%),
@@ -629,17 +589,8 @@
   color: #213453;
 }
 
-:root[data-theme="light"] .live-quote-empty-copy,
-:root[data-theme="light"] .live-quote-metric span {
+:root[data-theme="light"] .live-quote-empty-copy {
   color: #6a7d99;
-}
-
-:root[data-theme="light"] .live-quote-metric strong.up {
-  color: #2c8e5e;
-}
-
-:root[data-theme="light"] .live-quote-metric strong.down {
-  color: #c86a57;
 }
 
 .primary-btn-top {
@@ -1663,7 +1614,7 @@
   }
 
   .live-quote-chart-shell {
-    height: 118px;
+    height: 152px;
   }
 
   .live-quote-price-tag {
@@ -1672,18 +1623,6 @@
     min-height: 26px;
     padding: 0 9px;
     font-size: 11.5px;
-  }
-
-  .live-quote-metrics {
-    gap: 8px;
-  }
-
-  .live-quote-metric {
-    padding: 10px;
-  }
-
-  .live-quote-metric strong {
-    font-size: 13px;
   }
 
   .signal-panel {
@@ -1766,10 +1705,6 @@
 }
 
 @media (max-width: 380px) {
-  .live-quote-metrics {
-    grid-template-columns: 1fr;
-  }
-
   .signal-panel-toggle {
     align-items: flex-start;
     gap: 8px;

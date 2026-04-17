@@ -77,7 +77,7 @@ function buildCandles(candles) {
   const plotStart = 2;
   const plotWidth = 86;
   const step = plotWidth / Math.max(candles.length, 1);
-  const bodyWidth = Math.min(Math.max(step * 0.5, 2.1), 5.2);
+  const bodyWidth = Math.min(Math.max(step * 0.58, 0.72), 4.4);
 
   const scaleY = (value) => 100 - ((value - min) / range) * 100;
 
@@ -159,7 +159,7 @@ export default function LiveQuoteChart({
                   y1={candle.wickTop}
                   y2={candle.wickBottom}
                   stroke={candle.bullish ? "#62d96b" : "#ff6c5c"}
-                  strokeWidth="0.5"
+                  strokeWidth="0.34"
                   strokeLinecap="round"
                 />
                 <rect

@@ -378,6 +378,35 @@ export default function HomePage({ t }) {
   ]);
 
   useEffect(() => {
+    let isActive = true;
+
+    async function loadQuoteHistory() {
+      if (!isAutomaticMode || !autoQuoteSubscription.length || !quotesConfig.enabled) {
+        return;
+      }
+
+      const currentItem = autoQuoteSubscription[0];
+      try {
+        const data = await apiFetchJson(
+          `/api/quotes/history?category=${encodeURIComponent(currentItem.category)}&symbol=${encodeURIComponent(currentItem.symbol)}&history_seconds=${encodeURIComponent(currentItem.history_seconds || quotesConfig.history_seconds || 300)}`
+        );
+        if (!isActive) return;
+        if (data && typeof data === "object") {
+          setQuotePayload(data);
+        }
+      } catch (_error) {
+        if (!isActive) return;
+      }
+    }
+
+    loadQuoteHistory();
+
+    return () => {
+      isActive = false;
+    };
+  }, [autoQuoteSubscription, isAutomaticMode, quotesConfig.enabled, quotesConfig.history_seconds]);
+
+  useEffect(() => {
     const client = quoteClientRef.current;
     if (!client) return;
 

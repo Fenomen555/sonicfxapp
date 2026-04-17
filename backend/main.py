@@ -661,6 +661,45 @@ async def _fetch_expiration_options() -> List[Dict[str, Any]]:
     return parsed if parsed else defaults
 
 
+async def _fetch_quote_history(category: str, symbol: str, history_seconds: int) -> Dict[str, Any]:
+    if not DEVSBITE_CLIENT_TOKEN:
+        raise HTTPException(status_code=503, detail="Quote history is not configured")
+
+    normalized_category = normalize_quote_category(category)
+    normalized_symbol = normalize_quote_symbol(symbol)
+    normalized_history_seconds = max(int(history_seconds or QUOTE_HISTORY_SECONDS), 60)
+    url = f"{DEVSBITE_API_BASE_URL}/quotes/quote"
+    headers = {
+        "accept": "application/json",
+        "X-Client-Token": DEVSBITE_CLIENT_TOKEN,
+        "Cache-Control": "no-cache",
+    }
+    params = {
+        "category": normalized_category,
+        "symbol": normalized_symbol,
+        "history_seconds": normalized_history_seconds,
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, params=params, timeout=12.0)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text.strip() if exc.response is not None else ""
+        raise HTTPException(status_code=502, detail=detail or "Quote history request failed") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Quote history request failed") from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=502, detail="Quote history response is invalid")
+
+    payload.setdefault("category", normalized_category)
+    payload.setdefault("requested_symbol", normalized_symbol)
+    payload.setdefault("resolved_symbol", normalized_symbol)
+    return payload
+
+
 async def _upsert_market_pairs(kind: str, pairs: List[Dict[str, Any]]) -> None:
     pool = await require_db_pool()
     pair_kind = _pair_kind_normalized(kind)
@@ -975,6 +1014,21 @@ async def get_quotes_config(user: Dict[str, Any] = Depends(get_telegram_user)):
         "replace_debounce_ms": QUOTE_REPLACE_DEBOUNCE_MS,
         "ping_interval_sec": 25,
         "state": quotes_hub.snapshot_state(),
+    }
+
+
+@app.get("/api/quotes/history")
+async def get_quotes_history(
+    category: str = Query(...),
+    symbol: str = Query(...),
+    history_seconds: int = Query(default=QUOTE_HISTORY_SECONDS, ge=60, le=7200),
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    payload = await _fetch_quote_history(category=category, symbol=symbol, history_seconds=history_seconds)
+    return {
+        "event": "snapshot",
+        "data": payload,
     }
 
 

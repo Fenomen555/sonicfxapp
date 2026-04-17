@@ -411,7 +411,7 @@
 
 .live-quote-chart-shell {
   position: relative;
-  height: 176px;
+  height: 264px;
   border-radius: 18px;
   border: 1px solid rgba(111, 141, 193, 0.2);
   background:
@@ -1614,7 +1614,7 @@
   }
 
   .live-quote-chart-shell {
-    height: 152px;
+    height: 228px;
   }
 
   .live-quote-price-tag {

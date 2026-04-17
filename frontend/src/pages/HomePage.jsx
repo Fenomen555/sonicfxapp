@@ -70,6 +70,44 @@ function getUniqueIndicatorDescription(description, ...titles) {
   return normalizedTitles.includes(normalizedDescription) ? "" : description;
 }
 
+function getQuotePayloadRoot(payload) {
+  if (payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    return payload.data;
+  }
+  return payload || {};
+}
+
+function normalizeQuoteMatchValue(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function matchesQuotePayload(payload, subscriptionItem) {
+  if (!payload || !subscriptionItem) return false;
+
+  const root = getQuotePayloadRoot(payload);
+  const payloadCategory = String(root?.category || payload?.category || "").trim().toLowerCase();
+  if (payloadCategory && payloadCategory !== String(subscriptionItem.category || "").trim().toLowerCase()) {
+    return false;
+  }
+
+  const expectedSymbol = normalizeQuoteMatchValue(subscriptionItem.symbol);
+  const symbolCandidates = [
+    root?.requested_symbol,
+    root?.resolved_symbol,
+    root?.symbol,
+    payload?.requested_symbol,
+    payload?.resolved_symbol,
+    payload?.symbol
+  ]
+    .map(normalizeQuoteMatchValue)
+    .filter(Boolean);
+
+  if (!symbolCandidates.length) return true;
+  return symbolCandidates.includes(expectedSymbol);
+}
+
 
 export default function HomePage({ t }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -339,8 +377,9 @@ export default function HomePage({ t }) {
       replaceDebounceMs: quotesConfig.replace_debounce_ms,
       onStateChange: (nextState) => setQuoteState(nextState),
       onEvent: (payload) => {
+        const currentItem = autoQuoteSubscription[0] || null;
         const eventName = String(payload?.event || "").trim().toLowerCase();
-        if (eventName === "quote" || eventName === "snapshot" || eventName === "subscribed") {
+        if ((eventName === "quote" || eventName === "snapshot" || eventName === "subscribed") && matchesQuotePayload(payload, currentItem)) {
           setQuotePayload(payload);
         }
         if (eventName === "unsubscribed" && !isAutomaticMode) {
@@ -391,7 +430,7 @@ export default function HomePage({ t }) {
           `/api/quotes/history?category=${encodeURIComponent(currentItem.category)}&symbol=${encodeURIComponent(currentItem.symbol)}&history_seconds=${encodeURIComponent(currentItem.history_seconds || quotesConfig.history_seconds || 300)}`
         );
         if (!isActive) return;
-        if (data && typeof data === "object") {
+        if (data && typeof data === "object" && matchesQuotePayload(data, currentItem)) {
           setQuotePayload(data);
         }
       } catch (_error) {

@@ -116,14 +116,19 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   const summaryCards = useMemo(
     () => [
       {
-        key: "access",
-        label: t.profile.accessLabel || "Доступ",
-        value: user?.scanner_access ? (t.profile.accessOn || "Есть") : (t.profile.accessOff || "Нет")
+        key: "user_id",
+        label: t.profile.userId || "Telegram ID",
+        value: user?.user_id || "-"
       },
       {
-        key: "deposit",
-        label: t.profile.depositLabel || "Депозит",
-        value: Number(user?.deposit_amount || 0) > 0 ? `$${Number(user.deposit_amount || 0).toFixed(2)}` : (t.profile.noDeposit || "Не внесен")
+        key: "username",
+        label: t.profile.username || "Username",
+        value: user?.tg_username ? `@${user.tg_username}` : "-"
+      },
+      {
+        key: "balance",
+        label: t.profile.balanceLabel || "Баланс",
+        value: `$${Number(user?.deposit_amount || 0).toFixed(2)}`
       },
       {
         key: "joined",
@@ -226,22 +231,10 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           <div className="profile-hero-copy">
             <h1 className="page-title">{profileName}</h1>
             <p>{user?.tg_username ? `@${user.tg_username}` : (t.profile.noUsername || "@username not set")}</p>
-          </div>
-
-          <div className="profile-status-stack">
-            <span className="profile-status-kicker">{t.profile.status || "Статус"}</span>
-            <div className={`profile-status-chip ${statusMeta.tone}`}>{statusMeta.label}</div>
-          </div>
-        </div>
-
-        <div className="profile-identity-list compact">
-          <div>
-            <span>{t.profile.userId || "Telegram ID"}</span>
-            <strong>{user?.user_id || "-"}</strong>
-          </div>
-          <div>
-            <span>{t.profile.username || "Username"}</span>
-            <strong>{user?.tg_username ? `@${user.tg_username}` : "-"}</strong>
+            <div className="profile-status-inline">
+              <span className="profile-status-kicker">{t.profile.status || "Статус"}</span>
+              <div className={`profile-status-chip ${statusMeta.tone}`}>{statusMeta.label}</div>
+            </div>
           </div>
         </div>
 

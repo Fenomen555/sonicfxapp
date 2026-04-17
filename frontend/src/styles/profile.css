@@ -21,7 +21,7 @@
 
 .profile-hero-top {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 14px;
   align-items: center;
 }
@@ -67,6 +67,14 @@
   gap: 6px;
 }
 
+.profile-status-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
 .profile-hero-copy .page-title {
   margin: 0;
   font-size: 30px;
@@ -82,19 +90,14 @@
   line-height: 1.45;
 }
 
-.profile-status-stack {
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-}
-
 .profile-status-kicker {
-  display: block;
+  display: inline-block;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(197, 213, 243, 0.62);
+  margin-right: 2px;
 }
 
 .profile-status-chip {
@@ -128,17 +131,11 @@
   color: #f1d8ff;
 }
 
-.profile-identity-list,
 .profile-summary-grid {
   display: grid;
   gap: 10px;
 }
 
-.profile-identity-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.profile-identity-list div,
 .profile-summary-card,
 .profile-setting-block {
   border-radius: 18px;
@@ -147,12 +144,10 @@
   padding: 12px;
 }
 
-.profile-identity-list div,
 .profile-summary-card {
   backdrop-filter: blur(10px);
 }
 
-.profile-identity-list span,
 .profile-summary-card span,
 .profile-theme-copy small,
 .profile-timezone-zone,
@@ -163,7 +158,6 @@
   margin-bottom: 6px;
 }
 
-.profile-identity-list strong,
 .profile-summary-card strong {
   display: block;
   font-size: 15px;
@@ -188,7 +182,7 @@
 }
 
 .profile-summary-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .profile-settings-shell {

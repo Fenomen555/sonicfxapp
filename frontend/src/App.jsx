@@ -10,8 +10,6 @@ import HomePage from "./pages/HomePage";
 import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
 
-const ONBOARDING_STORAGE_KEY = "sonicfx_onboarding_done";
-
 function normalizeTheme(value) {
   return value === "light" ? "light" : "dark";
 }
@@ -37,7 +35,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(FALLBACK_USER);
   const [tab, setTab] = useState("home");
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const [isTgWebApp, setIsTgWebApp] = useState(true);
   const [botUsername, setBotUsername] = useState("");
   const [safeAreaTop, setSafeAreaTop] = useState(0);
@@ -51,17 +49,6 @@ export default function App() {
   const lang = useMemo(() => normalizeLang(user.lang), [user.lang]);
   const t = texts[lang];
   const isDesktop = device.isDesktop;
-
-  useEffect(() => {
-    try {
-      const onboardingDone = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
-      if (!onboardingDone) {
-        setShowOnboarding(true);
-      }
-    } catch {
-      setShowOnboarding(true);
-    }
-  }, []);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -200,9 +187,6 @@ export default function App() {
   }, [adminMode]);
 
   function handleOnboardingFinish() {
-    try {
-      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
-    } catch {}
     setShowOnboarding(false);
   }
 

@@ -27,8 +27,7 @@ textarea {
 }
 
 .loading-screen,
-.open-via-bot,
-.onboarding-shell {
+.open-via-bot {
   min-height: 100dvh;
   display: grid;
   place-items: center;
@@ -40,42 +39,106 @@ textarea {
     var(--bg-main);
 }
 
-.onboarding-shell {
-  position: relative;
+.onboarding-app-shell {
   overflow: hidden;
-  padding:
-    calc(22px + env(safe-area-inset-top))
-    calc(18px + env(safe-area-inset-right))
-    calc(22px + env(safe-area-inset-bottom))
-    calc(18px + env(safe-area-inset-left));
 }
 
-.onboarding-card {
-  position: relative;
-  width: min(100%, 430px);
-  min-height: min(760px, calc(100dvh - 44px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
-  display: grid;
-  align-content: start;
-  gap: 22px;
-  padding: 24px 20px 22px;
-  border-radius: 30px;
-  border: 1px solid rgba(104, 128, 176, 0.26);
-  background:
-    radial-gradient(560px 260px at 50% -10%, rgba(101, 136, 235, 0.14), transparent 60%),
-    radial-gradient(480px 220px at 100% 0%, rgba(217, 177, 98, 0.12), transparent 62%),
-    linear-gradient(180deg, rgba(11, 16, 25, 0.98), rgba(7, 11, 17, 0.98));
-  box-shadow:
-    0 28px 70px rgba(0, 0, 0, 0.36),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+.onboarding-app-main {
+  height: calc(var(--app-stable-height, 100dvh) - var(--top-padding, 72px));
+  min-height: calc(var(--app-stable-height, 100dvh) - var(--top-padding, 72px));
   overflow: hidden;
+}
+
+.onboarding-screen {
+  position: relative;
+  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-x;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.onboarding-scene {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  text-align: center;
+  padding: 10px 0 8px;
+  transition: transform 0.28s ease, opacity 0.28s ease;
+}
+
+.onboarding-scene.stage-enter {
   opacity: 0;
-  transform: translateY(18px) scale(0.985);
-  transition: opacity 0.22s ease, transform 0.22s ease;
+  transform: translateX(42px);
 }
 
-.onboarding-card.is-visible {
+.onboarding-scene.stage-active {
   opacity: 1;
-  transform: translateY(0) scale(1);
+  transform: translateX(0);
+}
+
+.onboarding-scene.stage-exit {
+  opacity: 0;
+  transform: translateX(-42px);
+}
+
+.onboarding-content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+}
+
+.onboarding-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 6px;
+}
+
+.onboarding-progress-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.onboarding-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.onboarding-skip-link {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: rgba(194, 206, 228, 0.68);
+  cursor: pointer;
+}
+
+.onboarding-skip-link:focus-visible,
+.onboarding-primary-btn:focus-visible,
+.brand-pill-button:focus-visible {
+  outline: 2px solid rgba(143, 184, 255, 0.64);
+  outline-offset: 3px;
 }
 
 .onboarding-orbit {
@@ -98,9 +161,9 @@ textarea {
 .onboarding-orbit.orbit-b {
   width: 170px;
   height: 170px;
-  bottom: 86px;
+  bottom: 32px;
   left: -56px;
-  background: radial-gradient(circle, rgba(235, 191, 97, 0.18), transparent 72%);
+  background: radial-gradient(circle, rgba(235, 191, 97, 0.16), transparent 72%);
   animation: shimmerPulse 7s ease-in-out infinite reverse;
 }
 
@@ -114,45 +177,9 @@ textarea {
   animation: shimmerPulse 5.4s ease-in-out infinite;
 }
 
-.onboarding-brand-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  min-height: 40px;
-  margin: 0 auto;
-  padding: 7px 18px 8px;
-  gap: 2px;
-  border-radius: 999px;
-  border: 1px solid rgba(122, 146, 191, 0.3);
-  background: linear-gradient(135deg, rgba(20, 29, 44, 0.96), rgba(16, 23, 35, 0.94));
-  box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-}
-
-.onboarding-brand-main {
-  font-family: "Unbounded", "Onest", sans-serif;
-  font-size: 24px;
-  letter-spacing: -1.2px;
-  font-weight: 700;
-  color: #f5f7fb;
-  transform: translateY(1px);
-}
-
-.onboarding-brand-fx {
-  font-family: "Unbounded", "Onest", sans-serif;
-  font-size: 11px;
-  align-self: flex-start;
-  margin-top: 2px;
-  font-weight: 700;
-  color: var(--accent-warm);
-}
-
 .onboarding-hero {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   justify-items: center;
 }
 
@@ -162,6 +189,7 @@ textarea {
   height: 124px;
   display: grid;
   place-items: center;
+  margin-top: 8px;
 }
 
 .onboarding-emoji-core {
@@ -485,7 +513,6 @@ textarea {
   gap: 10px;
 }
 
-
 :root[data-theme="light"] .bottom-nav {
   background: rgba(252, 253, 255, 0.92);
   border-color: rgba(106, 129, 168, 0.18);
@@ -590,7 +617,8 @@ textarea {
   .profile-chip:hover,
   .bottom-nav-item:hover,
   .quick-action:hover,
-  .onboarding-primary-btn:hover {
+  .onboarding-primary-btn:hover,
+  .onboarding-skip-link:hover {
     transform: translateY(-1px);
   }
 
@@ -646,7 +674,8 @@ textarea {
   :root[data-theme="light"] .action-sheet-option:hover,
   :root[data-theme="light"] .action-sheet-close:hover,
   :root[data-theme="light"] .bottom-nav-item:hover,
-  :root[data-theme="light"] .onboarding-primary-btn:hover {
+  :root[data-theme="light"] .onboarding-primary-btn:hover,
+  :root[data-theme="light"] .onboarding-skip-link:hover {
     box-shadow:
       0 14px 24px rgba(106, 129, 168, 0.12),
       0 0 0 1px rgba(56, 104, 246, 0.06);
@@ -722,11 +751,6 @@ textarea {
   .ref-primary {
     font-size: 16px;
     min-height: 52px;
-  }
-
-  .onboarding-card {
-    min-height: 740px;
-    padding: 28px 26px 24px;
   }
 }
 
@@ -842,33 +866,6 @@ textarea {
     font-size: 14px;
   }
 
-  .onboarding-shell {
-    padding:
-      calc(14px + env(safe-area-inset-top))
-      calc(14px + env(safe-area-inset-right))
-      calc(14px + env(safe-area-inset-bottom))
-      calc(14px + env(safe-area-inset-left));
-  }
-
-  .onboarding-card {
-    min-height: calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-    padding: 22px 16px 18px;
-    gap: 18px;
-    border-radius: 26px;
-  }
-
-  .onboarding-emoji-wrap {
-    width: 108px;
-    height: 108px;
-  }
-
-  .onboarding-emoji-core {
-    width: 76px;
-    height: 76px;
-    border-radius: 24px;
-    font-size: 38px;
-  }
-
   .onboarding-copy h1 {
     font-size: clamp(28px, 10vw, 38px);
   }
@@ -958,25 +955,6 @@ textarea {
 
   .profile-status-chip {
     min-height: 34px;
-  }
-
-  .onboarding-card {
-    padding: 20px 14px 16px;
-  }
-
-  .onboarding-bullet {
-    padding: 12px 13px;
-  }
-}
-
-@keyframes riseIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 

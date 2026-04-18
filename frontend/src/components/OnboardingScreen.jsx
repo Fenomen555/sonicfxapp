@@ -42,7 +42,14 @@ const ONBOARDING_STEPS = [
   }
 ];
 
-export default function OnboardingScreen({ onFinish, isDesktop = false, headerTopOffset = 8, safeAreaTop = 0, stableViewportHeight = 640, isCompactPhone = false }) {
+export default function OnboardingScreen({
+  onFinish,
+  isDesktop = false,
+  headerTopOffset = 8,
+  safeAreaTop = 0,
+  stableViewportHeight = 640,
+  isCompactPhone = false
+}) {
   const [step, setStep] = useState(0);
   const [transitionStage, setTransitionStage] = useState("enter");
 
@@ -89,7 +96,7 @@ export default function OnboardingScreen({ onFinish, isDesktop = false, headerTo
       </header>
 
       <main className="app-main onboarding-app-main">
-        <section className="onboarding-screen">
+        <section className="onboarding-screen" aria-label="Onboarding">
           <div className="onboarding-screen-topbar">
             <button type="button" className="onboarding-skip-btn" onClick={onFinish}>
               Пропустить

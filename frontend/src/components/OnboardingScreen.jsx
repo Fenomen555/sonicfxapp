@@ -44,10 +44,10 @@ const ONBOARDING_STEPS = [
 
 export default function OnboardingScreen({ onFinish }) {
   const [step, setStep] = useState(0);
-  const [isVisible, setIsVisible] = useState(false);
+  const [transitionStage, setTransitionStage] = useState("enter");
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsVisible(true), 40);
+    const timer = window.setTimeout(() => setTransitionStage("active"), 40);
     return () => window.clearTimeout(timer);
   }, []);
 
@@ -58,61 +58,65 @@ export default function OnboardingScreen({ onFinish }) {
       onFinish?.();
       return;
     }
-    setIsVisible(false);
+
+    setTransitionStage("exit");
     window.setTimeout(() => {
       setStep((prev) => Math.min(prev + 1, ONBOARDING_STEPS.length - 1));
-      setIsVisible(true);
-    }, 180);
+      setTransitionStage("enter");
+      window.setTimeout(() => setTransitionStage("active"), 24);
+    }, 240);
   }
 
   return (
     <section className="onboarding-shell">
-      <div className={`onboarding-card ${isVisible ? "is-visible" : ""}`}>
-        <div className="onboarding-orbit orbit-a" aria-hidden="true" />
-        <div className="onboarding-orbit orbit-b" aria-hidden="true" />
-        <div className="onboarding-orbit orbit-c" aria-hidden="true" />
+      <div className="onboarding-surface">
+        <div className={`onboarding-scene stage-${transitionStage}`}>
+          <div className="onboarding-orbit orbit-a" aria-hidden="true" />
+          <div className="onboarding-orbit orbit-b" aria-hidden="true" />
+          <div className="onboarding-orbit orbit-c" aria-hidden="true" />
 
-        <div className="onboarding-brand-pill">
-          <span className="onboarding-brand-main">Sonic</span>
-          <span className="onboarding-brand-fx">fx</span>
-        </div>
-
-        <div className="onboarding-hero">
-          <div className="onboarding-emoji-wrap" aria-hidden="true">
-            <span className="onboarding-emoji-core">{currentStep.emoji}</span>
-            <span className="onboarding-glow-ring ring-1" />
-            <span className="onboarding-glow-ring ring-2" />
+          <div className="onboarding-brand-pill">
+            <span className="onboarding-brand-main">Sonic</span>
+            <span className="onboarding-brand-fx">fx</span>
           </div>
 
-          <div className="onboarding-copy">
-            <div className="onboarding-overline">Premium trading assistant</div>
-            <h1>{currentStep.title}</h1>
-            <p>{currentStep.description}</p>
-          </div>
-        </div>
-
-        <div className="onboarding-bullets">
-          {currentStep.bullets.map((item) => (
-            <div key={item} className="onboarding-bullet">
-              <span>{item}</span>
+          <div className="onboarding-hero">
+            <div className="onboarding-emoji-wrap" aria-hidden="true">
+              <span className="onboarding-emoji-core">{currentStep.emoji}</span>
+              <span className="onboarding-glow-ring ring-1" />
+              <span className="onboarding-glow-ring ring-2" />
             </div>
-          ))}
+
+            <div className="onboarding-copy">
+              <div className="onboarding-overline">Premium trading assistant</div>
+              <h1>{currentStep.title}</h1>
+              <p>{currentStep.description}</p>
+            </div>
+          </div>
+
+          <div className="onboarding-bullets">
+            {currentStep.bullets.map((item) => (
+              <div key={item} className="onboarding-bullet">
+                <span>{item}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="onboarding-progress">
+            {ONBOARDING_STEPS.map((item, index) => (
+              <span
+                key={item.id}
+                className={`onboarding-progress-dot ${index === step ? "active" : ""} ${index < step ? "passed" : ""}`}
+              />
+            ))}
+          </div>
+
+          <button type="button" className="onboarding-primary-btn" onClick={handleNext}>
+            {currentStep.button}
+          </button>
+
+          <div className="onboarding-footnote">{currentStep.footnote}</div>
         </div>
-
-        <div className="onboarding-progress">
-          {ONBOARDING_STEPS.map((item, index) => (
-            <span
-              key={item.id}
-              className={`onboarding-progress-dot ${index === step ? "active" : ""} ${index < step ? "passed" : ""}`}
-            />
-          ))}
-        </div>
-
-        <button type="button" className="onboarding-primary-btn" onClick={handleNext}>
-          {currentStep.button}
-        </button>
-
-        <div className="onboarding-footnote">{currentStep.footnote}</div>
       </div>
     </section>
   );

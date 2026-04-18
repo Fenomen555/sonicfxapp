@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import AdminApp from "./admin/AdminApp";
 import BottomNav from "./components/BottomNav";
+import OnboardingScreen from "./components/OnboardingScreen";
 import { apiAdminFetchJson, apiFetchJson, isAdminRoute, isTelegramWebAppAvailable } from "./lib/api";
 import { getDeviceProfile } from "./lib/device";
 import { initTelegramApp } from "./lib/tgSetup";
@@ -8,6 +9,8 @@ import { texts } from "./locales/texts";
 import HomePage from "./pages/HomePage";
 import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
+
+const ONBOARDING_STORAGE_KEY = "sonicfx_onboarding_done";
 
 function normalizeTheme(value) {
   return value === "light" ? "light" : "dark";
@@ -34,6 +37,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(FALLBACK_USER);
   const [tab, setTab] = useState("home");
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [isTgWebApp, setIsTgWebApp] = useState(true);
   const [botUsername, setBotUsername] = useState("");
   const [safeAreaTop, setSafeAreaTop] = useState(0);
@@ -47,6 +51,17 @@ export default function App() {
   const lang = useMemo(() => normalizeLang(user.lang), [user.lang]);
   const t = texts[lang];
   const isDesktop = device.isDesktop;
+
+  useEffect(() => {
+    try {
+      const onboardingDone = window.localStorage.getItem(ONBOARDING_STORAGE_KEY);
+      if (!onboardingDone) {
+        setShowOnboarding(true);
+      }
+    } catch {
+      setShowOnboarding(true);
+    }
+  }, []);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -184,7 +199,18 @@ export default function App() {
     };
   }, [adminMode]);
 
+  function handleOnboardingFinish() {
+    try {
+      window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
+    } catch {}
+    setShowOnboarding(false);
+  }
+
   if (isLoading) return <div className="loading-screen">Loading...</div>;
+
+  if (showOnboarding) {
+    return <OnboardingScreen onFinish={handleOnboardingFinish} />;
+  }
 
   if (!isTgWebApp) {
     return (

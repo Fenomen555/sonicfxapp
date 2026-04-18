@@ -201,19 +201,6 @@ export default function App() {
   );
   const stableViewportHeight = Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
 
-  if (showOnboarding) {
-    return (
-      <OnboardingScreen
-        onFinish={handleOnboardingFinish}
-        isDesktop={isDesktop}
-        headerTopOffset={headerTopOffset}
-        safeAreaTop={safeAreaTop}
-        stableViewportHeight={stableViewportHeight}
-        isCompactPhone={device.isCompactPhone}
-      />
-    );
-  }
-
   if (!isTgWebApp) {
     return (
       <div className="open-via-bot">
@@ -261,20 +248,26 @@ export default function App() {
       </header>
 
       <main className="app-main">
-        {tab === "news" && <NewsPage t={t} lang={lang} />}
-        {tab === "home" && <HomePage t={t} />}
-        {tab === "profile" && (
-          <ProfilePage
-            t={t}
-            user={user}
-            onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
-            onThemePreview={(theme) => setUser((prev) => ({ ...prev, theme: normalizeTheme(theme) }))}
-            onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: normalizeLang(nextLang) }))}
-          />
+        {showOnboarding ? (
+          <OnboardingScreen onFinish={handleOnboardingFinish} />
+        ) : (
+          <>
+            {tab === "news" && <NewsPage t={t} lang={lang} />}
+            {tab === "home" && <HomePage t={t} />}
+            {tab === "profile" && (
+              <ProfilePage
+                t={t}
+                user={user}
+                onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
+                onThemePreview={(theme) => setUser((prev) => ({ ...prev, theme: normalizeTheme(theme) }))}
+                onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: normalizeLang(nextLang) }))}
+              />
+            )}
+          </>
         )}
       </main>
 
-      <BottomNav tabs={tabs} activeTab={tab} onChange={setTab} />
+      {!showOnboarding && <BottomNav tabs={tabs} activeTab={tab} onChange={setTab} />}
     </div>
   );
 }

@@ -42,14 +42,7 @@ const ONBOARDING_STEPS = [
   }
 ];
 
-export default function OnboardingScreen({
-  onFinish,
-  isDesktop = false,
-  headerTopOffset = 8,
-  safeAreaTop = 0,
-  stableViewportHeight = 640,
-  isCompactPhone = false
-}) {
+export default function OnboardingScreen() {
   const [step, setStep] = useState(0);
   const [transitionStage, setTransitionStage] = useState("enter");
 
@@ -60,14 +53,8 @@ export default function OnboardingScreen({
 
   const currentStep = useMemo(() => ONBOARDING_STEPS[step] || ONBOARDING_STEPS[0], [step]);
 
-  const topPadding = Math.max(
-    headerTopOffset + (isDesktop ? 56 : 60),
-    isDesktop ? 78 : safeAreaTop + 64
-  );
-
   function handleNext() {
     if (step >= ONBOARDING_STEPS.length - 1) {
-      onFinish?.();
       return;
     }
 
@@ -80,56 +67,38 @@ export default function OnboardingScreen({
   }
 
   return (
-    <div
-      className={`app-shell ${isDesktop ? "app-shell-desktop" : "app-shell-mobile"} ${isCompactPhone ? "app-shell-compact-phone" : ""} onboarding-app-shell`}
-      style={{
-        "--top-padding": `${topPadding}px`,
-        "--app-stable-height": `${stableViewportHeight}px`,
-        "--app-header-top": `${headerTopOffset}px`
-      }}
-    >
-      <header className="app-header onboarding-app-header">
-        <button type="button" className="brand-pill brand-pill-button" aria-label="Sonicfx">
-          <span className="brand-main">Sonic</span>
-          <span className="brand-fx">fx</span>
-        </button>
-      </header>
+    <section className="onboarding-screen" aria-label="Onboarding">
+      <div className={`onboarding-scene stage-${transitionStage}`}>
+        <div className="onboarding-orbit orbit-a" aria-hidden="true" />
+        <div className="onboarding-orbit orbit-b" aria-hidden="true" />
+        <div className="onboarding-orbit orbit-c" aria-hidden="true" />
 
-      <main className="app-main onboarding-app-main">
-        <section className="onboarding-screen" aria-label="Onboarding">
-          <div className="onboarding-screen-topbar">
-            <button type="button" className="onboarding-skip-btn" onClick={onFinish}>
-              Пропустить
-            </button>
+        <div className="onboarding-content">
+          <div className="onboarding-hero">
+            <div className="onboarding-emoji-wrap" aria-hidden="true">
+              <span className="onboarding-emoji-core">{currentStep.emoji}</span>
+              <span className="onboarding-glow-ring ring-1" />
+              <span className="onboarding-glow-ring ring-2" />
+            </div>
+
+            <div className="onboarding-copy">
+              <div className="onboarding-overline">Premium trading assistant</div>
+              <h1>{currentStep.title}</h1>
+              <p>{currentStep.description}</p>
+            </div>
           </div>
 
-          <div className={`onboarding-scene stage-${transitionStage}`}>
-            <div className="onboarding-orbit orbit-a" aria-hidden="true" />
-            <div className="onboarding-orbit orbit-b" aria-hidden="true" />
-            <div className="onboarding-orbit orbit-c" aria-hidden="true" />
-
-            <div className="onboarding-hero">
-              <div className="onboarding-emoji-wrap" aria-hidden="true">
-                <span className="onboarding-emoji-core">{currentStep.emoji}</span>
-                <span className="onboarding-glow-ring ring-1" />
-                <span className="onboarding-glow-ring ring-2" />
+          <div className="onboarding-bullets">
+            {currentStep.bullets.map((item) => (
+              <div key={item} className="onboarding-bullet">
+                <span>{item}</span>
               </div>
+            ))}
+          </div>
+        </div>
 
-              <div className="onboarding-copy">
-                <div className="onboarding-overline">Premium trading assistant</div>
-                <h1>{currentStep.title}</h1>
-                <p>{currentStep.description}</p>
-              </div>
-            </div>
-
-            <div className="onboarding-bullets">
-              {currentStep.bullets.map((item) => (
-                <div key={item} className="onboarding-bullet">
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-
+        <div className="onboarding-footer">
+          <div className="onboarding-progress-wrap">
             <div className="onboarding-progress">
               {ONBOARDING_STEPS.map((item, index) => (
                 <span
@@ -138,17 +107,20 @@ export default function OnboardingScreen({
                 />
               ))}
             </div>
-
-            <div className="onboarding-actions">
-              <button type="button" className="onboarding-primary-btn" onClick={handleNext}>
-                {currentStep.button}
-              </button>
-            </div>
-
-            <div className="onboarding-footnote">{currentStep.footnote}</div>
           </div>
-        </section>
-      </main>
-    </div>
+
+          <div className="onboarding-actions">
+            <button type="button" className="onboarding-primary-btn" onClick={handleNext}>
+              {currentStep.button}
+            </button>
+            <button type="button" className="onboarding-skip-link">
+              Пропустить
+            </button>
+          </div>
+
+          <div className="onboarding-footnote">{currentStep.footnote}</div>
+        </div>
+      </div>
+    </section>
   );
 }

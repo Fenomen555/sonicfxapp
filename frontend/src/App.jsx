@@ -192,8 +192,26 @@ export default function App() {
 
   if (isLoading) return <div className="loading-screen">Loading...</div>;
 
+  const headerTopOffset = isDesktop
+    ? 8
+    : Math.max(contentAreaTop - (device.isCompactPhone ? 34 : 36), safeAreaTop + 8);
+  const topPadding = Math.max(
+    headerTopOffset + (isDesktop ? 56 : 60),
+    isDesktop ? 78 : safeAreaTop + 64
+  );
+  const stableViewportHeight = Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
+
   if (showOnboarding) {
-    return <OnboardingScreen onFinish={handleOnboardingFinish} />;
+    return (
+      <OnboardingScreen
+        onFinish={handleOnboardingFinish}
+        isDesktop={isDesktop}
+        headerTopOffset={headerTopOffset}
+        safeAreaTop={safeAreaTop}
+        stableViewportHeight={stableViewportHeight}
+        isCompactPhone={device.isCompactPhone}
+      />
+    );
   }
 
   if (!isTgWebApp) {
@@ -220,15 +238,6 @@ export default function App() {
     { id: "home", label: t.nav.home || "Главная" },
     { id: "profile", label: t.nav.profile || "Профиль" }
   ];
-
-  const headerTopOffset = isDesktop
-    ? 8
-    : Math.max(contentAreaTop - (device.isCompactPhone ? 34 : 36), safeAreaTop + 8);
-  const topPadding = Math.max(
-    headerTopOffset + (isDesktop ? 56 : 60),
-    isDesktop ? 78 : safeAreaTop + 64
-  );
-  const stableViewportHeight = Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
 
   return (
     <div

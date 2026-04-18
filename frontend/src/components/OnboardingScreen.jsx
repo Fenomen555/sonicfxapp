@@ -42,7 +42,7 @@ const ONBOARDING_STEPS = [
   }
 ];
 
-export default function OnboardingScreen() {
+export default function OnboardingScreen({ onFinish }) {
   const [step, setStep] = useState(0);
   const [transitionStage, setTransitionStage] = useState("enter");
 
@@ -55,6 +55,7 @@ export default function OnboardingScreen() {
 
   function handleNext() {
     if (step >= ONBOARDING_STEPS.length - 1) {
+      onFinish?.();
       return;
     }
 
@@ -113,7 +114,7 @@ export default function OnboardingScreen() {
             <button type="button" className="onboarding-primary-btn" onClick={handleNext}>
               {currentStep.button}
             </button>
-            <button type="button" className="onboarding-skip-link">
+            <button type="button" className="onboarding-skip-link" onClick={onFinish}>
               Пропустить
             </button>
           </div>

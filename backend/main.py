@@ -7,6 +7,7 @@ import os
 import re
 import secrets
 import time
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -81,6 +82,8 @@ EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,5m,15m,1h").
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
 FINNHUB_TOKEN = (os.getenv("FINNHUB_TOKEN") or "").strip()
 SCAN_UPLOAD_MAX_BYTES = int((os.getenv("SCAN_UPLOAD_MAX_BYTES") or str(15 * 1024 * 1024)).strip() or str(15 * 1024 * 1024))
+SCAN_UPLOAD_RETENTION_DAYS = int((os.getenv("SCAN_UPLOAD_RETENTION_DAYS") or "7").strip() or "7")
+SCAN_UPLOAD_ARCHIVE_INTERVAL_SEC = int((os.getenv("SCAN_UPLOAD_ARCHIVE_INTERVAL_SEC") or str(6 * 60 * 60)).strip() or str(6 * 60 * 60))
 DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) // 60, 2), 30)
 DEFAULT_NEWS_SYNC_INTERVAL_MIN = 60
 VALID_NEWS_FEEDS = {"economic", "market"}
@@ -138,6 +141,8 @@ news_media_dir = media_dir / "news"
 news_media_dir.mkdir(parents=True, exist_ok=True)
 scan_upload_dir = media_dir / "scan_uploads"
 scan_upload_dir.mkdir(parents=True, exist_ok=True)
+scan_archive_dir = media_dir / "scan_archives"
+scan_archive_dir.mkdir(parents=True, exist_ok=True)
 admin_token_file_path = media_dir / "admin.token"
 admin_panel_token = (os.getenv("ADMIN_PANEL_TOKEN") or "").strip()
 
@@ -304,16 +309,35 @@ def _resolve_scan_upload_suffix(original_name: str, content_type: str) -> str:
     return ""
 
 
-def _build_scan_upload_name(user_id: int, suffix: str) -> str:
+def _build_scan_upload_name(user_id: int, suffix: str, upload_date: datetime, sequence_number: int) -> str:
     safe_suffix = suffix if suffix.startswith(".") else f".{suffix}"
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    return f"{user_id}-{stamp}-{secrets.token_hex(8)}{safe_suffix}"
+    date_key = upload_date.strftime("%Y%m%d")
+    return f"scaner-{int(user_id)}-{date_key}-{int(sequence_number):04d}{safe_suffix}"
+
+
+async def _next_scan_upload_sequence(user_id: int, upload_date: datetime) -> int:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                SELECT COALESCE(MAX(sequence_number), 0)
+                FROM scan_uploads
+                WHERE user_id = %s AND upload_date = %s
+                """,
+                (int(user_id), upload_date.date()),
+            )
+            row = await cur.fetchone()
+    current_max = int((row or [0])[0] or 0)
+    return current_max + 1
 
 
 def _serialize_scan_upload(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not row:
         return None
     created_at = row.get("created_at")
+    archived_at = row.get("archived_at")
+    upload_date = row.get("upload_date")
     return {
         "id": int(row.get("id") or 0),
         "user_id": int(row.get("user_id") or 0),
@@ -325,6 +349,10 @@ def _serialize_scan_upload(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, 
         "public_path": row.get("public_path") or "",
         "source_url": row.get("source_url") or "",
         "is_current": bool(row.get("is_current", 1)),
+        "upload_date": upload_date.isoformat() if hasattr(upload_date, "isoformat") else (str(upload_date) if upload_date else None),
+        "sequence_number": int(row.get("sequence_number") or 0),
+        "archive_path": row.get("archive_path") or "",
+        "archived_at": archived_at.isoformat() if archived_at else None,
         "created_at": created_at.isoformat() if created_at else None,
     }
 
@@ -337,6 +365,8 @@ async def _record_scan_upload(
     content_type: str,
     file_size: int,
     file_path: Path,
+    upload_date: datetime,
+    sequence_number: int,
     source_url: str = "",
 ) -> Dict[str, Any]:
     public_path = f"/api/uploads/scan/{user_id}/{file_path.name}"
@@ -344,15 +374,11 @@ async def _record_scan_upload(
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(
-                "UPDATE scan_uploads SET is_current = 0 WHERE user_id = %s AND is_current = 1",
-                (int(user_id),),
-            )
-            await cur.execute(
                 """
                 INSERT INTO scan_uploads (
                     user_id, source_type, original_name, content_type, file_size,
-                    file_path, public_path, source_url, is_current
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
+                    file_path, public_path, source_url, is_current, upload_date, sequence_number
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s, %s)
                 """,
                 (
                     int(user_id),
@@ -363,9 +389,15 @@ async def _record_scan_upload(
                     str(file_path),
                     public_path,
                     source_url or None,
+                    upload_date.date(),
+                    int(sequence_number),
                 ),
             )
             upload_id = int(cur.lastrowid or 0)
+            await cur.execute(
+                "UPDATE scan_uploads SET is_current = 0 WHERE user_id = %s AND is_current = 1 AND id <> %s",
+                (int(user_id), upload_id),
+            )
             await cur.execute("SELECT * FROM scan_uploads WHERE id = %s LIMIT 1", (upload_id,))
             row = await cur.fetchone()
     serialized = _serialize_scan_upload(row)
@@ -389,11 +421,21 @@ async def _save_scan_upload_file(
 
     user_dir = scan_upload_dir / str(user_id)
     user_dir.mkdir(parents=True, exist_ok=True)
-    target = user_dir / _build_scan_upload_name(user_id, suffix)
+    upload_date = datetime.now(timezone.utc)
+    sequence_number = await _next_scan_upload_sequence(user_id, upload_date)
+    target = user_dir / _build_scan_upload_name(user_id, suffix, upload_date, sequence_number)
     total_size = 0
 
     try:
-        with target.open("wb") as handle:
+        while True:
+            try:
+                handle = target.open("xb")
+                break
+            except FileExistsError:
+                sequence_number += 1
+                target = user_dir / _build_scan_upload_name(user_id, suffix, upload_date, sequence_number)
+
+        with handle:
             async for chunk in chunks:
                 if not chunk:
                     continue
@@ -421,6 +463,8 @@ async def _save_scan_upload_file(
         content_type=content_type,
         file_size=total_size,
         file_path=target,
+        upload_date=upload_date,
+        sequence_number=sequence_number,
         source_url=source_url,
     )
 
@@ -431,6 +475,117 @@ async def _upload_file_chunks(upload_file: UploadFile):
         if not chunk:
             break
         yield chunk
+
+
+def _scan_archive_name(user_id: int, upload_date: Any) -> str:
+    if hasattr(upload_date, "strftime"):
+        date_key = upload_date.strftime("%Y%m%d")
+    else:
+        date_key = str(upload_date or datetime.now(timezone.utc).date()).replace("-", "")[:8]
+    return f"scaner-{int(user_id)}-{date_key}.zip"
+
+
+def _zip_arcname_unique(zip_file: zipfile.ZipFile, filename: str) -> str:
+    existing = set(zip_file.namelist())
+    if filename not in existing:
+        return filename
+
+    path = Path(filename)
+    stem = path.stem
+    suffix = path.suffix
+    index = 2
+    while True:
+        candidate = f"{stem}-{index}{suffix}"
+        if candidate not in existing:
+            return candidate
+        index += 1
+
+
+async def archive_expired_scan_uploads_once(limit: int = 250) -> int:
+    retention_days = max(SCAN_UPLOAD_RETENTION_DAYS, 1)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT id, user_id, file_path, upload_date, created_at
+                FROM scan_uploads
+                WHERE archived_at IS NULL AND created_at < %s
+                ORDER BY created_at ASC, id ASC
+                LIMIT %s
+                """,
+                (cutoff.replace(tzinfo=None), int(limit)),
+            )
+            rows = await cur.fetchall()
+
+    if not rows:
+        return 0
+
+    archived_items = []
+    missing_items: List[int] = []
+
+    for row in rows:
+        upload_id = int(row.get("id") or 0)
+        user_id = int(row.get("user_id") or 0)
+        file_path = Path(row.get("file_path") or "")
+        if not upload_id or not user_id:
+            continue
+
+        if not file_path.is_file():
+            missing_items.append(upload_id)
+            continue
+
+        upload_date = row.get("upload_date") or row.get("created_at") or datetime.now(timezone.utc)
+        user_archive_dir = scan_archive_dir / str(user_id)
+        user_archive_dir.mkdir(parents=True, exist_ok=True)
+        archive_path = user_archive_dir / _scan_archive_name(user_id, upload_date)
+
+        try:
+            with zipfile.ZipFile(archive_path, mode="a", compression=zipfile.ZIP_DEFLATED) as zip_file:
+                zip_file.write(file_path, arcname=_zip_arcname_unique(zip_file, file_path.name))
+            file_path.unlink(missing_ok=True)
+            archived_items.append((str(archive_path), upload_id))
+        except Exception as exc:
+            print(f"[ScanArchive] failed to archive upload {upload_id}: {exc}")
+
+    if not archived_items and not missing_items:
+        return 0
+
+    archived_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            for archive_path, upload_id in archived_items:
+                await cur.execute(
+                    """
+                    UPDATE scan_uploads
+                    SET archived_at = %s, archive_path = %s, is_current = 0
+                    WHERE id = %s
+                    """,
+                    (archived_at, archive_path, upload_id),
+                )
+            for upload_id in missing_items:
+                await cur.execute(
+                    """
+                    UPDATE scan_uploads
+                    SET archived_at = %s, is_current = 0
+                    WHERE id = %s
+                    """,
+                    (archived_at, upload_id),
+                )
+
+    return len(archived_items) + len(missing_items)
+
+
+async def scan_upload_archive_loop():
+    while True:
+        try:
+            archived_count = await archive_expired_scan_uploads_once()
+            if archived_count:
+                print(f"[ScanArchive] archived {archived_count} expired uploads")
+        except Exception as exc:
+            print(f"[ScanArchive] loop error: {exc}")
+        await asyncio.sleep(max(SCAN_UPLOAD_ARCHIVE_INTERVAL_SEC, 60))
 
 
 async def is_admin_user(user_id: int) -> bool:
@@ -2445,6 +2600,7 @@ async def main(mode: str = "all"):
             await quotes_hub.start()
             await sync_market_pairs_once()
             await sync_news_once()
+            await archive_expired_scan_uploads_once()
     except Exception:
         pass
     try:
@@ -2455,6 +2611,7 @@ async def main(mode: str = "all"):
             tasks.append(start_api())
             tasks.append(market_pairs_sync_loop())
             tasks.append(news_sync_loop())
+            tasks.append(scan_upload_archive_loop())
         if not tasks:
             raise RuntimeError(f"Unsupported runtime mode: {mode}")
         await asyncio.gather(*tasks)

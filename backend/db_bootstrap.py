@@ -358,6 +358,10 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     public_path VARCHAR(700) NOT NULL,
                     source_url TEXT NULL,
                     is_current TINYINT(1) NOT NULL DEFAULT 1,
+                    upload_date DATE NULL,
+                    sequence_number INT NOT NULL DEFAULT 0,
+                    archive_path VARCHAR(700) NULL,
+                    archived_at TIMESTAMP NULL DEFAULT NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -400,6 +404,10 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "signal_indicators", "sort_order", "ALTER TABLE signal_indicators ADD COLUMN sort_order INT NOT NULL DEFAULT 100")
         await _ensure_column(conn, db_name, "scan_uploads", "source_url", "ALTER TABLE scan_uploads ADD COLUMN source_url TEXT NULL")
         await _ensure_column(conn, db_name, "scan_uploads", "is_current", "ALTER TABLE scan_uploads ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "scan_uploads", "upload_date", "ALTER TABLE scan_uploads ADD COLUMN upload_date DATE NULL")
+        await _ensure_column(conn, db_name, "scan_uploads", "sequence_number", "ALTER TABLE scan_uploads ADD COLUMN sequence_number INT NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "scan_uploads", "archive_path", "ALTER TABLE scan_uploads ADD COLUMN archive_path VARCHAR(700) NULL")
+        await _ensure_column(conn, db_name, "scan_uploads", "archived_at", "ALTER TABLE scan_uploads ADD COLUMN archived_at TIMESTAMP NULL DEFAULT NULL")
         await _ensure_column(conn, db_name, "scan_uploads", "updated_at", "ALTER TABLE scan_uploads ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 
         await _ensure_index(conn, db_name, "signals", "idx_signals_user_created", "CREATE INDEX idx_signals_user_created ON signals (user_id, created_at)")
@@ -415,6 +423,8 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "signal_indicators", "idx_signal_indicators_enabled_order", "CREATE INDEX idx_signal_indicators_enabled_order ON signal_indicators (is_enabled, sort_order)")
         await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_user_created", "CREATE INDEX idx_scan_uploads_user_created ON scan_uploads (user_id, created_at)")
         await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_user_current", "CREATE INDEX idx_scan_uploads_user_current ON scan_uploads (user_id, is_current, created_at)")
+        await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_archive_due", "CREATE INDEX idx_scan_uploads_archive_due ON scan_uploads (archived_at, created_at)")
+        await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_user_date_sequence", "CREATE INDEX idx_scan_uploads_user_date_sequence ON scan_uploads (user_id, upload_date, sequence_number)")
 
         await _seed_feature_flags(conn)
         await _seed_signal_indicators(conn)

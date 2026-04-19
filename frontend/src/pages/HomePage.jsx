@@ -151,6 +151,9 @@ export default function HomePage({ t }) {
   const [quoteState, setQuoteState] = useState({ status: "idle", detail: "" });
   const [quotePayload, setQuotePayload] = useState(null);
   const [quoteRenderReady, setQuoteRenderReady] = useState(false);
+  const [scanUploadState, setScanUploadState] = useState({ status: "idle", file: null, detail: "" });
+  const galleryInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const quoteClientRef = useRef(null);
   const currentQuoteSubscriptionRef = useRef(null);
   const quoteRenderReadyRef = useRef(false);
@@ -164,6 +167,8 @@ export default function HomePage({ t }) {
     { id: "camera", label: t.home.camera || "Camera", icon: CameraIcon },
     { id: "link", label: t.home.link || "Link", icon: LinkIcon }
   ];
+
+  const uploadAccept = "image/jpeg,image/png,image/webp,image/heic,image/heif";
 
   const signalModes = useMemo(
     () => [
@@ -204,6 +209,26 @@ export default function HomePage({ t }) {
       setMarketKind(allowedMarkets[0]?.key || "otc");
     }
   }, [allowedMarkets, marketKind, marketMap]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadLatestScanUpload() {
+      try {
+        const data = await apiFetchJson("/api/upload/scan/latest");
+        if (!isActive || !data?.file) return;
+        setScanUploadState({ status: "success", file: data.file, detail: "" });
+      } catch (_error) {
+        return;
+      }
+    }
+
+    loadLatestScanUpload();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -601,8 +626,105 @@ export default function HomePage({ t }) {
     }
   }
 
+  async function uploadScanFile(file, sourceType) {
+    if (!file) return;
+    setScanUploadState({ status: "uploading", file: null, detail: t.home.uploadingFile || "Uploading file..." });
+    setErrorText("");
+
+    const formData = new FormData();
+    formData.append("source_type", sourceType);
+    formData.append("file", file);
+
+    try {
+      const data = await apiFetchJson("/api/upload/scan", {
+        method: "POST",
+        body: formData
+      });
+      setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+    } catch (error) {
+      const message = error.message || t.home.uploadFailed || "Unable to upload file";
+      setScanUploadState({ status: "error", file: null, detail: message });
+      setErrorText(message);
+    }
+  }
+
+  function handleScanFileInput(event, sourceType) {
+    const file = event.target.files?.[0] || null;
+    event.target.value = "";
+    uploadScanFile(file, sourceType);
+  }
+
+  async function uploadScanLink() {
+    const url = window.prompt(t.home.linkPrompt || "Paste chart image URL");
+    const trimmedUrl = (url || "").trim();
+    if (!trimmedUrl) return;
+
+    setScanUploadState({ status: "uploading", file: null, detail: t.home.uploadingLink || "Checking link..." });
+    setErrorText("");
+
+    try {
+      const data = await apiFetchJson("/api/upload/scan/link", {
+        method: "POST",
+        body: JSON.stringify({ url: trimmedUrl })
+      });
+      setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+    } catch (error) {
+      const message = error.message || t.home.linkUploadFailed || "Unable to download file from link";
+      setScanUploadState({ status: "error", file: null, detail: message });
+      setErrorText(message);
+    }
+  }
+
+  function handleSourceAction(sourceId) {
+    setIsActionSheetOpen(false);
+    if (sourceId === "gallery") {
+      galleryInputRef.current?.click();
+      return;
+    }
+    if (sourceId === "camera") {
+      cameraInputRef.current?.click();
+      return;
+    }
+    if (sourceId === "link") {
+      uploadScanLink();
+    }
+  }
+
+  const scanUploadFileLabel = scanUploadState.file?.original_name || scanUploadState.file?.public_path || "";
+  const scanUploadTitle = scanUploadState.status === "uploading"
+    ? (t.home.uploadingFile || "Uploading file...")
+    : scanUploadState.status === "success"
+      ? (t.home.uploadSaved || "File saved")
+      : (t.home.upload || "Upload chart");
+  const scanUploadHint = scanUploadState.status === "success"
+    ? (scanUploadFileLabel || t.home.uploadSavedHint || "Ready for analysis")
+    : scanUploadState.status === "error"
+      ? (scanUploadState.detail || t.home.uploadFailed || "Upload failed")
+      : (t.home.uploadHint || "JPG, PNG or HEIC");
+  const scanUploadSubhint = scanUploadState.status === "success"
+    ? (t.home.uploadSavedHint || "Path saved on the server")
+    : scanUploadState.status === "uploading"
+      ? (t.home.uploadingHint || "Please wait, we are saving the chart")
+      : (t.home.sourceHint || "Choose a chart source");
+
   return (
     <section className="page page-home-ref">
+      <input
+        ref={galleryInputRef}
+        className="scan-file-input"
+        type="file"
+        accept={uploadAccept}
+        onChange={(event) => handleScanFileInput(event, "gallery")}
+      />
+      <input
+        ref={cameraInputRef}
+        className="scan-file-input"
+        type="file"
+        accept={uploadAccept}
+        capture="environment"
+        onChange={(event) => handleScanFileInput(event, "camera")}
+      />
+
       <div className="home-quota">
         <div className="quota-left">
           <SparkIcon className="quota-left-icon" aria-hidden="true" />
@@ -656,9 +778,9 @@ export default function HomePage({ t }) {
             <div className="upload-icon" aria-hidden="true">
               <UploadScanAnimation />
             </div>
-            <div className="upload-title">{t.home.upload || "Upload chart"}</div>
-            <div className="upload-hint">{t.home.uploadHint || "JPG, PNG or HEIC"}</div>
-            <div className="upload-subhint">{t.home.sourceHint || "Choose a chart source"}</div>
+            <div className="upload-title">{scanUploadTitle}</div>
+            <div className={`upload-hint ${scanUploadState.status === "error" ? "upload-hint-error" : ""}`}>{scanUploadHint}</div>
+            <div className="upload-subhint">{scanUploadSubhint}</div>
           </>
           )}
         </button>
@@ -807,7 +929,8 @@ export default function HomePage({ t }) {
                     key={item.id}
                     className="action-sheet-option"
                     type="button"
-                    onClick={() => setIsActionSheetOpen(false)}
+                    onClick={() => handleSourceAction(item.id)}
+                    disabled={scanUploadState.status === "uploading"}
                   >
                     <span className="action-sheet-option-icon" aria-hidden="true">
                       <Icon />

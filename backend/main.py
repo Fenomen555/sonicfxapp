@@ -10,6 +10,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import aiomysql
 import httpx
@@ -18,7 +19,7 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -79,6 +80,7 @@ MARKET_SYNC_INTERVAL_SEC = int((os.getenv("MARKET_SYNC_INTERVAL_SEC") or "300").
 EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,5m,15m,1h").strip()
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
 FINNHUB_TOKEN = (os.getenv("FINNHUB_TOKEN") or "").strip()
+SCAN_UPLOAD_MAX_BYTES = int((os.getenv("SCAN_UPLOAD_MAX_BYTES") or str(15 * 1024 * 1024)).strip() or str(15 * 1024 * 1024))
 DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) // 60, 2), 30)
 DEFAULT_NEWS_SYNC_INTERVAL_MIN = 60
 VALID_NEWS_FEEDS = {"economic", "market"}
@@ -134,8 +136,20 @@ media_dir = Path(__file__).resolve().parent / "media"
 media_dir.mkdir(parents=True, exist_ok=True)
 news_media_dir = media_dir / "news"
 news_media_dir.mkdir(parents=True, exist_ok=True)
+scan_upload_dir = media_dir / "scan_uploads"
+scan_upload_dir.mkdir(parents=True, exist_ok=True)
 admin_token_file_path = media_dir / "admin.token"
 admin_panel_token = (os.getenv("ADMIN_PANEL_TOKEN") or "").strip()
+
+SCAN_UPLOAD_SOURCE_TYPES = {"gallery", "camera", "link"}
+SCAN_UPLOAD_ALLOWED_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+SCAN_UPLOAD_ALLOWED_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+}
 
 WELCOME_TEXTS = {
     "ru": {
@@ -179,6 +193,10 @@ class UserSettingsUpdate(BaseModel):
     theme: Optional[str] = None
     mini_username: Optional[str] = Field(default=None, max_length=64)
     timezone: Optional[str] = Field(default=None, max_length=64)
+
+
+class ScanLinkUploadRequest(BaseModel):
+    url: str = Field(min_length=8, max_length=2000)
 
 
 class AdminSetActivationRequest(BaseModel):
@@ -260,6 +278,154 @@ async def require_db_pool() -> aiomysql.Pool:
     if db_pool is None:
         raise HTTPException(status_code=503, detail="Database pool is not initialized")
     return db_pool
+
+
+def _normalize_scan_upload_source(raw_source: str) -> str:
+    source = (raw_source or "").strip().lower()
+    if source in SCAN_UPLOAD_SOURCE_TYPES:
+        return source
+    raise HTTPException(status_code=400, detail="Unsupported upload source")
+
+
+def _resolve_scan_upload_suffix(original_name: str, content_type: str) -> str:
+    normalized_type = (content_type or "").split(";", 1)[0].strip().lower()
+    if normalized_type in SCAN_UPLOAD_ALLOWED_CONTENT_TYPES:
+        guessed = mimetypes.guess_extension(normalized_type) or ""
+        if guessed == ".jpe":
+            return ".jpg"
+        if guessed in SCAN_UPLOAD_ALLOWED_SUFFIXES:
+            return guessed
+
+    suffix = Path((original_name or "").split("?", 1)[0]).suffix.lower()
+    if suffix == ".jpe":
+        return ".jpg"
+    if suffix in SCAN_UPLOAD_ALLOWED_SUFFIXES:
+        return suffix
+    return ""
+
+
+def _build_scan_upload_name(user_id: int, suffix: str) -> str:
+    safe_suffix = suffix if suffix.startswith(".") else f".{suffix}"
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    return f"{user_id}-{stamp}-{secrets.token_hex(8)}{safe_suffix}"
+
+
+def _serialize_scan_upload(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not row:
+        return None
+    created_at = row.get("created_at")
+    return {
+        "id": int(row.get("id") or 0),
+        "user_id": int(row.get("user_id") or 0),
+        "source_type": row.get("source_type") or "gallery",
+        "original_name": row.get("original_name") or "",
+        "content_type": row.get("content_type") or "",
+        "file_size": int(row.get("file_size") or 0),
+        "file_path": row.get("file_path") or "",
+        "public_path": row.get("public_path") or "",
+        "source_url": row.get("source_url") or "",
+        "created_at": created_at.isoformat() if created_at else None,
+    }
+
+
+async def _record_scan_upload(
+    *,
+    user_id: int,
+    source_type: str,
+    original_name: str,
+    content_type: str,
+    file_size: int,
+    file_path: Path,
+    source_url: str = "",
+) -> Dict[str, Any]:
+    public_path = f"/api/uploads/scan/{user_id}/{file_path.name}"
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                INSERT INTO scan_uploads (
+                    user_id, source_type, original_name, content_type, file_size,
+                    file_path, public_path, source_url
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    int(user_id),
+                    source_type,
+                    (original_name or "")[:255],
+                    (content_type or "")[:128],
+                    int(file_size or 0),
+                    str(file_path),
+                    public_path,
+                    source_url or None,
+                ),
+            )
+            upload_id = int(cur.lastrowid or 0)
+            await cur.execute("SELECT * FROM scan_uploads WHERE id = %s LIMIT 1", (upload_id,))
+            row = await cur.fetchone()
+    serialized = _serialize_scan_upload(row)
+    if not serialized:
+        raise HTTPException(status_code=500, detail="Unable to save upload metadata")
+    return serialized
+
+
+async def _save_scan_upload_file(
+    *,
+    user_id: int,
+    source_type: str,
+    original_name: str,
+    content_type: str,
+    chunks,
+    source_url: str = "",
+) -> Dict[str, Any]:
+    suffix = _resolve_scan_upload_suffix(original_name, content_type)
+    if not suffix:
+        raise HTTPException(status_code=415, detail="Only chart images in JPG, PNG, WEBP or HEIC are supported")
+
+    user_dir = scan_upload_dir / str(user_id)
+    user_dir.mkdir(parents=True, exist_ok=True)
+    target = user_dir / _build_scan_upload_name(user_id, suffix)
+    total_size = 0
+
+    try:
+        with target.open("wb") as handle:
+            async for chunk in chunks:
+                if not chunk:
+                    continue
+                total_size += len(chunk)
+                if total_size > SCAN_UPLOAD_MAX_BYTES:
+                    raise HTTPException(status_code=413, detail="File is too large")
+                handle.write(chunk)
+    except HTTPException:
+        if target.exists():
+            target.unlink(missing_ok=True)
+        raise
+    except Exception as exc:
+        if target.exists():
+            target.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="Unable to save uploaded file") from exc
+
+    if total_size <= 0:
+        target.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="Downloaded file is empty")
+
+    return await _record_scan_upload(
+        user_id=user_id,
+        source_type=source_type,
+        original_name=original_name,
+        content_type=content_type,
+        file_size=total_size,
+        file_path=target,
+        source_url=source_url,
+    )
+
+
+async def _upload_file_chunks(upload_file: UploadFile):
+    while True:
+        chunk = await upload_file.read(1024 * 1024)
+        if not chunk:
+            break
+        yield chunk
 
 
 async def is_admin_user(user_id: int) -> bool:
@@ -1003,6 +1169,127 @@ async def update_user_settings(
                     tuple(values),
                 )
     return {"status": "success", "user": await fetch_user_profile(user_id)}
+
+
+@app.get("/api/upload/scan/latest")
+async def get_latest_scan_upload(user: Dict[str, Any] = Depends(get_telegram_user)):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT *
+                FROM scan_uploads
+                WHERE user_id = %s
+                ORDER BY created_at DESC, id DESC
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            row = await cur.fetchone()
+    return {"file": _serialize_scan_upload(row)}
+
+
+@app.post("/api/upload/scan")
+async def upload_scan_file(
+    source_type: str = Form(default="gallery"),
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    normalized_source = _normalize_scan_upload_source(source_type)
+    if normalized_source == "link":
+        raise HTTPException(status_code=400, detail="Use link upload endpoint for URL uploads")
+    original_name = (file.filename or f"{normalized_source}-chart").strip()
+    content_type = (file.content_type or "").strip().lower()
+    try:
+        saved_file = await _save_scan_upload_file(
+            user_id=user_id,
+            source_type=normalized_source,
+            original_name=original_name,
+            content_type=content_type,
+            chunks=_upload_file_chunks(file),
+        )
+    finally:
+        await file.close()
+    return {"status": "success", "file": saved_file}
+
+
+@app.post("/api/upload/scan/link")
+async def upload_scan_from_link(
+    payload: ScanLinkUploadRequest,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    source_url = (payload.url or "").strip()
+    parsed = urlparse(source_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
+
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True,
+            headers={"User-Agent": "SonicFX-MiniApp/1.0"},
+            timeout=httpx.Timeout(15.0, connect=6.0),
+        ) as client:
+            async with client.stream("GET", source_url) as response:
+                if response.status_code != 200:
+                    raise HTTPException(status_code=400, detail="Unable to download file from URL")
+                content_type = (response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+                if content_type in {"text/html", "application/json", "text/plain"}:
+                    raise HTTPException(status_code=415, detail="URL does not point to an image file")
+                content_length = response.headers.get("content-length")
+                if content_length:
+                    try:
+                        if int(content_length) > SCAN_UPLOAD_MAX_BYTES:
+                            raise HTTPException(status_code=413, detail="File is too large")
+                    except ValueError:
+                        pass
+
+                final_url = str(response.url)
+                original_name = Path(urlparse(final_url).path).name or "linked-chart"
+
+                async def response_chunks():
+                    async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
+                        yield chunk
+
+                saved_file = await _save_scan_upload_file(
+                    user_id=user_id,
+                    source_type="link",
+                    original_name=original_name,
+                    content_type=content_type,
+                    chunks=response_chunks(),
+                    source_url=final_url,
+                )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Unable to download file from URL") from exc
+
+    return {"status": "success", "file": saved_file}
+
+
+@app.get("/api/uploads/scan/{owner_id}/{filename}")
+async def get_scan_upload_file(
+    owner_id: int,
+    filename: str,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    requester_id = int(user["user_id"])
+    if requester_id != int(owner_id) and not await is_admin_user(requester_id):
+        raise HTTPException(status_code=403, detail="Upload access denied")
+    if "/" in filename or "\\" in filename or filename in {"", ".", ".."}:
+        raise HTTPException(status_code=400, detail="Invalid file name")
+
+    owner_dir = (scan_upload_dir / str(owner_id)).resolve()
+    target = (owner_dir / filename).resolve()
+    if target.parent != owner_dir or not target.is_file():
+        raise HTTPException(status_code=404, detail="Uploaded file not found")
+    return FileResponse(target)
 
 
 @app.get("/api/market/options")

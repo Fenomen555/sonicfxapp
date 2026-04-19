@@ -95,6 +95,14 @@
     0 0 42px rgba(102, 145, 234, 0.08);
 }
 
+.scan-file-input {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .upload-zone::before {
   content: "";
   position: absolute;
@@ -315,6 +323,11 @@
 .upload-hint {
   font-size: 14px;
   color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.upload-hint-error {
+  color: #ffb2b2;
 }
 
 .upload-subhint {
@@ -552,6 +565,10 @@
 
 :root[data-theme="light"] .upload-hint {
   color: #647791;
+}
+
+:root[data-theme="light"] .upload-hint-error {
+  color: #b33c3c;
 }
 
 :root[data-theme="light"] .upload-subhint {
@@ -988,6 +1005,11 @@
   gap: 12px;
   text-align: left;
   cursor: pointer;
+}
+
+.action-sheet-option:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .action-sheet-option-icon {

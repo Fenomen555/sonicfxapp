@@ -345,6 +345,24 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                 """
             )
 
+            await cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS scan_uploads (
+                    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    source_type VARCHAR(16) NOT NULL,
+                    original_name VARCHAR(255) NULL,
+                    content_type VARCHAR(128) NULL,
+                    file_size BIGINT NOT NULL DEFAULT 0,
+                    file_path VARCHAR(700) NOT NULL,
+                    public_path VARCHAR(700) NOT NULL,
+                    source_url TEXT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
         await _ensure_column(conn, db_name, "users", "theme", "ALTER TABLE users ADD COLUMN theme VARCHAR(16) NOT NULL DEFAULT 'dark'")
         await _ensure_column(conn, db_name, "users", "lang", "ALTER TABLE users ADD COLUMN lang VARCHAR(8) NOT NULL DEFAULT 'ru'")
         await _ensure_column(conn, db_name, "users", "timezone", "ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev'")
@@ -379,6 +397,8 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "signal_indicators", "description", "ALTER TABLE signal_indicators ADD COLUMN description VARCHAR(255) NULL")
         await _ensure_column(conn, db_name, "signal_indicators", "is_enabled", "ALTER TABLE signal_indicators ADD COLUMN is_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "signal_indicators", "sort_order", "ALTER TABLE signal_indicators ADD COLUMN sort_order INT NOT NULL DEFAULT 100")
+        await _ensure_column(conn, db_name, "scan_uploads", "source_url", "ALTER TABLE scan_uploads ADD COLUMN source_url TEXT NULL")
+        await _ensure_column(conn, db_name, "scan_uploads", "updated_at", "ALTER TABLE scan_uploads ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 
         await _ensure_index(conn, db_name, "signals", "idx_signals_user_created", "CREATE INDEX idx_signals_user_created ON signals (user_id, created_at)")
         await _ensure_index(conn, db_name, "signals", "idx_signals_status", "CREATE INDEX idx_signals_status ON signals (status)")
@@ -391,6 +411,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_kind_active", "CREATE INDEX idx_market_pairs_kind_active ON market_pairs (pair_kind, is_active)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_last_seen", "CREATE INDEX idx_market_pairs_last_seen ON market_pairs (last_seen_at)")
         await _ensure_index(conn, db_name, "signal_indicators", "idx_signal_indicators_enabled_order", "CREATE INDEX idx_signal_indicators_enabled_order ON signal_indicators (is_enabled, sort_order)")
+        await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_user_created", "CREATE INDEX idx_scan_uploads_user_created ON scan_uploads (user_id, created_at)")
 
         await _seed_feature_flags(conn)
         await _seed_signal_indicators(conn)

@@ -377,13 +377,20 @@
   color: var(--text-muted);
 }
 
-:root[data-theme="light"] .onboarding-visual {
-  border-color: rgba(86, 112, 166, 0.18);
+:root[data-theme="light"] .onboarding-screen {
   background:
-    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.72), transparent 42%),
-    linear-gradient(180deg, #ffffff, #e8eefb);
+    radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.86), transparent 32%),
+    radial-gradient(circle at 50% 68%, rgba(84, 120, 202, 0.07), transparent 38%),
+    linear-gradient(180deg, #f7f9fd 0%, #eef3f9 100%);
+}
+
+:root[data-theme="light"] .onboarding-visual {
+  border-color: rgba(71, 96, 146, 0.12);
+  background:
+    radial-gradient(circle at 28% 18%, rgba(255, 255, 255, 0.9), transparent 42%),
+    linear-gradient(180deg, #ffffff, #eef3fb);
   box-shadow:
-    0 16px 32px rgba(89, 117, 166, 0.16),
+    0 18px 38px rgba(82, 103, 142, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
@@ -394,16 +401,26 @@
 
 :root[data-theme="light"] .onboarding-bullets {
   background:
-    radial-gradient(circle at 12% 0%, rgba(56, 104, 246, 0.09), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(244, 248, 255, 0.88));
-  border-color: rgba(91, 116, 162, 0.16);
+    radial-gradient(circle at 18% 0%, rgba(58, 112, 214, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(246, 249, 255, 0.96));
+  border-color: rgba(91, 116, 162, 0.12);
   box-shadow:
-    0 14px 28px rgba(105, 130, 176, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+    0 16px 36px rgba(86, 111, 153, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 
 :root[data-theme="light"] .onboarding-bullet {
-  border-color: rgba(91, 116, 162, 0.12);
+  border-color: rgba(91, 116, 162, 0.1);
+}
+
+:root[data-theme="light"] .onboarding-bullet-title strong {
+  color: #142136;
+}
+
+:root[data-theme="light"] .onboarding-bullet-copy small,
+:root[data-theme="light"] .onboarding-footnote,
+:root[data-theme="light"] .onboarding-skip-link {
+  color: #637493;
 }
 
 :root[data-theme="light"] .onboarding-bullet-index {
@@ -421,11 +438,14 @@
 }
 
 :root[data-theme="light"] .onboarding-primary-btn {
-  background: linear-gradient(135deg, #2f61f2 0%, #f0c66f 100%);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 255, 255, 0.48), transparent 34%),
+    linear-gradient(135deg, #2f66f6 0%, #4968df 48%, #f1c96e 128%);
   color: #ffffff;
+  text-shadow: 0 1px 10px rgba(11, 24, 55, 0.18);
   box-shadow:
-    0 18px 36px rgba(75, 111, 224, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+    0 18px 34px rgba(45, 93, 210, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 @media (hover: hover) {

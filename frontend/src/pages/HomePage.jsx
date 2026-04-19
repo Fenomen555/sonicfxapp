@@ -8,7 +8,7 @@ import {
   ScannerModeIcon,
   SparkIcon
 } from "../components/AppIcons";
-import lightningCtaIcon from "../assets/cta-lightning.png";
+import AnalyzeCtaAnimation from "../components/AnalyzeCtaAnimation";
 import homeHistoryIcon from "../assets/profile-history.png";
 import homeInfoIcon from "../assets/home-info.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
@@ -1042,7 +1042,7 @@ export default function HomePage({ t, notify }) {
         </button>
         <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button" onClick={handleAnalyzeClick}>
           <span>{actionLabel}</span>
-          <img className="primary-btn-icon primary-btn-icon-accent" src={lightningCtaIcon} alt="" loading="lazy" aria-hidden="true" />
+          <AnalyzeCtaAnimation />
         </button>
         <button
           type="button"
@@ -1055,7 +1055,6 @@ export default function HomePage({ t, notify }) {
       </div>
 
       <div className="card form-card ref-form-card generator-panel">
-        <label className="field-label">{t.home.marketLabel || "Market"}</label>
         <div className={`market-chip-grid ${signalMode === "indicators" ? "indicators" : "basic"}`}>
           {currentMarkets.map((item) => (
             <button

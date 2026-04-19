@@ -1447,6 +1447,49 @@ async def upload_scan_from_link(
     return {"status": "success", "file": saved_file}
 
 
+@app.get("/api/upload/scan/{upload_id}/preview")
+async def get_scan_upload_preview(
+    upload_id: int,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    requester_id = int(user["user_id"])
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT id, user_id, file_path, content_type, archived_at
+                FROM scan_uploads
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (int(upload_id),),
+            )
+            row = await cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Uploaded file not found")
+
+    owner_id = int(row.get("user_id") or 0)
+    if requester_id != owner_id and not await is_admin_user(requester_id):
+        raise HTTPException(status_code=403, detail="Upload access denied")
+    if row.get("archived_at"):
+        raise HTTPException(status_code=410, detail="Uploaded file has been archived")
+
+    target = Path(row.get("file_path") or "").resolve()
+    scan_root = scan_upload_dir.resolve()
+    try:
+        target.relative_to(scan_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid upload path") from exc
+
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Uploaded file not found")
+
+    media_type = (row.get("content_type") or "").split(";", 1)[0].strip().lower() or None
+    return FileResponse(target, media_type=media_type)
+
+
 @app.get("/api/uploads/scan/{owner_id}/{filename}")
 async def get_scan_upload_file(
     owner_id: int,

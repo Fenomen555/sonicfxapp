@@ -256,9 +256,9 @@ export default function HomePage({ t }) {
   useEffect(() => {
     let isActive = true;
     let objectUrl = "";
-    const publicPath = scanUploadState.file?.public_path || "";
+    const uploadId = Number(scanUploadState.file?.id || 0);
 
-    if (scanUploadState.status !== "success" || !publicPath) {
+    if (scanUploadState.status !== "success" || !uploadId) {
       setScanPreview({ url: "", status: "idle" });
       return undefined;
     }
@@ -266,7 +266,7 @@ export default function HomePage({ t }) {
     async function loadPreview() {
       setScanPreview({ url: "", status: "loading" });
       try {
-        const response = await apiFetch(publicPath);
+        const response = await apiFetch(`/api/upload/scan/${encodeURIComponent(uploadId)}/preview`);
         if (!response.ok) {
           throw new Error("Preview request failed");
         }
@@ -291,7 +291,7 @@ export default function HomePage({ t }) {
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [scanUploadState.file?.public_path, scanUploadState.status]);
+  }, [scanUploadState.file?.id, scanUploadState.status]);
 
   useEffect(() => {
     let isActive = true;
@@ -857,6 +857,7 @@ export default function HomePage({ t }) {
               <img
                 src={scanPreview.url}
                 alt={t.home.uploadPreviewAlt || "Uploaded chart"}
+                onError={() => setScanPreview((prev) => ({ ...prev, url: "", status: "error" }))}
               />
             ) : (
               <div className={`upload-preview-placeholder ${scanPreview.status === "error" ? "error" : ""}`}>

@@ -11,6 +11,16 @@ const TIMEZONE_OPTIONS = [
   { id: "Asia/Dubai", city: "Dubai", flag: "AE" }
 ];
 
+const PROFILE_TOP_ACTIONS = [
+  { key: "history", fallback: "История", icon: "↗" },
+  { key: "faq", fallback: "FAQ", icon: "?" }
+];
+
+const PROFILE_BOTTOM_ACTIONS = [
+  { key: "support", fallback: "Поддержка", icon: "✦" },
+  { key: "notifications", fallback: "Уведомления", icon: "•" }
+];
+
 function getInitials(user, fallback) {
   const source = [user?.first_name, user?.last_name, user?.tg_username].filter(Boolean).join(" ").trim();
   if (!source) return fallback;
@@ -177,6 +187,17 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
     [timezone, timezoneOptions]
   );
 
+  const profileActions = useMemo(() => ({
+    top: PROFILE_TOP_ACTIONS.map((item) => ({
+      ...item,
+      label: t.profile?.actions?.[item.key] || item.fallback
+    })),
+    bottom: PROFILE_BOTTOM_ACTIONS.map((item) => ({
+      ...item,
+      label: t.profile?.actions?.[item.key] || item.fallback
+    }))
+  }), [t.profile?.actions]);
+
   const beginSettingsRequest = () => {
     settingsRequestRef.current += 1;
     return settingsRequestRef.current;
@@ -287,6 +308,15 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         </button>
       </div>
 
+      <div className="profile-action-grid profile-action-grid-top" aria-label={t.profile.quickActions || "Быстрые действия"}>
+        {profileActions.top.map((item) => (
+          <button type="button" className="profile-action-tile" key={item.key}>
+            <span className="profile-action-icon">{item.icon}</span>
+            <strong>{item.label}</strong>
+          </button>
+        ))}
+      </div>
+
       <div className="card profile-section profile-settings-shell">
         <div className="profile-section-head">
           <strong>{t.profile.settingsTitle || "Настройки"}</strong>
@@ -394,6 +424,15 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           {saving ? (t.profile.saving || "Saving...") : (t.profile.save || "Save")}
         </button>
         {statusMessage && <div className={`form-status ${statusTone}`}>{statusMessage}</div>}
+      </div>
+
+      <div className="profile-action-grid profile-action-grid-bottom" aria-label={t.profile.quickActions || "Быстрые действия"}>
+        {profileActions.bottom.map((item) => (
+          <button type="button" className="profile-action-tile" key={item.key}>
+            <span className="profile-action-icon">{item.icon}</span>
+            <strong>{item.label}</strong>
+          </button>
+        ))}
       </div>
     </section>
   );

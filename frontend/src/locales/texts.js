@@ -162,7 +162,14 @@ export const texts = {
       profileHint: "Управляй отображением профиля и основными данными аккаунта.",
       appearanceTitle: "Интерфейс",
       appearanceHint: "Язык и тема применяются сразу, чтобы ты видел результат вживую.",
-      avatarHint: "Аватар и данные Telegram автоматически обновляются при открытии Mini App."
+      avatarHint: "Аватар и данные Telegram автоматически обновляются при открытии Mini App.",
+      quickActions: "Быстрые действия",
+      actions: {
+        history: "История",
+        faq: "FAQ",
+        support: "Поддержка",
+        notifications: "Уведомления"
+      }
     },
     news: {
       title: "Новости",
@@ -374,7 +381,14 @@ export const texts = {
       profileHint: "Manage your profile presentation and core account fields.",
       appearanceTitle: "Interface",
       appearanceHint: "Language and theme update instantly so you can preview the result.",
-      avatarHint: "Telegram avatar and account data are refreshed automatically when the Mini App opens."
+      avatarHint: "Telegram avatar and account data are refreshed automatically when the Mini App opens.",
+      quickActions: "Quick actions",
+      actions: {
+        history: "History",
+        faq: "FAQ",
+        support: "Support",
+        notifications: "Notifications"
+      }
     },
     news: {
       title: "News",
@@ -586,7 +600,14 @@ export const texts = {
       profileHint: "Керуй відображенням профілю та основними даними акаунта.",
       appearanceTitle: "Інтерфейс",
       appearanceHint: "Мова і тема змінюються одразу, щоб ти бачив результат наживо.",
-      avatarHint: "Аватар і дані Telegram автоматично оновлюються під час відкриття Mini App."
+      avatarHint: "Аватар і дані Telegram автоматично оновлюються під час відкриття Mini App.",
+      quickActions: "Швидкі дії",
+      actions: {
+        history: "Історія",
+        faq: "FAQ",
+        support: "Підтримка",
+        notifications: "Сповіщення"
+      }
     },
     news: {
       title: "Новини",

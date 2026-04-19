@@ -187,6 +187,81 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.profile-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-action-tile {
+  min-height: 76px;
+  border: 1px solid rgba(83, 103, 136, 0.26);
+  border-radius: 20px;
+  padding: 12px;
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(18, 26, 40, 0.92), rgba(11, 17, 27, 0.94));
+  color: var(--text-main);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 14px 24px rgba(5, 10, 18, 0.12);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.profile-action-grid-bottom .profile-action-tile {
+  background:
+    radial-gradient(circle at top right, rgba(228, 196, 134, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(18, 26, 40, 0.92), rgba(11, 17, 27, 0.94));
+}
+
+.profile-action-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 14px;
+  display: inline-grid;
+  place-items: center;
+  color: #dce8ff;
+  background:
+    radial-gradient(circle at 35% 22%, rgba(255, 255, 255, 0.16), transparent 38%),
+    rgba(143, 184, 255, 0.13);
+  border: 1px solid rgba(143, 184, 255, 0.16);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.profile-action-grid-bottom .profile-action-icon {
+  color: #f6dfaa;
+  background:
+    radial-gradient(circle at 35% 22%, rgba(255, 255, 255, 0.16), transparent 38%),
+    rgba(228, 196, 134, 0.12);
+  border-color: rgba(228, 196, 134, 0.16);
+}
+
+.profile-action-tile strong {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (hover: hover) {
+  .profile-action-tile:hover {
+    transform: translateY(-1px);
+    border-color: rgba(143, 184, 255, 0.3);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 18px 30px rgba(5, 10, 18, 0.16);
+  }
+}
+
 .profile-settings-shell {
   background:
     radial-gradient(circle at top right, rgba(143, 184, 255, 0.1), transparent 34%),
@@ -639,9 +714,41 @@
 
 :root[data-theme="light"] .profile-identity-list div,
 :root[data-theme="light"] .profile-summary-card,
-:root[data-theme="light"] .profile-setting-block {
+:root[data-theme="light"] .profile-setting-block,
+:root[data-theme="light"] .profile-action-tile {
   border-color: rgba(106, 129, 168, 0.16);
   background: rgba(245, 248, 255, 0.94);
+}
+
+:root[data-theme="light"] .profile-action-tile {
+  background:
+    radial-gradient(circle at top right, rgba(56, 104, 246, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 255, 0.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 14px 24px rgba(108, 132, 176, 0.1);
+}
+
+:root[data-theme="light"] .profile-action-grid-bottom .profile-action-tile {
+  background:
+    radial-gradient(circle at top right, rgba(185, 140, 69, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 249, 255, 0.96));
+}
+
+:root[data-theme="light"] .profile-action-icon {
+  color: #3154c7;
+  background:
+    radial-gradient(circle at 35% 22%, rgba(255, 255, 255, 0.7), transparent 38%),
+    rgba(56, 104, 246, 0.1);
+  border-color: rgba(56, 104, 246, 0.14);
+}
+
+:root[data-theme="light"] .profile-action-grid-bottom .profile-action-icon {
+  color: #9b6b24;
+  background:
+    radial-gradient(circle at 35% 22%, rgba(255, 255, 255, 0.72), transparent 38%),
+    rgba(185, 140, 69, 0.1);
+  border-color: rgba(185, 140, 69, 0.14);
 }
 
 :root[data-theme="light"] .profile-chip,

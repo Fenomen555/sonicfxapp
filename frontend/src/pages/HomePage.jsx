@@ -914,11 +914,20 @@ export default function HomePage({ t, notify }) {
         <div className="upload-zone upload-zone-preview">
           <div className="upload-preview-media">
             {scanPreview.url ? (
-              <img
-                src={scanPreview.url}
-                alt={t.home.uploadPreviewAlt || "Uploaded chart"}
-                onError={() => setScanPreview((prev) => ({ ...prev, url: "", status: "error" }))}
-              />
+              <>
+                <img
+                  className="upload-preview-backdrop"
+                  src={scanPreview.url}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <img
+                  className="upload-preview-image"
+                  src={scanPreview.url}
+                  alt={t.home.uploadPreviewAlt || "Uploaded chart"}
+                  onError={() => setScanPreview((prev) => ({ ...prev, url: "", status: "error" }))}
+                />
+              </>
             ) : (
               <div className={`upload-preview-placeholder ${scanPreview.status === "error" ? "error" : ""}`}>
                 {scanPreview.status === "error"

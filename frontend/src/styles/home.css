@@ -2420,6 +2420,79 @@
     width: 17px;
     height: 17px;
   }
+
+  .action-sheet.picker-sheet {
+    left: max(8px, calc(8px + var(--tg-content-safe-area-inset-left, 0px)));
+    right: max(8px, calc(8px + var(--tg-content-safe-area-inset-right, 0px)));
+    bottom: calc(8px + var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom)));
+    max-height: calc(100dvh - var(--tg-safe-area-inset-top, env(safe-area-inset-top)) - 108px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 22px;
+    padding: 12px 12px calc(12px + var(--tg-safe-area-inset-bottom, env(safe-area-inset-bottom)));
+  }
+
+  .picker-sheet .action-sheet-handle {
+    margin-bottom: 12px;
+  }
+
+  .picker-sheet .action-sheet-head {
+    margin-bottom: 11px;
+    gap: 4px;
+  }
+
+  .picker-sheet .action-sheet-title {
+    font-size: 17px;
+  }
+
+  .picker-sheet .action-sheet-copy {
+    font-size: 12.5px;
+    line-height: 1.32;
+  }
+
+  .picker-market-grid {
+    margin-bottom: 10px;
+    flex: 0 0 auto;
+  }
+
+  .picker-search-wrap {
+    margin-bottom: 9px;
+    flex: 0 0 auto;
+  }
+
+  .picker-search-input {
+    min-height: 46px;
+  }
+
+  .picker-sheet-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    gap: 9px;
+    padding-right: 3px;
+  }
+
+  .picker-sheet-assets .picker-sheet-option {
+    min-height: 78px;
+    padding: 12px 14px;
+    border-radius: 17px;
+  }
+
+  .picker-sheet-assets .picker-sheet-option .action-sheet-option-copy strong {
+    font-size: 14px;
+    line-height: 1.14;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .picker-sheet .action-sheet-close {
+    flex: 0 0 auto;
+    width: min(76%, 300px);
+    min-height: 46px;
+    margin-top: 12px;
+  }
 }
 
 @keyframes livePulse {
@@ -2490,6 +2563,19 @@
 
   .signal-mode-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .picker-sheet-assets .picker-sheet-list.cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .picker-sheet-assets .picker-sheet-option {
+    min-height: 74px;
+    padding: 11px 10px;
+  }
+
+  .picker-sheet-assets .picker-sheet-option .action-sheet-option-copy strong {
+    font-size: 12.5px;
   }
 }
 

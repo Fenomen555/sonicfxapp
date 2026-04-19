@@ -28,7 +28,8 @@ const FALLBACK_USER = {
   theme: "dark",
   activation_status: "inactive",
   scanner_access: 0,
-  deposit_amount: 0
+  deposit_amount: 0,
+  onboarding_seen: 0
 };
 
 export default function App() {
@@ -123,9 +124,11 @@ export default function App() {
           theme: normalizeTheme(profile?.theme),
           lang: normalizeLang(profile?.lang)
         });
+        setShowOnboarding(!Number(profile?.onboarding_seen || 0));
       } catch {
         if (!isActive) return;
         setUser(FALLBACK_USER);
+        setShowOnboarding(true);
       } finally {
         if (isActive) setIsLoading(false);
       }
@@ -186,8 +189,23 @@ export default function App() {
     };
   }, [adminMode]);
 
-  function handleOnboardingFinish() {
+  async function handleOnboardingFinish() {
     setShowOnboarding(false);
+    try {
+      const result = await apiFetchJson("/api/user/onboarding/seen", { method: "POST" });
+      if (result?.user) {
+        setUser((prev) => ({
+          ...prev,
+          ...result.user,
+          theme: normalizeTheme(result.user.theme),
+          lang: normalizeLang(result.user.lang)
+        }));
+      } else {
+        setUser((prev) => ({ ...prev, onboarding_seen: 1 }));
+      }
+    } catch {
+      setUser((prev) => ({ ...prev, onboarding_seen: 1 }));
+    }
   }
 
   if (isLoading) return <div className="loading-screen">Loading...</div>;

@@ -413,6 +413,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
         "deposit_amount": float(row.get("deposit_amount") or 0),
         "scanner_access": int(row.get("scanner_access") or 0),
+        "onboarding_seen": int(row.get("onboarding_seen") or 0),
         "is_blocked": int(row.get("is_blocked") or 0),
         "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
@@ -948,6 +949,25 @@ async def sync_user(user: Dict[str, Any] = Depends(get_telegram_user)):
 async def get_profile(user: Dict[str, Any] = Depends(get_telegram_user)):
     await upsert_user_from_telegram(user)
     return await fetch_user_profile(int(user["user_id"]))
+
+
+@app.post("/api/user/onboarding/seen")
+async def mark_onboarding_seen(user: Dict[str, Any] = Depends(get_telegram_user)):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users
+                SET onboarding_seen = 1,
+                    last_active_at = NOW()
+                WHERE user_id = %s
+                """,
+                (user_id,),
+            )
+    return {"status": "success", "user": await fetch_user_profile(user_id)}
 
 
 @app.post("/api/user/settings")

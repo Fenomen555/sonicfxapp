@@ -210,6 +210,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive',
                     deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
                     scanner_access TINYINT(1) NOT NULL DEFAULT 0,
+                    onboarding_seen TINYINT(1) NOT NULL DEFAULT 0,
                     is_blocked TINYINT(1) NOT NULL DEFAULT 0,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -353,6 +354,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "users", "activation_status", "ALTER TABLE users ADD COLUMN activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive'")
         await _ensure_column(conn, db_name, "users", "deposit_amount", "ALTER TABLE users ADD COLUMN deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "scanner_access", "ALTER TABLE users ADD COLUMN scanner_access TINYINT(1) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "users", "onboarding_seen", "ALTER TABLE users ADD COLUMN onboarding_seen TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "is_blocked", "ALTER TABLE users ADD COLUMN is_blocked TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "last_active_at", "ALTER TABLE users ADD COLUMN last_active_at TIMESTAMP NULL DEFAULT NULL")
 

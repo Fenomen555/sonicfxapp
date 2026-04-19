@@ -317,6 +317,15 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         ))}
       </div>
 
+      <div className="profile-action-grid profile-action-grid-bottom" aria-label={t.profile.quickActions || "Быстрые действия"}>
+        {profileActions.bottom.map((item) => (
+          <button type="button" className="profile-action-tile" key={item.key}>
+            <span className="profile-action-icon">{item.icon}</span>
+            <strong>{item.label}</strong>
+          </button>
+        ))}
+      </div>
+
       <div className="card profile-section profile-settings-shell">
         <div className="profile-section-head">
           <strong>{t.profile.settingsTitle || "Настройки"}</strong>
@@ -424,15 +433,6 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
           {saving ? (t.profile.saving || "Saving...") : (t.profile.save || "Save")}
         </button>
         {statusMessage && <div className={`form-status ${statusTone}`}>{statusMessage}</div>}
-      </div>
-
-      <div className="profile-action-grid profile-action-grid-bottom" aria-label={t.profile.quickActions || "Быстрые действия"}>
-        {profileActions.bottom.map((item) => (
-          <button type="button" className="profile-action-tile" key={item.key}>
-            <span className="profile-action-icon">{item.icon}</span>
-            <strong>{item.label}</strong>
-          </button>
-        ))}
       </div>
     </section>
   );

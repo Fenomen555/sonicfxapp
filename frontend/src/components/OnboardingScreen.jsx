@@ -69,7 +69,7 @@ export default function OnboardingScreen({ t = FALLBACK_ONBOARDING, onFinish }) 
   return (
     <section className="onboarding-screen" aria-label="Onboarding">
       <div className="onboarding-scene">
-        <div className="onboarding-content">
+        <div key={currentStep.id} className="onboarding-content">
           <div className="onboarding-hero">
             <div className={`onboarding-visual tone-${currentStep.tone}`} aria-hidden="true">
               <span className="onboarding-visual-mark">{currentStep.icon}</span>

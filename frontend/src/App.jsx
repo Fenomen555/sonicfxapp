@@ -199,7 +199,9 @@ export default function App() {
     headerTopOffset + (isDesktop ? 56 : 60),
     isDesktop ? 78 : safeAreaTop + 64
   );
-  const stableViewportHeight = Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
+  const stableViewportHeight = showOnboarding
+    ? Math.max(device.stableHeight || 0, window.innerHeight || 0, 1)
+    : Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
 
   if (!isTgWebApp) {
     return (
@@ -228,7 +230,7 @@ export default function App() {
 
   return (
     <div
-      className={`app-shell ${isDesktop ? "app-shell-desktop" : "app-shell-mobile"} ${device.isCompactPhone ? "app-shell-compact-phone" : ""}`}
+      className={`app-shell ${showOnboarding ? "app-shell-onboarding" : ""} ${isDesktop ? "app-shell-desktop" : "app-shell-mobile"} ${device.isCompactPhone ? "app-shell-compact-phone" : ""}`}
       style={{
         "--top-padding": `${topPadding}px`,
         "--app-stable-height": `${stableViewportHeight}px`,

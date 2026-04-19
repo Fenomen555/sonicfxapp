@@ -967,13 +967,13 @@
 .analyze-cta-animation {
   position: relative;
   z-index: 1;
-  top: -2px;
+  top: -5px;
   width: 24px;
   height: 24px;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  margin-top: 1px;
+  margin-top: 0;
   filter: drop-shadow(0 4px 10px rgba(248, 211, 93, 0.24));
 }
 
@@ -985,6 +985,7 @@
 }
 
 .analyze-cta-fallback {
+  transform: translateY(-2px);
   object-fit: contain;
   opacity: 0.98;
   transition: opacity 0.18s ease;
@@ -997,8 +998,13 @@
 .analyze-cta-lottie {
   display: block;
   opacity: 0;
-  transform: scale(1.08);
+  transform: translateY(-2px) scale(1.08);
   transition: opacity 0.18s ease;
+}
+
+.analyze-cta-lottie svg {
+  transform: translateY(-2px);
+  transform-origin: center;
 }
 
 .analyze-cta-lottie.is-ready {
@@ -2464,7 +2470,7 @@
   }
 
   .analysis-action-row .analyze-cta-animation {
-    top: -2px;
+    top: -5px;
     width: 22px;
     height: 22px;
   }

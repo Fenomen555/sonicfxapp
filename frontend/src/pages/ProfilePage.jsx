@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactCountryFlag from "react-country-flag";
 import { apiFetchJson } from "../lib/api";
 
@@ -94,6 +94,7 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   const [saving, setSaving] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isTimezoneExpanded, setIsTimezoneExpanded] = useState(false);
+  const settingsRequestRef = useRef(0);
 
   useEffect(() => {
     setLang(user?.lang || "ru");
@@ -176,54 +177,71 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
     [timezone, timezoneOptions]
   );
 
-  const saveSettings = async (payload, successMessage) => {
+  const beginSettingsRequest = () => {
+    settingsRequestRef.current += 1;
+    return settingsRequestRef.current;
+  };
+
+  const saveSettings = async (payload, successMessage, requestId = beginSettingsRequest()) => {
     const data = await apiFetchJson("/api/user/settings", {
       method: "POST",
       body: JSON.stringify(payload)
     });
-    onUserUpdate(data?.user || user);
-    setStatusTone("success");
-    setStatusMessage(successMessage || t.profile.saved || "Настройки сохранены");
+    if (requestId === settingsRequestRef.current) {
+      onUserUpdate?.(data?.user || user);
+      setStatusTone("success");
+      setStatusMessage(successMessage || t.profile.saved || "Настройки сохранены");
+    }
     return data;
   };
 
   const handleThemeToggle = async () => {
     const nextTheme = theme === "dark" ? "light" : "dark";
+    const requestId = beginSettingsRequest();
     setTheme(nextTheme);
-    onThemePreview(nextTheme);
+    onThemePreview?.(nextTheme);
     setStatusMessage("");
     try {
-      await saveSettings({ theme: nextTheme }, t.profile.saved || "Настройки сохранены");
+      await saveSettings({ theme: nextTheme }, t.profile.saved || "Настройки сохранены", requestId);
     } catch (error) {
-      setTheme(user?.theme || "dark");
-      onThemePreview(user?.theme || "dark");
-      setStatusTone("error");
-      setStatusMessage(error.message || "Failed");
+      if (requestId === settingsRequestRef.current) {
+        setTheme(user?.theme || "dark");
+        onThemePreview?.(user?.theme || "dark");
+        setStatusTone("error");
+        setStatusMessage(error.message || "Failed");
+      }
     }
   };
 
   const handleLangSelect = async (nextLang) => {
+    if (nextLang === lang) return;
+    const requestId = beginSettingsRequest();
     setLang(nextLang);
-    onLangPreview(nextLang);
+    onLangPreview?.(nextLang);
     setStatusMessage("");
     try {
-      await saveSettings({ lang: nextLang }, t.profile.saved || "Настройки сохранены");
+      await saveSettings({ lang: nextLang }, t.profile.saved || "Настройки сохранены", requestId);
     } catch (error) {
-      setLang(user?.lang || "ru");
-      onLangPreview(user?.lang || "ru");
-      setStatusTone("error");
-      setStatusMessage(error.message || "Failed");
+      if (requestId === settingsRequestRef.current) {
+        setLang(user?.lang || "ru");
+        onLangPreview?.(user?.lang || "ru");
+        setStatusTone("error");
+        setStatusMessage(error.message || "Failed");
+      }
     }
   };
 
   const handleSave = async () => {
+    const requestId = beginSettingsRequest();
     setSaving(true);
     setStatusMessage("");
     try {
-      await saveSettings({ lang, theme, timezone }, t.profile.saved || "Настройки сохранены");
+      await saveSettings({ lang, theme, timezone }, t.profile.saved || "Настройки сохранены", requestId);
     } catch (error) {
-      setStatusTone("error");
-      setStatusMessage(error.message || "Failed");
+      if (requestId === settingsRequestRef.current) {
+        setStatusTone("error");
+        setStatusMessage(error.message || "Failed");
+      }
     } finally {
       setSaving(false);
     }

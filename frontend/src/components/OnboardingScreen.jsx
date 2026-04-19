@@ -1,98 +1,90 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const ONBOARDING_STEPS = [
   {
     id: 0,
-    emoji: "⚡",
-    title: "Умные сигналы для точных решений",
-    description: "Три режима анализа в одном пространстве: сканер по скриншоту, автоматический AI-анализ и сигналы по индикаторам.",
+    icon: "S",
+    tone: "scanner",
+    overline: "Быстрый старт",
+    title: "Выберите удобный способ анализа",
+    description: "SonicFX помогает получить сигнал через скриншот, автоматический поток или набор индикаторов.",
     bullets: [
-      "📸 Сканер по вашему скриншоту",
-      "🤖 Автоматический AI-режим",
-      "📊 Анализ по выбранным индикаторам"
+      { label: "Сканер", text: "загрузите график и получите AI-разбор" },
+      { label: "Авто режим", text: "пара и рынок ведут live-график" },
+      { label: "Индикаторы", text: "сигнал строится по выбранной стратегии" }
     ],
-    button: "✨ Открыть возможности",
+    button: "Продолжить",
     footnote: "Доступ к функциям открывается после активации аккаунта"
   },
   {
     id: 1,
-    emoji: "⏱",
-    title: "Контроль сделки в реальном времени",
-    description: "Следите за сигналами без лишней нагрузки. Всё важное видно сразу и в одном экране.",
+    icon: "AI",
+    tone: "auto",
+    overline: "Live сценарий",
+    title: "Следите за сделкой без лишнего шума",
+    description: "Главные данные собраны в одном экране: актив, цена, состояние графика и выбранный режим.",
     bullets: [
-      "📍 До 3 сигналов одновременно",
-      "📍 Таймер до закрытия позиции",
-      "📍 Наглядная шкала прогресса и итог сделки"
+      { label: "Live график", text: "котировки обновляются в реальном времени" },
+      { label: "Пары и рынки", text: "выбор через удобные карточки" },
+      { label: "Без дублей", text: "подписки переключаются аккуратно" }
     ],
-    button: "✨ Продолжить",
+    button: "Дальше",
     footnote: "Все результаты фиксируются автоматически"
   },
   {
     id: 2,
-    emoji: "📈",
-    title: "Статистика, история и рост",
-    description: "Контролируйте прогресс и принимайте решения на основе своей реальной торговой эффективности.",
+    icon: "FX",
+    tone: "growth",
+    overline: "Контроль прогресса",
+    title: "Профиль, новости и история под рукой",
+    description: "Переключайте тему, язык, часовой пояс и следите за важными событиями прямо внутри mini app.",
     bullets: [
-      "👤 Профиль трейдера и статус",
-      "📊 Винрейт и основная статистика",
-      "📅 История сделок за последние 7 дней"
+      { label: "Профиль", text: "статус, баланс и основные данные" },
+      { label: "Новости", text: "экономический календарь и рынок" },
+      { label: "Адаптивность", text: "аккуратно на телефоне и ПК" }
     ],
-    button: "🚀 Перейти к сигналам",
+    button: "Открыть приложение",
     footnote: "Профиль, история и статистика обновляются в реальном времени"
   }
 ];
 
 export default function OnboardingScreen({ onFinish }) {
   const [step, setStep] = useState(0);
-  const [transitionStage, setTransitionStage] = useState("enter");
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setTransitionStage("active"), 40);
-    return () => window.clearTimeout(timer);
-  }, []);
-
   const currentStep = useMemo(() => ONBOARDING_STEPS[step] || ONBOARDING_STEPS[0], [step]);
+  const isLastStep = step >= ONBOARDING_STEPS.length - 1;
 
   function handleNext() {
-    if (step >= ONBOARDING_STEPS.length - 1) {
+    if (isLastStep) {
       onFinish?.();
       return;
     }
-
-    setTransitionStage("exit");
-    window.setTimeout(() => {
-      setStep((prev) => Math.min(prev + 1, ONBOARDING_STEPS.length - 1));
-      setTransitionStage("enter");
-      window.setTimeout(() => setTransitionStage("active"), 24);
-    }, 240);
+    setStep((prev) => Math.min(prev + 1, ONBOARDING_STEPS.length - 1));
   }
 
   return (
     <section className="onboarding-screen" aria-label="Onboarding">
-      <div className={`onboarding-scene stage-${transitionStage}`}>
-        <div className="onboarding-orbit orbit-a" aria-hidden="true" />
-        <div className="onboarding-orbit orbit-b" aria-hidden="true" />
-        <div className="onboarding-orbit orbit-c" aria-hidden="true" />
-
+      <div className="onboarding-scene">
         <div className="onboarding-content">
           <div className="onboarding-hero">
-            <div className="onboarding-emoji-wrap" aria-hidden="true">
-              <span className="onboarding-emoji-core">{currentStep.emoji}</span>
-              <span className="onboarding-glow-ring ring-1" />
-              <span className="onboarding-glow-ring ring-2" />
+            <div className={`onboarding-visual tone-${currentStep.tone}`} aria-hidden="true">
+              <span className="onboarding-visual-mark">{currentStep.icon}</span>
             </div>
 
             <div className="onboarding-copy">
-              <div className="onboarding-overline">Premium trading assistant</div>
+              <div className="onboarding-overline">{currentStep.overline}</div>
               <h1>{currentStep.title}</h1>
               <p>{currentStep.description}</p>
             </div>
           </div>
 
           <div className="onboarding-bullets">
-            {currentStep.bullets.map((item) => (
-              <div key={item} className="onboarding-bullet">
-                <span>{item}</span>
+            {currentStep.bullets.map((item, index) => (
+              <div key={item.label} className="onboarding-bullet">
+                <span className="onboarding-bullet-index">{String(index + 1).padStart(2, "0")}</span>
+                <span className="onboarding-bullet-copy">
+                  <strong>{item.label}</strong>
+                  <small>{item.text}</small>
+                </span>
               </div>
             ))}
           </div>
@@ -115,7 +107,7 @@ export default function OnboardingScreen({ onFinish }) {
               {currentStep.button}
             </button>
             <button type="button" className="onboarding-skip-link" onClick={onFinish}>
-              Пропустить
+              {isLastStep ? "Закрыть" : "Пропустить"}
             </button>
           </div>
 

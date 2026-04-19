@@ -128,7 +128,7 @@ function payloadHasRenderableCandles(payload) {
 }
 
 
-export default function HomePage({ t }) {
+export default function HomePage({ t, notify }) {
   const [signalMode, setSignalMode] = useState("scanner");
   const [isSignalModeExpanded, setIsSignalModeExpanded] = useState(false);
   const [marketKind, setMarketKind] = useState("otc");
@@ -714,10 +714,20 @@ export default function HomePage({ t }) {
         body: formData
       });
       setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+      notify?.({
+        type: "success",
+        title: t.home.uploadToastTitle || "Chart uploaded",
+        message: t.home.uploadToastMessage || "You can start analysis now."
+      });
     } catch (error) {
       const message = error.message || t.home.uploadFailed || "Unable to upload file";
       setScanUploadState({ status: "error", file: null, detail: message });
       setErrorText(message);
+      notify?.({
+        type: "error",
+        title: t.home.uploadErrorToastTitle || "Upload failed",
+        message
+      });
     }
   }
 
@@ -742,10 +752,20 @@ export default function HomePage({ t }) {
       setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
       setIsLinkSheetOpen(false);
       setLinkInputValue("");
+      notify?.({
+        type: "success",
+        title: t.home.uploadToastTitle || "Chart uploaded",
+        message: t.home.uploadToastMessage || "You can start analysis now."
+      });
     } catch (error) {
       const message = error.message || t.home.linkUploadFailed || "Unable to download file from link";
       setScanUploadState({ status: "error", file: null, detail: message });
       setErrorText(message);
+      notify?.({
+        type: "error",
+        title: t.home.uploadErrorToastTitle || "Upload failed",
+        message
+      });
     }
   }
 
@@ -792,9 +812,23 @@ export default function HomePage({ t }) {
       // The local reset still keeps the interface usable if the server is temporarily unavailable.
     }
     setScanUploadState({ status: "idle", file: null, detail: "" });
+    notify?.({
+      type: "info",
+      title: t.home.uploadResetToastTitle || "Chart reset",
+      message: t.home.uploadResetToastMessage || "Choose a new chart source when you are ready."
+    });
   }
 
   function handleAnalyzeClick() {
+    if (signalMode === "scanner" && !hasScanUploadPreview) {
+      notify?.({
+        type: "error",
+        title: t.home.analyzeNoImageTitle || "Chart is not uploaded",
+        message: t.home.analyzeNoImageMessage || "Upload a chart from gallery, camera or link before analysis."
+      });
+      return;
+    }
+
     if (analysisScanTimerRef.current) {
       window.clearTimeout(analysisScanTimerRef.current);
     }

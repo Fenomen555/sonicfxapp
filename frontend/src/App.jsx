@@ -1,5 +1,6 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminApp from "./admin/AdminApp";
+import AppToasts from "./components/AppToasts";
 import BottomNav from "./components/BottomNav";
 import OnboardingScreen from "./components/OnboardingScreen";
 import { apiAdminFetchJson, apiFetchJson, isAdminRoute, isTelegramWebAppAvailable } from "./lib/api";
@@ -45,6 +46,8 @@ export default function App() {
   const [adminInitDone, setAdminInitDone] = useState(false);
   const [adminUser, setAdminUser] = useState(null);
   const [adminAuthError, setAdminAuthError] = useState("");
+  const [toastItems, setToastItems] = useState([]);
+  const toastTimersRef = useRef(new Map());
 
   const adminMode = useMemo(() => isAdminRoute(), []);
   const lang = useMemo(() => normalizeLang(user.lang), [user.lang]);
@@ -71,6 +74,31 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", normalizeTheme(user.theme));
   }, [user.theme]);
+
+  useEffect(() => () => {
+    toastTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    toastTimersRef.current.clear();
+  }, []);
+
+  const dismissToast = useCallback((id) => {
+    const timerId = toastTimersRef.current.get(id);
+    if (timerId) {
+      window.clearTimeout(timerId);
+      toastTimersRef.current.delete(id);
+    }
+    setToastItems((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const notify = useCallback(({ type = "info", title = "", message = "", duration = 3800 }) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const nextToast = { id, type, title, message };
+    setToastItems((prev) => [...prev.slice(-3), nextToast]);
+    const timerId = window.setTimeout(() => {
+      toastTimersRef.current.delete(id);
+      setToastItems((prev) => prev.filter((item) => item.id !== id));
+    }, Math.max(Number(duration) || 3800, 1600));
+    toastTimersRef.current.set(id, timerId);
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -273,11 +301,12 @@ export default function App() {
         ) : (
           <>
             {tab === "news" && <NewsPage t={t} lang={lang} />}
-            {tab === "home" && <HomePage t={t} />}
+            {tab === "home" && <HomePage t={t} notify={notify} />}
             {tab === "profile" && (
               <ProfilePage
                 t={t}
                 user={user}
+                notify={notify}
                 onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
                 onThemePreview={(theme) => setUser((prev) => ({ ...prev, theme: normalizeTheme(theme) }))}
                 onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: normalizeLang(nextLang) }))}
@@ -288,6 +317,7 @@ export default function App() {
       </main>
 
       {!showOnboarding && <BottomNav tabs={tabs} activeTab={tab} onChange={setTab} />}
+      <AppToasts items={toastItems} onDismiss={dismissToast} />
     </div>
   );
 }

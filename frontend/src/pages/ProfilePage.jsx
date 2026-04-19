@@ -99,7 +99,7 @@ function getStatusMeta(tier, t) {
   };
 }
 
-export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onLangPreview }) {
+export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePreview, onLangPreview }) {
   const [lang, setLang] = useState(user?.lang || "ru");
   const [theme, setTheme] = useState(user?.theme || "dark");
   const [timezone, setTimezone] = useState(user?.timezone || "Europe/Kiev");
@@ -157,6 +157,11 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
   const handleUpgradeStatus = () => {
     setStatusTone("success");
     setStatusMessage(t.profile.upgradeStatusSoon || "Скоро здесь появится апгрейд статуса.");
+    notify?.({
+      type: "info",
+      title: t.profile.upgradeStatus || "Повысить статус",
+      message: t.profile.upgradeStatusSoon || "Скоро здесь появится апгрейд статуса."
+    });
   };
 
   const languageOptions = useMemo(
@@ -216,6 +221,11 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
       onUserUpdate?.(data?.user || user);
       setStatusTone("success");
       setStatusMessage(successMessage || t.profile.saved || "Настройки сохранены");
+      notify?.({
+        type: "success",
+        title: t.profile.saved || "Настройки сохранены",
+        message: t.profile.settingsSavedToast || "Изменения применены в приложении."
+      });
     }
     return data;
   };
@@ -234,6 +244,11 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         onThemePreview?.(user?.theme || "dark");
         setStatusTone("error");
         setStatusMessage(error.message || "Failed");
+        notify?.({
+          type: "error",
+          title: t.profile.settingsErrorToast || "Не удалось сохранить настройки",
+          message: error.message || "Failed"
+        });
       }
     }
   };
@@ -252,6 +267,11 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
         onLangPreview?.(user?.lang || "ru");
         setStatusTone("error");
         setStatusMessage(error.message || "Failed");
+        notify?.({
+          type: "error",
+          title: t.profile.settingsErrorToast || "Не удалось сохранить настройки",
+          message: error.message || "Failed"
+        });
       }
     }
   };
@@ -266,6 +286,11 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
       if (requestId === settingsRequestRef.current) {
         setStatusTone("error");
         setStatusMessage(error.message || "Failed");
+        notify?.({
+          type: "error",
+          title: t.profile.settingsErrorToast || "Не удалось сохранить настройки",
+          message: error.message || "Failed"
+        });
       }
     } finally {
       setSaving(false);

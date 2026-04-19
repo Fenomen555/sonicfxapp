@@ -85,11 +85,12 @@ export default function OnboardingScreen({ t = FALLBACK_ONBOARDING, onFinish }) 
           <div className="onboarding-bullets">
             {currentStep.bullets.map((item, index) => (
               <div key={item.label} className="onboarding-bullet">
-                <span className="onboarding-bullet-index">{String(index + 1).padStart(2, "0")}</span>
+                <span className={`onboarding-bullet-index is-dot dot-${index + 1}`} aria-hidden="true">
+                  <span className="onboarding-live-dot" />
+                </span>
                 <span className="onboarding-bullet-copy">
                   <span className="onboarding-bullet-title">
                     <strong>{item.label}</strong>
-                    {index === 0 && <span className="onboarding-live-dot" aria-hidden="true" />}
                   </span>
                   <small>{item.text}</small>
                 </span>

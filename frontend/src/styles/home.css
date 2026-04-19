@@ -856,9 +856,9 @@
 
 .analysis-action-row {
   display: grid;
-  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   width: calc(100% - 18px);
   max-width: 438px;
   margin: 38px auto 30px;
@@ -883,9 +883,9 @@
 }
 
 .analysis-side-action {
-  width: 46px;
-  height: 46px;
-  border-radius: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
 }
 
 .analysis-action-row .home-quick-action {
@@ -897,8 +897,8 @@
 }
 
 .analysis-action-row .home-quick-action img {
-  width: 23px;
-  height: 23px;
+  width: 22px;
+  height: 22px;
 }
 
 .analysis-action-row .home-quick-action:hover {
@@ -916,7 +916,7 @@
   margin-inline: auto;
   width: calc(100% - 24px);
   max-width: 420px;
-  min-height: 54px;
+  min-height: 58px;
   border-radius: 18px;
   background:
     linear-gradient(135deg, #f2f6ff 0%, #aecbff 52%, #f3dcb0 100%);
@@ -951,8 +951,8 @@
 }
 
 .primary-btn.primary-btn-scanner .primary-btn-icon-accent {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   object-fit: contain;
   filter: drop-shadow(0 3px 8px rgba(78, 98, 201, 0.18));
 }
@@ -960,7 +960,7 @@
 .primary-btn.primary-btn-scanner span:last-child {
   position: relative;
   z-index: 1;
-  font-size: 17px;
+  font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
@@ -2263,31 +2263,31 @@
 
 @media (max-width: 380px) {
   .analysis-action-row {
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
-    gap: 4px;
+    grid-template-columns: 38px minmax(0, 1fr) 38px;
+    gap: 5px;
     width: calc(100% - 14px);
     padding: 5px;
     border-radius: 20px;
   }
 
   .analysis-side-action {
-    width: 40px;
-    height: 40px;
+    width: 38px;
+    height: 38px;
     border-radius: 14px;
   }
 
   .analysis-action-row .primary-btn-scanner {
-    min-height: 48px;
+    min-height: 52px;
     border-radius: 15px;
   }
 
   .analysis-action-row .primary-btn-scanner span:last-child {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .analysis-action-row .primary-btn-scanner .primary-btn-icon-accent {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
   }
 
   .signal-panel-toggle {

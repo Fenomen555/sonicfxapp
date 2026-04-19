@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactCountryFlag from "react-country-flag";
+import profileFaqIcon from "../assets/profile-faq.png";
 import profileHistoryIcon from "../assets/profile-history.png";
 import { apiFetchJson } from "../lib/api";
 
@@ -14,7 +15,7 @@ const TIMEZONE_OPTIONS = [
 
 const PROFILE_TOP_ACTIONS = [
   { key: "history", fallback: "История", image: profileHistoryIcon },
-  { key: "faq", fallback: "FAQ", icon: "?" }
+  { key: "faq", fallback: "FAQ", image: profileFaqIcon }
 ];
 
 const PROFILE_BOTTOM_ACTIONS = [

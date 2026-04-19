@@ -371,7 +371,7 @@
   height: 100%;
   min-height: 170px;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
   background: rgba(6, 11, 19, 0.86);
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactCountryFlag from "react-country-flag";
+import profileHistoryIcon from "../assets/profile-history.png";
 import { apiFetchJson } from "../lib/api";
 
 const TIMEZONE_OPTIONS = [
@@ -12,7 +13,7 @@ const TIMEZONE_OPTIONS = [
 ];
 
 const PROFILE_TOP_ACTIONS = [
-  { key: "history", fallback: "История", icon: "↗" },
+  { key: "history", fallback: "История", image: profileHistoryIcon },
   { key: "faq", fallback: "FAQ", icon: "?" }
 ];
 
@@ -311,7 +312,9 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
       <div className="profile-action-grid profile-action-grid-top" aria-label={t.profile.quickActions || "Быстрые действия"}>
         {profileActions.top.map((item) => (
           <button type="button" className="profile-action-tile" key={item.key}>
-            <span className="profile-action-icon">{item.icon}</span>
+            <span className="profile-action-icon">
+              {item.image ? <img src={item.image} alt="" draggable="false" /> : item.icon}
+            </span>
             <strong>{item.label}</strong>
           </button>
         ))}
@@ -320,7 +323,9 @@ export default function ProfilePage({ t, user, onUserUpdate, onThemePreview, onL
       <div className="profile-action-grid profile-action-grid-bottom" aria-label={t.profile.quickActions || "Быстрые действия"}>
         {profileActions.bottom.map((item) => (
           <button type="button" className="profile-action-tile" key={item.key}>
-            <span className="profile-action-icon">{item.icon}</span>
+            <span className="profile-action-icon">
+              {item.image ? <img src={item.image} alt="" draggable="false" /> : item.icon}
+            </span>
             <strong>{item.label}</strong>
           </button>
         ))}

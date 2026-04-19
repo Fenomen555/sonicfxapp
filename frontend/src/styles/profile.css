@@ -236,6 +236,13 @@
   line-height: 1;
 }
 
+.profile-action-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+}
+
 .profile-action-grid-bottom .profile-action-icon {
   color: #f6dfaa;
   background:

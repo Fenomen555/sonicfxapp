@@ -444,18 +444,6 @@ export default function HomePage({ t, notify }) {
       ? (t.home.indicatorAction || "Get signal")
       : (t.home.analyze || "Analyze");
 
-  const configTitle = signalMode === "automatic"
-    ? (t.home.automaticConfigTitle || "Automatic flow")
-    : signalMode === "indicators"
-      ? (t.home.indicatorsConfigTitle || "Indicator mode")
-      : (t.home.scannerConfigTitle || "Scanner settings");
-
-  const configHint = signalMode === "automatic"
-    ? (t.home.automaticConfigHint || "We will pick the asset and timing for the automated scenario.")
-    : signalMode === "indicators"
-      ? (t.home.indicatorsConfigHint || "Choose market, symbol and expiration for the manual signal.")
-      : (t.home.scannerConfigHint || "Scanner stays the primary mode and works together with chart upload.");
-
   const pairSearchValue = pickerSearch.trim().toLowerCase();
   const filteredPairs = pairSearchValue
     ? pairs.filter((item) => {
@@ -1027,14 +1015,6 @@ export default function HomePage({ t, notify }) {
       </button>
 
       <div className="card form-card ref-form-card generator-panel">
-        <div className="generator-panel-head">
-          <div className="generator-panel-copy">
-            <strong>{configTitle}</strong>
-            <span>{configHint}</span>
-          </div>
-          <span className="generator-panel-badge">{selectedMode.label}</span>
-        </div>
-
         <label className="field-label">{t.home.marketLabel || "Market"}</label>
         <div className={`market-chip-grid ${signalMode === "indicators" ? "indicators" : "basic"}`}>
           {currentMarkets.map((item) => (

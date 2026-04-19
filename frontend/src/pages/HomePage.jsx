@@ -847,11 +847,6 @@ export default function HomePage({ t }) {
         </div>
       ) : hasScanUploadPreview ? (
         <div className="upload-zone upload-zone-preview">
-          <span className="frame-corner tl" />
-          <span className="frame-corner tr" />
-          <span className="frame-corner bl" />
-          <span className="frame-corner br" />
-
           <div className="upload-preview-media">
             {scanPreview.url ? (
               <img
@@ -866,11 +861,6 @@ export default function HomePage({ t }) {
                   : (t.home.uploadPreviewLoading || "Preparing preview...")}
               </div>
             )}
-          </div>
-
-          <div className="upload-preview-info">
-            <strong>{t.home.uploadPreviewTitle || "Chart uploaded"}</strong>
-            <small>{scanUploadFileLabel || t.home.uploadPreviewHint || "Ready for analysis"}</small>
           </div>
 
           <div className="upload-preview-actions">

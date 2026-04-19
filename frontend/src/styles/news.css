@@ -250,7 +250,7 @@
   background:
     radial-gradient(circle at top right, rgba(185, 140, 69, 0.12), transparent 30%),
     radial-gradient(circle at top left, rgba(56, 104, 246, 0.12), transparent 34%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 255, 0.98));
+    linear-gradient(180deg, rgba(255, 250, 240, 0.98), rgba(247, 240, 228, 0.98));
 }
 
 :root[data-theme="light"] .news-kicker {
@@ -262,8 +262,8 @@
 :root[data-theme="light"] .news-summary-card,
 :root[data-theme="light"] .news-performance-item,
 :root[data-theme="light"] .news-stat-box {
-  border-color: rgba(106, 129, 168, 0.16);
-  background: rgba(245, 248, 255, 0.94);
+  border-color: rgba(119, 102, 78, 0.15);
+  background: rgba(250, 244, 234, 0.94);
 }
 
 :root[data-theme="light"] .news-section-count {
@@ -285,8 +285,8 @@
 }
 
 :root[data-theme="light"] .news-currency-chip {
-  background: rgba(242, 246, 253, 0.96);
-  border-color: rgba(106, 129, 168, 0.16);
+  background: rgba(250, 244, 234, 0.96);
+  border-color: rgba(119, 102, 78, 0.15);
   color: #30435f;
 }
 
@@ -309,8 +309,8 @@
 }
 
 :root[data-theme="light"] .news-time-chip {
-  background: rgba(242, 246, 253, 0.96);
-  border-color: rgba(106, 129, 168, 0.16);
+  background: rgba(250, 244, 234, 0.96);
+  border-color: rgba(119, 102, 78, 0.15);
   color: #526581;
 }
 
@@ -591,13 +591,13 @@
 }
 
 :root[data-theme="light"] .news-shell {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.96));
+  background: linear-gradient(180deg, rgba(255, 250, 240, 0.96), rgba(247, 240, 228, 0.96));
 }
 
 :root[data-theme="light"] .news-switcher-btn,
 :root[data-theme="light"] .news-category-chip {
-  background: rgba(243, 247, 255, 0.96);
-  border-color: rgba(109, 131, 168, 0.16);
+  background: rgba(250, 244, 234, 0.96);
+  border-color: rgba(119, 102, 78, 0.15);
   color: #617492;
 }
 
@@ -611,19 +611,19 @@
 
 :root[data-theme="light"] .news-card,
 :root[data-theme="light"] .news-block-head span {
-  background: rgba(249, 251, 255, 0.96);
-  border-color: rgba(109, 131, 168, 0.16);
+  background: rgba(255, 250, 240, 0.96);
+  border-color: rgba(119, 102, 78, 0.15);
 }
 
 :root[data-theme="light"] .news-flag-chip {
-  background: rgba(248, 250, 255, 0.98);
-  border-color: rgba(109, 131, 168, 0.16);
+  background: rgba(250, 244, 234, 0.98);
+  border-color: rgba(119, 102, 78, 0.15);
 }
 
 :root[data-theme="light"] .news-market-media,
 :root[data-theme="light"] .news-related-chip {
-  background: rgba(243, 247, 255, 0.96);
-  border-color: rgba(109, 131, 168, 0.16);
+  background: rgba(250, 244, 234, 0.96);
+  border-color: rgba(119, 102, 78, 0.15);
 }
 
 :root[data-theme="light"] .news-open-link {

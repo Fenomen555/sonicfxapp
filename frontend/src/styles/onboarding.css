@@ -232,10 +232,10 @@
 .onboarding-bullet-index.is-dot {
   --dot-color: #54e08e;
   color: transparent;
-  background:
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--dot-color) 24%, transparent), transparent 58%),
-    rgba(143, 184, 255, 0.1);
-  border-color: color-mix(in srgb, var(--dot-color) 26%, rgba(143, 184, 255, 0.14));
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  animation: none;
 }
 
 .onboarding-bullet-index.dot-2 {
@@ -435,9 +435,7 @@
 }
 
 :root[data-theme="light"] .onboarding-bullet-index.is-dot {
-  background:
-    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--dot-color) 24%, transparent), transparent 58%),
-    rgba(56, 104, 246, 0.08);
+  background: transparent;
 }
 
 :root[data-theme="light"] .onboarding-live-dot {

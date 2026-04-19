@@ -12,6 +12,7 @@ import lightningCtaIcon from "../assets/cta-lightning.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
 import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetchJson } from "../lib/api";
+import { getDeviceProfile } from "../lib/device";
 import { getIndicatorMeta } from "../lib/indicatorMeta";
 import { QuoteStreamClient } from "../lib/quoteStream";
 
@@ -138,6 +139,9 @@ export default function HomePage({ t }) {
   const [errorText, setErrorText] = useState("");
   const [availableMarkets, setAvailableMarkets] = useState([]);
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
+  const [isLinkSheetOpen, setIsLinkSheetOpen] = useState(false);
+  const [linkInputValue, setLinkInputValue] = useState("");
+  const [deviceProfile, setDeviceProfile] = useState(() => getDeviceProfile());
   const [pickerSheet, setPickerSheet] = useState(null);
   const [pickerSearch, setPickerSearch] = useState("");
   const [indicators, setIndicators] = useState(FALLBACK_INDICATORS);
@@ -162,11 +166,14 @@ export default function HomePage({ t }) {
   const currentQuoteLoadKeyRef = useRef("");
   const lastQuoteSubscriptionKeyRef = useRef("");
 
-  const quickActions = [
-    { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
-    { id: "camera", label: t.home.camera || "Camera", icon: CameraIcon },
-    { id: "link", label: t.home.link || "Link", icon: LinkIcon }
-  ];
+  const quickActions = useMemo(
+    () => [
+      { id: "gallery", label: t.home.gallery || "Gallery", icon: GalleryIcon },
+      ...(!deviceProfile.isDesktop ? [{ id: "camera", label: t.home.camera || "Camera", icon: CameraIcon }] : []),
+      { id: "link", label: t.home.link || "Link", icon: LinkIcon }
+    ],
+    [deviceProfile.isDesktop, t.home]
+  );
 
   const uploadAccept = "image/jpeg,image/png,image/webp,image/heic,image/heif";
 
@@ -209,6 +216,21 @@ export default function HomePage({ t }) {
       setMarketKind(allowedMarkets[0]?.key || "otc");
     }
   }, [allowedMarkets, marketKind, marketMap]);
+
+  useEffect(() => {
+    function refreshDeviceProfile() {
+      setDeviceProfile(getDeviceProfile());
+    }
+
+    refreshDeviceProfile();
+    window.addEventListener("resize", refreshDeviceProfile);
+    window.Telegram?.WebApp?.onEvent?.("viewportChanged", refreshDeviceProfile);
+
+    return () => {
+      window.removeEventListener("resize", refreshDeviceProfile);
+      window.Telegram?.WebApp?.offEvent?.("viewportChanged", refreshDeviceProfile);
+    };
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -654,8 +676,7 @@ export default function HomePage({ t }) {
     uploadScanFile(file, sourceType);
   }
 
-  async function uploadScanLink() {
-    const url = window.prompt(t.home.linkPrompt || "Paste chart image URL");
+  async function uploadScanLink(url = linkInputValue) {
     const trimmedUrl = (url || "").trim();
     if (!trimmedUrl) return;
 
@@ -668,11 +689,23 @@ export default function HomePage({ t }) {
         body: JSON.stringify({ url: trimmedUrl })
       });
       setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+      setIsLinkSheetOpen(false);
+      setLinkInputValue("");
     } catch (error) {
       const message = error.message || t.home.linkUploadFailed || "Unable to download file from link";
       setScanUploadState({ status: "error", file: null, detail: message });
       setErrorText(message);
     }
+  }
+
+  function closeLinkSheet() {
+    if (scanUploadState.status === "uploading") return;
+    setIsLinkSheetOpen(false);
+  }
+
+  function submitLinkUpload(event) {
+    event.preventDefault();
+    uploadScanLink();
   }
 
   function handleSourceAction(sourceId) {
@@ -686,7 +719,11 @@ export default function HomePage({ t }) {
       return;
     }
     if (sourceId === "link") {
-      uploadScanLink();
+      setLinkInputValue("");
+      if (scanUploadState.status === "error") {
+        setScanUploadState({ status: "idle", file: null, detail: "" });
+      }
+      setIsLinkSheetOpen(true);
     }
   }
 
@@ -954,6 +991,52 @@ export default function HomePage({ t }) {
               {t.home.close || "Close"}
             </button>
           </div>
+        </div>
+      )}
+
+      {isLinkSheetOpen && (
+        <div className="action-sheet-layer" role="presentation">
+          <button
+            className="action-sheet-backdrop"
+            type="button"
+            aria-label={t.home.close || "Close"}
+            onClick={closeLinkSheet}
+          />
+          <form className="action-sheet link-upload-sheet" role="dialog" aria-modal="true" aria-label={t.home.linkSheetTitle || t.home.link || "Link"} onSubmit={submitLinkUpload}>
+            <div className="action-sheet-handle" aria-hidden="true" />
+            <div className="action-sheet-head">
+              <div className="action-sheet-title">{t.home.linkSheetTitle || "Upload by link"}</div>
+              <div className="action-sheet-copy">{t.home.linkSheetHint || "Paste a direct chart image link. We will check and save it on the server."}</div>
+            </div>
+
+            <label className="link-upload-field">
+              <span>{t.home.link || "Link"}</span>
+              <input
+                value={linkInputValue}
+                onChange={(event) => setLinkInputValue(event.target.value)}
+                placeholder={t.home.linkInputPlaceholder || "https://example.com/chart.png"}
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
+                disabled={scanUploadState.status === "uploading"}
+              />
+            </label>
+
+            {scanUploadState.status === "error" && scanUploadState.detail ? (
+              <div className="link-upload-error">{scanUploadState.detail}</div>
+            ) : null}
+
+            <div className="link-upload-actions">
+              <button className="action-sheet-close link-upload-cancel" type="button" onClick={closeLinkSheet}>
+                {t.home.close || "Close"}
+              </button>
+              <button className="link-upload-submit" type="submit" disabled={scanUploadState.status === "uploading" || !linkInputValue.trim()}>
+                {scanUploadState.status === "uploading" ? (t.home.uploadingLink || "Checking link...") : (t.home.linkUploadAction || "Save link")}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

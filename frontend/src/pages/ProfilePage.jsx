@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactCountryFlag from "react-country-flag";
 import profileFaqIcon from "../assets/profile-faq.png";
 import profileHistoryIcon from "../assets/profile-history.png";
+import profileSupportIcon from "../assets/profile-support.png";
 import { apiFetchJson } from "../lib/api";
 
 const TIMEZONE_OPTIONS = [
@@ -19,7 +20,7 @@ const PROFILE_TOP_ACTIONS = [
 ];
 
 const PROFILE_BOTTOM_ACTIONS = [
-  { key: "support", fallback: "Поддержка", icon: "✦" },
+  { key: "support", fallback: "Поддержка", image: profileSupportIcon },
   { key: "notifications", fallback: "Уведомления", icon: "•" }
 ];
 

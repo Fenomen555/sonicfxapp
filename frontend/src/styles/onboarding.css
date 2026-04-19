@@ -39,22 +39,14 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 14px;
+  gap: 18px;
 }
 
 .onboarding-hero {
   display: grid;
   gap: 14px;
   justify-items: center;
-  padding: 18px 16px;
-  border: 1px solid rgba(111, 134, 177, 0.22);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, rgba(18, 27, 42, 0.86), rgba(11, 17, 27, 0.92)),
-    var(--bg-card);
-  box-shadow:
-    0 22px 46px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 18px 4px 8px;
 }
 
 .onboarding-visual {
@@ -135,8 +127,17 @@
 
 .onboarding-bullets {
   display: grid;
-  gap: 8px;
+  gap: 0;
   text-align: left;
+  overflow: hidden;
+  border: 1px solid rgba(115, 139, 184, 0.18);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(143, 184, 255, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(17, 25, 39, 0.72), rgba(10, 15, 24, 0.78));
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .onboarding-bullet {
@@ -144,14 +145,14 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  min-height: 64px;
-  padding: 12px 13px;
-  border: 1px solid rgba(115, 139, 184, 0.24);
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgba(18, 27, 41, 0.88), rgba(12, 18, 29, 0.94)),
-    var(--bg-card);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  min-height: 58px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(115, 139, 184, 0.12);
+  background: transparent;
+}
+
+.onboarding-bullet:last-child {
+  border-bottom: 0;
 }
 
 .onboarding-bullet-index {
@@ -274,16 +275,6 @@
   color: var(--text-muted);
 }
 
-:root[data-theme="light"] .onboarding-hero {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(245, 248, 255, 0.98)),
-    var(--bg-card);
-  border-color: rgba(91, 116, 162, 0.18);
-  box-shadow:
-    0 22px 44px rgba(104, 128, 172, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.82);
-}
-
 :root[data-theme="light"] .onboarding-visual {
   border-color: rgba(86, 112, 166, 0.18);
   background:
@@ -299,14 +290,18 @@
   text-shadow: none;
 }
 
-:root[data-theme="light"] .onboarding-bullet {
+:root[data-theme="light"] .onboarding-bullets {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.98)),
-    var(--bg-card);
+    radial-gradient(circle at 12% 0%, rgba(56, 104, 246, 0.09), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(244, 248, 255, 0.88));
   border-color: rgba(91, 116, 162, 0.16);
   box-shadow:
-    0 12px 24px rgba(105, 130, 176, 0.09),
+    0 14px 28px rgba(105, 130, 176, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+:root[data-theme="light"] .onboarding-bullet {
+  border-color: rgba(91, 116, 162, 0.12);
 }
 
 :root[data-theme="light"] .onboarding-bullet-index {
@@ -347,7 +342,22 @@
   }
 
   .onboarding-hero {
-    padding: 20px 22px;
+    padding: 20px 12px 8px;
+  }
+
+  .onboarding-bullets {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .onboarding-bullet {
+    align-content: start;
+    min-height: 96px;
+    border-right: 1px solid rgba(115, 139, 184, 0.12);
+    border-bottom: 0;
+  }
+
+  .onboarding-bullet:last-child {
+    border-right: 0;
   }
 
   .onboarding-copy h1 {
@@ -368,8 +378,7 @@
 
   .onboarding-hero {
     gap: 11px;
-    padding: 14px 13px;
-    border-radius: 24px;
+    padding: 12px 4px 4px;
   }
 
   .onboarding-visual {
@@ -403,8 +412,7 @@
 
   .onboarding-bullet {
     min-height: 58px;
-    padding: 10px 11px;
-    border-radius: 16px;
+    padding: 10px 12px;
   }
 
   .onboarding-bullet-index {

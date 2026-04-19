@@ -9,6 +9,8 @@ import {
   SparkIcon
 } from "../components/AppIcons";
 import lightningCtaIcon from "../assets/cta-lightning.png";
+import homeHistoryIcon from "../assets/profile-history.png";
+import homeInfoIcon from "../assets/home-info.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
 import ScanAnalysisOverlay from "../components/ScanAnalysisOverlay";
 import UploadScanAnimation from "../components/UploadScanAnimation";
@@ -1015,7 +1017,35 @@ export default function HomePage({ t, notify }) {
       </button>
 
       <div className="card form-card ref-form-card generator-panel">
-        <label className="field-label">{t.home.marketLabel || "Market"}</label>
+        <div className="generator-market-head">
+          <label className="field-label">{t.home.marketLabel || "Market"}</label>
+          <div className="home-quick-actions" aria-label={t.home.quickActionsLabel || "Quick actions"}>
+            <button
+              type="button"
+              className="home-quick-action"
+              onClick={() => notify?.({
+                type: "info",
+                title: t.home.historyActionTitle || "История",
+                message: t.home.historyActionMessage || "История сигналов появится здесь."
+              })}
+              aria-label={t.home.historyActionTitle || "История"}
+            >
+              <img src={homeHistoryIcon} alt="" loading="lazy" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="home-quick-action"
+              onClick={() => notify?.({
+                type: "info",
+                title: t.home.infoActionTitle || "Инфо",
+                message: t.home.infoActionMessage || "Здесь будет краткая справка по выбранному режиму."
+              })}
+              aria-label={t.home.infoActionTitle || "Инфо"}
+            >
+              <img src={homeInfoIcon} alt="" loading="lazy" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
         <div className={`market-chip-grid ${signalMode === "indicators" ? "indicators" : "basic"}`}>
           {currentMarkets.map((item) => (
             <button

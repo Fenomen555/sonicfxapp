@@ -1055,19 +1055,6 @@ export default function HomePage({ t, notify }) {
       </div>
 
       <div className="card form-card ref-form-card generator-panel">
-        <div className={`market-chip-grid ${signalMode === "indicators" ? "indicators" : "basic"}`}>
-          {currentMarkets.map((item) => (
-            <button
-              key={item.key}
-              className={`market-chip ${marketKind === item.key ? "active" : ""}`}
-              onClick={() => setMarketKind(item.key)}
-              type="button"
-            >
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>
-
         <div className={`field-row ${signalMode === "indicators" ? "field-row-indicators" : ""}`}>
           <div className="field-grow">
             <label className="field-label">{t.home.asset || "Symbol"}</label>
@@ -1075,7 +1062,6 @@ export default function HomePage({ t, notify }) {
               type="button"
               className="field-input ref-input field-picker-trigger"
               onClick={() => openPickerSheet("asset")}
-              disabled={isLoading || pairs.length === 0}
             >
               <span className="field-picker-copy">
                 <strong>
@@ -1279,6 +1265,24 @@ export default function HomePage({ t, notify }) {
               </div>
             </div>
 
+            {pickerSheet === "asset" && (
+              <div className={`market-chip-grid picker-market-grid ${signalMode === "indicators" ? "indicators" : "basic"}`} aria-label={t.home.marketLabel || "Market"}>
+                {currentMarkets.map((item) => (
+                  <button
+                    key={item.key}
+                    className={`market-chip picker-market-chip ${marketKind === item.key ? "active" : ""}`}
+                    onClick={() => {
+                      setMarketKind(item.key);
+                      setPickerSearch("");
+                    }}
+                    type="button"
+                  >
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {(pickerSheet === "asset" || pickerSheet === "indicator") && (
               <div className="picker-search-wrap">
                 <input
@@ -1343,7 +1347,7 @@ export default function HomePage({ t, notify }) {
               {(pickerSheet === "asset" || pickerSheet === "indicator") && (pickerSheet === "asset" ? filteredPairs.length === 0 : filteredIndicators.length === 0) && (
                 <div className="picker-sheet-empty">
                   {pickerSheet === "asset"
-                    ? (t.home.assetSearchEmpty || "Nothing found for this query.")
+                    ? (isLoading ? (t.home.loading || "Loading...") : (t.home.assetSearchEmpty || "Nothing found for this query."))
                     : (t.home.indicatorSearchEmpty || "No indicator found for this query.")}
                 </div>
               )}

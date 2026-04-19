@@ -1554,6 +1554,16 @@
   max-width: 440px;
 }
 
+.picker-market-grid {
+  margin-bottom: 12px;
+}
+
+.market-chip.picker-market-chip {
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 13px;
+}
+
 .picker-search-wrap {
   margin-bottom: 10px;
 }

@@ -19,7 +19,7 @@ from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -420,72 +420,12 @@ async def _save_scan_upload_file(
     )
 
 
-async def _bytes_upload_chunks(content: bytes):
-    if content:
-        yield content
-
-
-def _extract_multipart_boundary(content_type: str) -> str:
-    match = re.search(r'boundary=(?:"([^"]+)"|([^;]+))', content_type or "", flags=re.IGNORECASE)
-    return (match.group(1) or match.group(2) or "").strip() if match else ""
-
-
-def _parse_content_disposition_value(disposition: str, key: str) -> str:
-    match = re.search(rf'{re.escape(key)}="([^"]*)"', disposition or "", flags=re.IGNORECASE)
-    if match:
-        return match.group(1).strip()
-    return ""
-
-
-def _parse_scan_upload_multipart(body: bytes, content_type: str) -> Dict[str, Any]:
-    boundary = _extract_multipart_boundary(content_type)
-    if not boundary:
-        raise HTTPException(status_code=400, detail="Multipart boundary is missing")
-    delimiter = f"--{boundary}".encode("utf-8")
-    source_type = "gallery"
-    file_name = ""
-    file_content_type = ""
-    file_content = b""
-
-    for raw_part in body.split(delimiter):
-        part = raw_part
-        if part.startswith(b"\r\n"):
-            part = part[2:]
-        if part.endswith(b"--"):
-            part = part[:-2]
-        if part.endswith(b"\r\n"):
-            part = part[:-2]
-        if not part or part == b"--":
-            continue
-        if b"\r\n\r\n" not in part:
-            continue
-
-        raw_headers, content = part.split(b"\r\n\r\n", 1)
-        headers: Dict[str, str] = {}
-        for line in raw_headers.decode("latin-1", errors="ignore").split("\r\n"):
-            if ":" not in line:
-                continue
-            name, value = line.split(":", 1)
-            headers[name.strip().lower()] = value.strip()
-
-        disposition = headers.get("content-disposition", "")
-        field_name = _parse_content_disposition_value(disposition, "name")
-        if field_name == "source_type":
-            source_type = content.decode("utf-8", errors="ignore").strip() or source_type
-            continue
-        if field_name == "file":
-            file_name = _parse_content_disposition_value(disposition, "filename") or "chart-upload"
-            file_content_type = headers.get("content-type", "")
-            file_content = content
-
-    if not file_content:
-        raise HTTPException(status_code=400, detail="File field is required")
-    return {
-        "source_type": source_type,
-        "filename": file_name,
-        "content_type": file_content_type,
-        "content": file_content,
-    }
+async def _upload_file_chunks(upload_file: UploadFile):
+    while True:
+        chunk = await upload_file.read(1024 * 1024)
+        if not chunk:
+            break
+        yield chunk
 
 
 async def is_admin_user(user_id: int) -> bool:
@@ -1254,39 +1194,27 @@ async def get_latest_scan_upload(user: Dict[str, Any] = Depends(get_telegram_use
 
 @app.post("/api/upload/scan")
 async def upload_scan_file(
-    request: Request,
+    source_type: str = Form(default="gallery"),
+    file: UploadFile = File(...),
     user: Dict[str, Any] = Depends(get_telegram_user),
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
-    request_content_type = request.headers.get("content-type", "")
-    if "multipart/form-data" not in request_content_type.lower():
-        raise HTTPException(status_code=415, detail="Upload must use multipart/form-data")
-    content_length = request.headers.get("content-length")
-    if content_length:
-        try:
-            if int(content_length) > SCAN_UPLOAD_MAX_BYTES + 1024 * 1024:
-                raise HTTPException(status_code=413, detail="File is too large")
-        except ValueError:
-            pass
-
-    body = await request.body()
-    if len(body) > SCAN_UPLOAD_MAX_BYTES + 1024 * 1024:
-        raise HTTPException(status_code=413, detail="File is too large")
-
-    parsed_upload = _parse_scan_upload_multipart(body, request_content_type)
-    normalized_source = _normalize_scan_upload_source(parsed_upload["source_type"])
+    normalized_source = _normalize_scan_upload_source(source_type)
     if normalized_source == "link":
         raise HTTPException(status_code=400, detail="Use link upload endpoint for URL uploads")
-    original_name = (parsed_upload["filename"] or f"{normalized_source}-chart").strip()
-    content_type = (parsed_upload["content_type"] or "").strip().lower()
-    saved_file = await _save_scan_upload_file(
-        user_id=user_id,
-        source_type=normalized_source,
-        original_name=original_name,
-        content_type=content_type,
-        chunks=_bytes_upload_chunks(parsed_upload["content"]),
-    )
+    original_name = (file.filename or f"{normalized_source}-chart").strip()
+    content_type = (file.content_type or "").strip().lower()
+    try:
+        saved_file = await _save_scan_upload_file(
+            user_id=user_id,
+            source_type=normalized_source,
+            original_name=original_name,
+            content_type=content_type,
+            chunks=_upload_file_chunks(file),
+        )
+    finally:
+        await file.close()
     return {"status": "success", "file": saved_file}
 
 

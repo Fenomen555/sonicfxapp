@@ -1011,41 +1011,39 @@ export default function HomePage({ t, notify }) {
         )}
       </div>
 
-      <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button" onClick={handleAnalyzeClick}>
-        <span>{actionLabel}</span>
-        <img className="primary-btn-icon primary-btn-icon-accent" src={lightningCtaIcon} alt="" loading="lazy" aria-hidden="true" />
-      </button>
+      <div className="analysis-action-row" aria-label={t.home.quickActionsLabel || "Quick actions"}>
+        <button
+          type="button"
+          className="home-quick-action analysis-side-action"
+          onClick={() => notify?.({
+            type: "info",
+            title: t.home.historyActionTitle || "История",
+            message: t.home.historyActionMessage || "История сигналов появится здесь."
+          })}
+          aria-label={t.home.historyActionTitle || "История"}
+        >
+          <img src={homeHistoryIcon} alt="" loading="lazy" aria-hidden="true" />
+        </button>
+        <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button" onClick={handleAnalyzeClick}>
+          <span>{actionLabel}</span>
+          <img className="primary-btn-icon primary-btn-icon-accent" src={lightningCtaIcon} alt="" loading="lazy" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="home-quick-action analysis-side-action"
+          onClick={() => notify?.({
+            type: "info",
+            title: t.home.infoActionTitle || "Инфо",
+            message: t.home.infoActionMessage || "Здесь будет краткая справка по выбранному режиму."
+          })}
+          aria-label={t.home.infoActionTitle || "Инфо"}
+        >
+          <img src={homeInfoIcon} alt="" loading="lazy" aria-hidden="true" />
+        </button>
+      </div>
 
       <div className="card form-card ref-form-card generator-panel">
-        <div className="generator-market-head">
-          <label className="field-label">{t.home.marketLabel || "Market"}</label>
-          <div className="home-quick-actions" aria-label={t.home.quickActionsLabel || "Quick actions"}>
-            <button
-              type="button"
-              className="home-quick-action"
-              onClick={() => notify?.({
-                type: "info",
-                title: t.home.historyActionTitle || "История",
-                message: t.home.historyActionMessage || "История сигналов появится здесь."
-              })}
-              aria-label={t.home.historyActionTitle || "История"}
-            >
-              <img src={homeHistoryIcon} alt="" loading="lazy" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="home-quick-action"
-              onClick={() => notify?.({
-                type: "info",
-                title: t.home.infoActionTitle || "Инфо",
-                message: t.home.infoActionMessage || "Здесь будет краткая справка по выбранному режиму."
-              })}
-              aria-label={t.home.infoActionTitle || "Инфо"}
-            >
-              <img src={homeInfoIcon} alt="" loading="lazy" aria-hidden="true" />
-            </button>
-          </div>
-        </div>
+        <label className="field-label">{t.home.marketLabel || "Market"}</label>
         <div className={`market-chip-grid ${signalMode === "indicators" ? "indicators" : "basic"}`}>
           {currentMarkets.map((item) => (
             <button

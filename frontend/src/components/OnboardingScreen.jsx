@@ -1,4 +1,13 @@
 import { useMemo, useState } from "react";
+import aiBrainIcon from "../assets/ai-brain.png";
+import indicatorCandlesIcon from "../assets/indicator-candles.png";
+import scannerPortraitIcon from "../assets/scanner-portrait.png";
+
+const ONBOARDING_VISUALS = {
+  scanner: scannerPortraitIcon,
+  auto: aiBrainIcon,
+  growth: indicatorCandlesIcon
+};
 
 const FALLBACK_ONBOARDING = {
   skip: "Пропустить",
@@ -57,6 +66,7 @@ export default function OnboardingScreen({ t = FALLBACK_ONBOARDING, onFinish }) 
   const steps = useMemo(() => (Array.isArray(t?.steps) && t.steps.length ? t.steps : FALLBACK_ONBOARDING.steps), [t]);
   const currentStep = useMemo(() => steps[step] || steps[0], [step, steps]);
   const isLastStep = step >= steps.length - 1;
+  const visualIcon = ONBOARDING_VISUALS[currentStep.tone] || ONBOARDING_VISUALS.scanner;
 
   function handleNext() {
     if (isLastStep) {
@@ -72,7 +82,7 @@ export default function OnboardingScreen({ t = FALLBACK_ONBOARDING, onFinish }) 
         <div key={currentStep.id} className="onboarding-content">
           <div className="onboarding-hero">
             <div className={`onboarding-visual tone-${currentStep.tone}`} aria-hidden="true">
-              <span className="onboarding-visual-mark">{currentStep.icon}</span>
+              <img className="onboarding-visual-mark" src={visualIcon} alt="" draggable="false" />
             </div>
 
             <div className="onboarding-copy">

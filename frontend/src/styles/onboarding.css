@@ -78,6 +78,28 @@
   animation: onboardingFloat 4.8s ease-in-out infinite;
 }
 
+.onboarding-visual::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from 120deg,
+    transparent 0deg,
+    rgba(143, 184, 255, 0.14) 76deg,
+    rgba(244, 207, 125, 0.72) 116deg,
+    rgba(143, 184, 255, 0.18) 156deg,
+    transparent 236deg
+  );
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: onboardingRingSweep 5.6s linear infinite;
+}
+
 .onboarding-visual::after {
   content: "";
   position: absolute;
@@ -107,6 +129,7 @@
   letter-spacing: -0.07em;
   color: #f7f9ff;
   text-shadow: 0 8px 18px rgba(0, 0, 0, 0.28);
+  animation: onboardingMarkPop 0.5s cubic-bezier(0.2, 0.9, 0.24, 1.18) both;
 }
 
 .onboarding-copy {
@@ -140,6 +163,7 @@
 }
 
 .onboarding-bullets {
+  position: relative;
   display: grid;
   gap: 0;
   text-align: left;
@@ -153,6 +177,17 @@
     0 18px 34px rgba(0, 0, 0, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
   animation: onboardingLift 0.42s ease both 0.08s;
+}
+
+.onboarding-bullets::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 42%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.075), transparent);
+  transform: translateX(-130%);
+  animation: onboardingListSweep 5.8s ease-in-out infinite 0.8s;
 }
 
 .onboarding-bullet {
@@ -190,6 +225,8 @@
   color: #d9e5ff;
   background: rgba(143, 184, 255, 0.12);
   border: 1px solid rgba(143, 184, 255, 0.16);
+  box-shadow: 0 0 0 rgba(143, 184, 255, 0);
+  animation: onboardingIndexPulse 4.4s ease-in-out infinite;
 }
 
 .onboarding-bullet-copy {
@@ -245,6 +282,7 @@
   background: linear-gradient(90deg, rgba(102, 142, 255, 0.98), rgba(232, 191, 100, 0.9));
   transform: translateY(-1px);
   box-shadow: 0 0 18px rgba(143, 184, 255, 0.28);
+  animation: onboardingDotPulse 1.8s ease-in-out infinite;
 }
 
 .onboarding-progress-dot.passed {
@@ -260,6 +298,7 @@
 }
 
 .onboarding-primary-btn {
+  position: relative;
   appearance: none;
   border: 0;
   width: min(100%, 390px);
@@ -276,6 +315,25 @@
     0 18px 36px rgba(0, 0, 0, 0.24),
     inset 0 1px 0 rgba(255, 255, 255, 0.62);
   animation: onboardingButtonShine 5s ease-in-out infinite;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.onboarding-primary-btn::before {
+  content: "";
+  position: absolute;
+  inset: -120% auto -120% -34%;
+  width: 28%;
+  transform: rotate(18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.62), transparent);
+  opacity: 0;
+  z-index: -1;
+  animation: onboardingButtonSweep 4.8s ease-in-out infinite 0.7s;
+}
+
+.onboarding-primary-btn:active {
+  transform: translateY(1px) scale(0.99);
 }
 
 .onboarding-skip-link {
@@ -496,8 +554,14 @@
   .onboarding-bullet,
   .onboarding-footer,
   .onboarding-visual,
+  .onboarding-visual::before,
   .onboarding-visual::after,
-  .onboarding-primary-btn {
+  .onboarding-visual-mark,
+  .onboarding-bullets::after,
+  .onboarding-bullet-index,
+  .onboarding-progress-dot.active,
+  .onboarding-primary-btn,
+  .onboarding-primary-btn::before {
     animation: none;
   }
 }
@@ -557,6 +621,68 @@
   }
 }
 
+@keyframes onboardingRingSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes onboardingMarkPop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes onboardingListSweep {
+  0%,
+  58% {
+    opacity: 0;
+    transform: translateX(-130%);
+  }
+  68% {
+    opacity: 1;
+  }
+  84% {
+    opacity: 0;
+    transform: translateX(330%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(330%);
+  }
+}
+
+@keyframes onboardingIndexPulse {
+  0%,
+  72%,
+  100% {
+    box-shadow: 0 0 0 rgba(143, 184, 255, 0);
+    transform: scale(1);
+  }
+  82% {
+    box-shadow: 0 0 18px rgba(143, 184, 255, 0.18);
+    transform: scale(1.04);
+  }
+}
+
+@keyframes onboardingDotPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 14px rgba(143, 184, 255, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(232, 191, 100, 0.34);
+  }
+}
+
 @keyframes onboardingButtonShine {
   0%,
   100% {
@@ -564,5 +690,24 @@
   }
   50% {
     background-position: 100% 50%;
+  }
+}
+
+@keyframes onboardingButtonSweep {
+  0%,
+  54% {
+    opacity: 0;
+    left: -34%;
+  }
+  62% {
+    opacity: 0.75;
+  }
+  78% {
+    opacity: 0;
+    left: 112%;
+  }
+  100% {
+    opacity: 0;
+    left: 112%;
   }
 }

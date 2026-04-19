@@ -1,64 +1,69 @@
 import { useMemo, useState } from "react";
 
-const ONBOARDING_STEPS = [
-  {
-    id: 0,
-    icon: "S",
-    tone: "scanner",
-    overline: "Быстрый старт",
-    title: "Выберите удобный способ анализа",
-    description: "SonicFX помогает получить сигнал через скриншот, автоматический поток или набор индикаторов.",
-    bullets: [
-      { label: "Сканер", text: "загрузите график и получите AI-разбор" },
-      { label: "Авто режим", text: "пара и рынок ведут live-график" },
-      { label: "Индикаторы", text: "сигнал строится по выбранной стратегии" }
-    ],
-    button: "Продолжить",
-    footnote: "Доступ к функциям открывается после активации аккаунта"
-  },
-  {
-    id: 1,
-    icon: "AI",
-    tone: "auto",
-    overline: "Live сценарий",
-    title: "Следите за сделкой без лишнего шума",
-    description: "Главные данные собраны в одном экране: актив, цена, состояние графика и выбранный режим.",
-    bullets: [
-      { label: "Live график", text: "котировки обновляются в реальном времени" },
-      { label: "Пары и рынки", text: "выбор через удобные карточки" },
-      { label: "Без дублей", text: "подписки переключаются аккуратно" }
-    ],
-    button: "Дальше",
-    footnote: "Все результаты фиксируются автоматически"
-  },
-  {
-    id: 2,
-    icon: "FX",
-    tone: "growth",
-    overline: "Контроль прогресса",
-    title: "Профиль, новости и история под рукой",
-    description: "Переключайте тему, язык, часовой пояс и следите за важными событиями прямо внутри mini app.",
-    bullets: [
-      { label: "Профиль", text: "статус, баланс и основные данные" },
-      { label: "Новости", text: "экономический календарь и рынок" },
-      { label: "Адаптивность", text: "аккуратно на телефоне и ПК" }
-    ],
-    button: "Открыть приложение",
-    footnote: "Профиль, история и статистика обновляются в реальном времени"
-  }
-];
+const FALLBACK_ONBOARDING = {
+  skip: "Пропустить",
+  close: "Закрыть",
+  steps: [
+    {
+      id: 0,
+      icon: "S",
+      tone: "scanner",
+      overline: "Быстрый старт",
+      title: "Выберите удобный способ анализа",
+      description: "SonicFX помогает получить сигнал через скриншот, автоматический поток или набор индикаторов.",
+      bullets: [
+        { label: "Сканер", text: "загрузите график и получите AI-разбор" },
+        { label: "Авто режим", text: "пара и рынок ведут live-график" },
+        { label: "Индикаторы", text: "сигнал строится по выбранной стратегии" }
+      ],
+      button: "Продолжить",
+      footnote: "Доступ к функциям открывается после активации аккаунта"
+    },
+    {
+      id: 1,
+      icon: "AI",
+      tone: "auto",
+      overline: "Live сценарий",
+      title: "Следите за сделкой без лишнего шума",
+      description: "Главные данные собраны в одном экране: актив, цена, состояние графика и выбранный режим.",
+      bullets: [
+        { label: "Live график", text: "котировки обновляются в реальном времени" },
+        { label: "Пары и рынки", text: "выбор через удобные карточки" },
+        { label: "Без дублей", text: "подписки переключаются аккуратно" }
+      ],
+      button: "Дальше",
+      footnote: "Все результаты фиксируются автоматически"
+    },
+    {
+      id: 2,
+      icon: "FX",
+      tone: "growth",
+      overline: "Контроль прогресса",
+      title: "Профиль, новости и история под рукой",
+      description: "Переключайте тему, язык, часовой пояс и следите за важными событиями прямо внутри mini app.",
+      bullets: [
+        { label: "Профиль", text: "статус, баланс и основные данные" },
+        { label: "Новости", text: "экономический календарь и рынок" },
+        { label: "Адаптивность", text: "аккуратно на телефоне и ПК" }
+      ],
+      button: "Открыть приложение",
+      footnote: "Профиль, история и статистика обновляются в реальном времени"
+    }
+  ]
+};
 
-export default function OnboardingScreen({ onFinish }) {
+export default function OnboardingScreen({ t = FALLBACK_ONBOARDING, onFinish }) {
   const [step, setStep] = useState(0);
-  const currentStep = useMemo(() => ONBOARDING_STEPS[step] || ONBOARDING_STEPS[0], [step]);
-  const isLastStep = step >= ONBOARDING_STEPS.length - 1;
+  const steps = useMemo(() => (Array.isArray(t?.steps) && t.steps.length ? t.steps : FALLBACK_ONBOARDING.steps), [t]);
+  const currentStep = useMemo(() => steps[step] || steps[0], [step, steps]);
+  const isLastStep = step >= steps.length - 1;
 
   function handleNext() {
     if (isLastStep) {
       onFinish?.();
       return;
     }
-    setStep((prev) => Math.min(prev + 1, ONBOARDING_STEPS.length - 1));
+    setStep((prev) => Math.min(prev + 1, steps.length - 1));
   }
 
   return (
@@ -93,7 +98,7 @@ export default function OnboardingScreen({ onFinish }) {
         <div className="onboarding-footer">
           <div className="onboarding-progress-wrap">
             <div className="onboarding-progress">
-              {ONBOARDING_STEPS.map((item, index) => (
+              {steps.map((item, index) => (
                 <span
                   key={item.id}
                   className={`onboarding-progress-dot ${index === step ? "active" : ""} ${index < step ? "passed" : ""}`}
@@ -107,7 +112,7 @@ export default function OnboardingScreen({ onFinish }) {
               {currentStep.button}
             </button>
             <button type="button" className="onboarding-skip-link" onClick={onFinish}>
-              {isLastStep ? "Закрыть" : "Пропустить"}
+              {isLastStep ? (t?.close || FALLBACK_ONBOARDING.close) : (t?.skip || FALLBACK_ONBOARDING.skip)}
             </button>
           </div>
 

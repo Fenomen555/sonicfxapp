@@ -31,21 +31,11 @@ const FALLBACK_USER = {
   deposit_amount: 0
 };
 
-const ONBOARDING_STORAGE_KEY = "sonicfx:onboarding:v1";
-
-function shouldShowOnboarding() {
-  try {
-    return window.localStorage?.getItem(ONBOARDING_STORAGE_KEY) !== "done";
-  } catch {
-    return true;
-  }
-}
-
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(FALLBACK_USER);
   const [tab, setTab] = useState("home");
-  const [showOnboarding, setShowOnboarding] = useState(() => shouldShowOnboarding());
+  const [showOnboarding, setShowOnboarding] = useState(true);
   const [isTgWebApp, setIsTgWebApp] = useState(true);
   const [botUsername, setBotUsername] = useState("");
   const [safeAreaTop, setSafeAreaTop] = useState(0);
@@ -197,11 +187,6 @@ export default function App() {
   }, [adminMode]);
 
   function handleOnboardingFinish() {
-    try {
-      window.localStorage?.setItem(ONBOARDING_STORAGE_KEY, "done");
-    } catch {
-      // Telegram WebView can deny storage in rare privacy modes; closing onboarding should still work.
-    }
     setShowOnboarding(false);
   }
 
@@ -264,7 +249,7 @@ export default function App() {
 
       <main className={`app-main ${showOnboarding ? "app-main-onboarding" : ""}`}>
         {showOnboarding ? (
-          <OnboardingScreen onFinish={handleOnboardingFinish} />
+          <OnboardingScreen t={t.onboarding} onFinish={handleOnboardingFinish} />
         ) : (
           <>
             {tab === "news" && <NewsPage t={t} lang={lang} />}

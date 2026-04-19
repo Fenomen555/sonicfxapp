@@ -8,6 +8,57 @@ export const texts = {
       home: "Главная",
       profile: "Профиль"
     },
+    onboarding: {
+      skip: "Пропустить",
+      close: "Закрыть",
+      steps: [
+        {
+          id: 0,
+          icon: "S",
+          tone: "scanner",
+          overline: "Быстрый старт",
+          title: "Выберите удобный способ анализа",
+          description: "SonicFX помогает получить сигнал через скриншот, автоматический поток или набор индикаторов.",
+          bullets: [
+            { label: "Сканер", text: "загрузите график и получите AI-разбор" },
+            { label: "Авто режим", text: "пара и рынок ведут live-график" },
+            { label: "Индикаторы", text: "сигнал строится по выбранной стратегии" }
+          ],
+          button: "Продолжить",
+          footnote: "Доступ к функциям открывается после активации аккаунта"
+        },
+        {
+          id: 1,
+          icon: "AI",
+          tone: "auto",
+          overline: "Live сценарий",
+          title: "Следите за сделкой без лишнего шума",
+          description: "Главные данные собраны в одном экране: актив, цена, состояние графика и выбранный режим.",
+          bullets: [
+            { label: "Live график", text: "котировки обновляются в реальном времени" },
+            { label: "Пары и рынки", text: "выбор через удобные карточки" },
+            { label: "Без дублей", text: "подписки переключаются аккуратно" }
+          ],
+          button: "Дальше",
+          footnote: "Все результаты фиксируются автоматически"
+        },
+        {
+          id: 2,
+          icon: "FX",
+          tone: "growth",
+          overline: "Контроль прогресса",
+          title: "Профиль, новости и история под рукой",
+          description: "Переключайте тему, язык, часовой пояс и следите за важными событиями прямо внутри mini app.",
+          bullets: [
+            { label: "Профиль", text: "статус, баланс и основные данные" },
+            { label: "Новости", text: "экономический календарь и рынок" },
+            { label: "Адаптивность", text: "аккуратно на телефоне и ПК" }
+          ],
+          button: "Открыть приложение",
+          footnote: "Профиль, история и статистика обновляются в реальном времени"
+        }
+      ]
+    },
     home: {
       title: "Загрузите скриншот графика",
       sub: "AI анализ за 30 секунд",
@@ -169,6 +220,57 @@ export const texts = {
       home: "Home",
       profile: "Profile"
     },
+    onboarding: {
+      skip: "Skip",
+      close: "Close",
+      steps: [
+        {
+          id: 0,
+          icon: "S",
+          tone: "scanner",
+          overline: "Quick start",
+          title: "Choose the analysis flow that fits",
+          description: "SonicFX helps you get a signal from a screenshot, an automatic stream, or a set of indicators.",
+          bullets: [
+            { label: "Scanner", text: "upload a chart and get an AI breakdown" },
+            { label: "Auto mode", text: "pair and market drive the live chart" },
+            { label: "Indicators", text: "signal is built from the selected strategy" }
+          ],
+          button: "Continue",
+          footnote: "Feature access opens after account activation"
+        },
+        {
+          id: 1,
+          icon: "AI",
+          tone: "auto",
+          overline: "Live scenario",
+          title: "Track the trade without extra noise",
+          description: "Core data stays on one screen: asset, price, chart state, and selected generation mode.",
+          bullets: [
+            { label: "Live chart", text: "quotes update in real time" },
+            { label: "Pairs and markets", text: "selection works through clean cards" },
+            { label: "No duplicates", text: "subscriptions switch safely" }
+          ],
+          button: "Next",
+          footnote: "Results are saved automatically"
+        },
+        {
+          id: 2,
+          icon: "FX",
+          tone: "growth",
+          overline: "Progress control",
+          title: "Profile, news, and history stay nearby",
+          description: "Switch theme, language, time zone, and follow important events inside the mini app.",
+          bullets: [
+            { label: "Profile", text: "status, balance, and core data" },
+            { label: "News", text: "economic calendar and market flow" },
+            { label: "Adaptive UI", text: "clean on mobile and desktop" }
+          ],
+          button: "Open app",
+          footnote: "Profile, history, and statistics update in real time"
+        }
+      ]
+    },
     home: {
       title: "Upload chart screenshot",
       sub: "AI analysis in 30 seconds",
@@ -329,6 +431,57 @@ export const texts = {
       news: "Новини",
       home: "Головна",
       profile: "Профіль"
+    },
+    onboarding: {
+      skip: "Пропустити",
+      close: "Закрити",
+      steps: [
+        {
+          id: 0,
+          icon: "S",
+          tone: "scanner",
+          overline: "Швидкий старт",
+          title: "Оберіть зручний спосіб аналізу",
+          description: "SonicFX допомагає отримати сигнал через скріншот, автоматичний потік або набір індикаторів.",
+          bullets: [
+            { label: "Сканер", text: "завантажте графік і отримайте AI-розбір" },
+            { label: "Авто режим", text: "пара і ринок ведуть live-графік" },
+            { label: "Індикатори", text: "сигнал будується за вибраною стратегією" }
+          ],
+          button: "Продовжити",
+          footnote: "Доступ до функцій відкривається після активації акаунта"
+        },
+        {
+          id: 1,
+          icon: "AI",
+          tone: "auto",
+          overline: "Live сценарій",
+          title: "Стежте за угодою без зайвого шуму",
+          description: "Головні дані зібрані на одному екрані: актив, ціна, стан графіка і вибраний режим.",
+          bullets: [
+            { label: "Live графік", text: "котирування оновлюються в реальному часі" },
+            { label: "Пари і ринки", text: "вибір працює через зручні картки" },
+            { label: "Без дублів", text: "підписки перемикаються акуратно" }
+          ],
+          button: "Далі",
+          footnote: "Усі результати фіксуються автоматично"
+        },
+        {
+          id: 2,
+          icon: "FX",
+          tone: "growth",
+          overline: "Контроль прогресу",
+          title: "Профіль, новини та історія поруч",
+          description: "Перемикайте тему, мову, часовий пояс і стежте за важливими подіями всередині mini app.",
+          bullets: [
+            { label: "Профіль", text: "статус, баланс і основні дані" },
+            { label: "Новини", text: "економічний календар і ринок" },
+            { label: "Адаптивність", text: "акуратно на телефоні та ПК" }
+          ],
+          button: "Відкрити застосунок",
+          footnote: "Профіль, історія і статистика оновлюються в реальному часі"
+        }
+      ]
     },
     home: {
       title: "Завантажте скріншот графіка",

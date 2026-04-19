@@ -205,6 +205,7 @@ export const texts = {
       appearanceHint: "Язык и тема применяются сразу, чтобы ты видел результат вживую.",
       avatarHint: "Аватар и данные Telegram автоматически обновляются при открытии Mini App.",
       quickActions: "Быстрые действия",
+      actionSoon: "Раздел скоро появится в приложении.",
       actions: {
         history: "История",
         faq: "FAQ",
@@ -465,6 +466,7 @@ export const texts = {
       appearanceHint: "Language and theme update instantly so you can preview the result.",
       avatarHint: "Telegram avatar and account data are refreshed automatically when the Mini App opens.",
       quickActions: "Quick actions",
+      actionSoon: "This section will appear in the app soon.",
       actions: {
         history: "History",
         faq: "FAQ",
@@ -725,6 +727,7 @@ export const texts = {
       appearanceHint: "Мова і тема змінюються одразу, щоб ти бачив результат наживо.",
       avatarHint: "Аватар і дані Telegram автоматично оновлюються під час відкриття Mini App.",
       quickActions: "Швидкі дії",
+      actionSoon: "Розділ скоро з'явиться в застосунку.",
       actions: {
         history: "Історія",
         faq: "FAQ",

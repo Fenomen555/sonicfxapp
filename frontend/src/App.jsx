@@ -38,6 +38,7 @@ export default function App() {
   const [user, setUser] = useState(FALLBACK_USER);
   const [tab, setTab] = useState("home");
   const [showOnboarding, setShowOnboarding] = useState(true);
+  const [manualOnboarding, setManualOnboarding] = useState(false);
   const [isTgWebApp, setIsTgWebApp] = useState(true);
   const [botUsername, setBotUsername] = useState("");
   const [safeAreaTop, setSafeAreaTop] = useState(0);
@@ -152,6 +153,7 @@ export default function App() {
           theme: normalizeTheme(profile?.theme),
           lang: normalizeLang(profile?.lang)
         });
+        setManualOnboarding(false);
         setShowOnboarding(!Number(profile?.onboarding_seen || 0));
       } catch {
         if (!isActive) return;
@@ -219,6 +221,10 @@ export default function App() {
 
   async function handleOnboardingFinish() {
     setShowOnboarding(false);
+    if (manualOnboarding) {
+      setManualOnboarding(false);
+      return;
+    }
     try {
       const result = await apiFetchJson("/api/user/onboarding/seen", { method: "POST" });
       if (result?.user) {
@@ -234,6 +240,11 @@ export default function App() {
     } catch {
       setUser((prev) => ({ ...prev, onboarding_seen: 1 }));
     }
+  }
+
+  function openOnboardingFromProfile() {
+    setManualOnboarding(true);
+    setShowOnboarding(true);
   }
 
   if (isLoading) return <div className="loading-screen">Loading...</div>;
@@ -310,6 +321,7 @@ export default function App() {
                 onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
                 onThemePreview={(theme) => setUser((prev) => ({ ...prev, theme: normalizeTheme(theme) }))}
                 onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: normalizeLang(nextLang) }))}
+                onOpenOnboarding={openOnboardingFromProfile}
               />
             )}
           </>

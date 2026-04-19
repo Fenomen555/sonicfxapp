@@ -5,6 +5,7 @@ import profileHistoryIcon from "../assets/profile-history.png";
 import profileNotificationsIcon from "../assets/profile-notifications.png";
 import profileSupportIcon from "../assets/profile-support.png";
 import { apiFetchJson } from "../lib/api";
+import { getIndicatorMeta } from "../lib/indicatorMeta";
 
 const TIMEZONE_OPTIONS = [
   { id: "Europe/Kiev", city: "Kyiv", flag: "UA" },
@@ -24,6 +25,179 @@ const PROFILE_BOTTOM_ACTIONS = [
   { key: "support", fallback: "Поддержка", image: profileSupportIcon },
   { key: "notifications", fallback: "Уведомления", image: profileNotificationsIcon }
 ];
+
+const FAQ_INDICATORS = [
+  {
+    code: "rsi",
+    description: "Оценивает скорость и силу движения цены. Помогает замечать перегрев, ослабление импульса и дивергенции, но лучше работает вместе с трендом и уровнями."
+  },
+  {
+    code: "stochastic_oscillator",
+    description: "Показывает, где закрытие находится относительно недавнего диапазона. Полезен для поиска разворотов внутри боковика и откатов по тренду."
+  },
+  {
+    code: "cci",
+    description: "Сравнивает типичную цену со средней и показывает отклонение от нормального диапазона. Помогает видеть импульс, экстремумы и смену темпа."
+  },
+  {
+    code: "williams_r",
+    description: "Быстрый осциллятор перекупленности и перепроданности. Показывает положение закрытия относительно максимумов и минимумов выбранного периода."
+  },
+  {
+    code: "macd",
+    description: "Сравнивает быстрые и медленные EMA, чтобы показать трендовый импульс. Важны пересечения, гистограмма и расхождения с ценой."
+  },
+  {
+    code: "ema_9_50_200",
+    description: "Набор экспоненциальных средних для чтения короткого, среднего и долгого тренда. Стек EMA помогает понять направление и зоны отката."
+  },
+  {
+    code: "adx",
+    description: "Измеряет силу тренда, а не его направление. Вместе с DI+ и DI- помогает отличать трендовый рынок от шума."
+  },
+  {
+    code: "atr",
+    description: "Показывает средний реальный диапазон и текущую волатильность. Нужен для фильтра шума, оценки риска и размера защитного буфера."
+  },
+  {
+    code: "bollinger_bands",
+    description: "Волатильностный канал вокруг средней. Сжатие часто говорит о накоплении энергии, а касания границ помогают оценивать экстремумы."
+  },
+  {
+    code: "keltner_channel",
+    description: "Канал вокруг EMA, построенный через ATR. Хорошо показывает трендовые коридоры, пробои и откаты к средней линии."
+  },
+  {
+    code: "supertrend",
+    description: "Трендовый overlay на базе волатильности. Переключение линии помогает быстро видеть смену направления и рабочую сторону рынка."
+  },
+  {
+    code: "parabolic_sar",
+    description: "Точки Stop and Reverse помогают сопровождать тренд и видеть потенциальную смену направления. В боковике может давать много ложных сигналов."
+  },
+  {
+    code: "vortex",
+    description: "Сравнивает восходящее и нисходящее движение через линии VI+ и VI-. Помогает замечать зарождение или ослабление тренда."
+  },
+  {
+    code: "momentum",
+    description: "Показывает скорость изменения цены относительно прошлого значения. Полезен для оценки ускорения, затухания и подтверждения импульса."
+  },
+  {
+    code: "rate_of_change",
+    description: "Процентное изменение цены за выбранный период. Помогает видеть силу импульса и моменты, когда движение начинает выдыхаться."
+  }
+];
+
+function getFaqCopy(lang, t) {
+  const modeDisclaimer = t.home?.modeInfoDisclaimer || "Сигнал носит информационный характер и не является гарантией результата сделки.";
+  const ru = {
+    title: "FAQ",
+    subtitle: "Короткие подсказки по SonicFX, режимам, индикаторам и новостям.",
+    close: "Закрыть",
+    back: "Назад",
+    openTour: "Открыть обучение",
+    readMore: "Подробнее",
+    indicatorList: "Список индикаторов",
+    howItHelps: "Как использовать",
+    indicatorUseLine: "Фильтрует рыночное состояние и помогает понять, где тренд, импульс или волатильность подтверждают сценарий.",
+    riskNote: modeDisclaimer,
+    cards: {
+      sonic: {
+        title: "SonicFX",
+        subtitle: "Быстрый тур по приложению",
+        body: "Откройте онбординг заново: он покажет основные сценарии, даже если пользователь уже проходил обучение."
+      },
+      scanner: {
+        title: t.home?.scannerInfoTitle || "SonicFX Scanner",
+        subtitle: t.home?.signalModeScannerHint || "AI анализ графика",
+        body: t.home?.scannerInfoBody || "Добавьте скриншот графика или ссылку на изображение, чтобы алгоритм разобрал структуру цены."
+      },
+      auto: {
+        title: t.home?.autoInfoTitle || "SonicFX Auto",
+        subtitle: t.home?.signalModeAutomaticHint || "Поток сигналов Live",
+        body: t.home?.autoInfoBody || "Live-график анализируется в реальном времени с учетом текущего движения цены."
+      },
+      indicators: {
+        title: t.home?.indicatorsInfoTitle || "SonicFX Indicators",
+        subtitle: t.home?.signalModeIndicatorsHint || "Точные сигналы по индикаторам",
+        body: t.home?.indicatorsInfoBody || "Выберите индикатор, тикер и экспирацию, чтобы построить сигнал по выбранной стратегии."
+      },
+      news: {
+        title: "Новости",
+        subtitle: "Календарь и рынок",
+        body: "Раздел помогает заранее видеть события, которые могут резко усилить волатильность: ставки, инфляцию, занятость, выступления регуляторов и важные рыночные заголовки."
+      }
+    },
+    newsGuide: [
+      "Сначала смотрите время события и валюту: новости по USD сильнее влияют на пары с долларом, по EUR - на евро-пары.",
+      "Перед важным событием рынок часто становится резким: лучше снижать риск и не открывать сигнал вслепую прямо на публикации.",
+      "После выхода новости сравните факт, прогноз и предыдущее значение: сильное отклонение часто дает импульс, но первые минуты могут быть шумными."
+    ],
+    indicatorGuide: [
+      "Индикатор не должен быть единственной причиной входа.",
+      "Сильнее всего сигнал, когда индикатор совпадает с трендом, уровнем и поведением свечей.",
+      "Если несколько индикаторов показывают одно и то же состояние рынка, уверенность сценария выше."
+    ]
+  };
+
+  if (lang === "en") {
+    return {
+      ...ru,
+      title: "FAQ",
+      subtitle: "Short guides for SonicFX, modes, indicators, and news.",
+      close: "Close",
+      back: "Back",
+      openTour: "Open tour",
+      readMore: "Details",
+      indicatorList: "Indicator list",
+      howItHelps: "How to use it",
+      indicatorUseLine: "It filters market state and helps understand where trend, momentum or volatility confirms the scenario.",
+      cards: {
+        ...ru.cards,
+        sonic: { title: "SonicFX", subtitle: "Quick product tour", body: "Open onboarding again without changing the saved completion flag." },
+        news: { title: "News", subtitle: "Calendar and market", body: "The section highlights events that may increase volatility: rates, inflation, jobs data, central-bank speeches, and important market headlines." }
+      },
+      newsGuide: [
+        "Check event time and currency first: USD news affects dollar pairs most directly.",
+        "Around major releases volatility can spike, so avoid blind entries at the exact publication moment.",
+        "Compare actual, forecast and previous values; a strong surprise can create impulse, but the first minutes may be noisy."
+      ],
+      indicatorGuide: [
+        "Do not use a single indicator as the only reason to enter.",
+        "Signals are stronger when the indicator agrees with trend, level and candles.",
+        "When several tools describe the same market state, the scenario is more reliable."
+      ]
+    };
+  }
+
+  if (lang === "uk") {
+    return {
+      ...ru,
+      title: "FAQ",
+      subtitle: "Короткі підказки по SonicFX, режимах, індикаторах і новинах.",
+      close: "Закрити",
+      back: "Назад",
+      openTour: "Відкрити навчання",
+      readMore: "Докладніше",
+      indicatorList: "Список індикаторів",
+      howItHelps: "Як використовувати",
+      indicatorUseLine: "Фільтрує ринковий стан і допомагає зрозуміти, де тренд, імпульс або волатильність підтверджують сценарій.",
+      cards: {
+        ...ru.cards,
+        sonic: { title: "SonicFX", subtitle: "Швидкий тур застосунком", body: "Відкрийте онбординг повторно: це не змінює позначку, що навчання вже пройдено." },
+        news: { title: "Новини", subtitle: "Календар і ринок", body: "Розділ допомагає бачити події, які можуть різко підсилити волатильність: ставки, інфляцію, зайнятість, виступи регуляторів і важливі ринкові заголовки." }
+      },
+      newsGuide: [
+        "Спочатку дивіться час події та валюту: новини по USD найсильніше впливають на пари з доларом.",
+        "Перед важливою публікацією ринок часто стає різким, тому краще зменшувати ризик.",
+        "Після виходу порівнюйте факт, прогноз і попереднє значення: сильне відхилення може дати імпульс, але перші хвилини бувають шумними."
+      ]
+    };
+  }
+
+  return ru;
+}
 
 function getInitials(user, fallback) {
   const source = [user?.first_name, user?.last_name, user?.tg_username].filter(Boolean).join(" ").trim();
@@ -99,13 +273,15 @@ function getStatusMeta(tier, t) {
   };
 }
 
-export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePreview, onLangPreview }) {
+export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePreview, onLangPreview, onOpenOnboarding }) {
   const [lang, setLang] = useState(user?.lang || "ru");
   const [theme, setTheme] = useState(user?.theme || "dark");
   const [timezone, setTimezone] = useState(user?.timezone || "Europe/Kiev");
   const [saving, setSaving] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isTimezoneExpanded, setIsTimezoneExpanded] = useState(false);
+  const [faqView, setFaqView] = useState("closed");
+  const [selectedFaqIndicator, setSelectedFaqIndicator] = useState("");
   const settingsRequestRef = useRef(0);
 
   useEffect(() => {
@@ -160,6 +336,19 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     });
   };
 
+  const handleProfileAction = (key) => {
+    if (key === "faq") {
+      setFaqView("home");
+      setSelectedFaqIndicator("");
+      return;
+    }
+    notify?.({
+      type: "info",
+      title: t.profile?.actions?.[key] || key,
+      message: t.profile?.actionSoon || "Раздел скоро появится в приложении."
+    });
+  };
+
   const languageOptions = useMemo(
     () => [
       { id: "ru", label: t.profile.langRu || "Русский", flag: "RU" },
@@ -202,6 +391,53 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
       label: t.profile?.actions?.[item.key] || item.fallback
     }))
   }), [t.profile?.actions]);
+
+  const faqCopy = useMemo(() => getFaqCopy(lang, t), [lang, t]);
+  const faqIndicators = useMemo(
+    () => FAQ_INDICATORS.map((item) => ({
+      ...item,
+      meta: getIndicatorMeta(item.code)
+    })),
+    []
+  );
+  const selectedIndicatorInfo = useMemo(
+    () => faqIndicators.find((item) => item.code === selectedFaqIndicator) || null,
+    [faqIndicators, selectedFaqIndicator]
+  );
+  const faqCards = useMemo(
+    () => [
+      { id: "sonic", marker: "SF", ...faqCopy.cards.sonic },
+      { id: "scanner", marker: "SCN", ...faqCopy.cards.scanner },
+      { id: "auto", marker: "AUTO", ...faqCopy.cards.auto },
+      { id: "indicators", marker: "IND", ...faqCopy.cards.indicators },
+      { id: "news", marker: "NEWS", ...faqCopy.cards.news }
+    ],
+    [faqCopy]
+  );
+
+  const handleFaqCardClick = (id) => {
+    if (id === "sonic") {
+      onOpenOnboarding?.();
+      return;
+    }
+    if (id === "indicators") {
+      setFaqView("indicators");
+      setSelectedFaqIndicator("");
+      return;
+    }
+    setFaqView(id);
+    setSelectedFaqIndicator("");
+  };
+
+  const handleFaqBack = () => {
+    if (faqView === "indicator") {
+      setFaqView("indicators");
+      setSelectedFaqIndicator("");
+      return;
+    }
+    setFaqView("home");
+    setSelectedFaqIndicator("");
+  };
 
   const beginSettingsRequest = () => {
     settingsRequestRef.current += 1;
@@ -324,7 +560,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
 
       <div className="profile-action-grid profile-action-grid-top" aria-label={t.profile.quickActions || "Быстрые действия"}>
         {profileActions.top.map((item) => (
-          <button type="button" className="profile-action-tile" key={item.key}>
+          <button type="button" className="profile-action-tile" key={item.key} onClick={() => handleProfileAction(item.key)}>
             <span className="profile-action-icon">
               {item.image ? <img src={item.image} alt="" draggable="false" /> : item.icon}
             </span>
@@ -335,7 +571,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
 
       <div className="profile-action-grid profile-action-grid-bottom" aria-label={t.profile.quickActions || "Быстрые действия"}>
         {profileActions.bottom.map((item) => (
-          <button type="button" className="profile-action-tile" key={item.key}>
+          <button type="button" className="profile-action-tile" key={item.key} onClick={() => handleProfileAction(item.key)}>
             <span className="profile-action-icon">
               {item.image ? <img src={item.image} alt="" draggable="false" /> : item.icon}
             </span>
@@ -343,6 +579,125 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
           </button>
         ))}
       </div>
+
+      {faqView !== "closed" && (
+        <section className="card profile-faq-panel" aria-label={faqCopy.title}>
+          <div className="profile-faq-head">
+            <span className="profile-faq-kicker">{faqCopy.title}</span>
+            <strong>
+              {faqView === "home"
+                ? faqCopy.subtitle
+                : faqView === "indicators"
+                ? faqCopy.indicatorList
+                : faqView === "indicator" && selectedIndicatorInfo
+                ? selectedIndicatorInfo.meta.title
+                : faqCopy.cards[faqView]?.title || faqCopy.title}
+            </strong>
+            <div className="profile-faq-controls">
+              {faqView !== "home" && (
+                <button type="button" className="profile-faq-ghost-btn" onClick={handleFaqBack}>
+                  {faqCopy.back}
+                </button>
+              )}
+              <button
+                type="button"
+                className="profile-faq-ghost-btn"
+                onClick={() => {
+                  setFaqView("closed");
+                  setSelectedFaqIndicator("");
+                }}
+              >
+                {faqCopy.close}
+              </button>
+            </div>
+          </div>
+
+          {faqView === "home" && (
+            <div className="profile-faq-grid">
+              {faqCards.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`profile-faq-card profile-faq-card-${item.id}`}
+                  onClick={() => handleFaqCardClick(item.id)}
+                >
+                  <span className="profile-faq-marker">{item.marker}</span>
+                  <span className="profile-faq-card-copy">
+                    <strong>{item.title}</strong>
+                    <small>{item.subtitle}</small>
+                    <span>{item.body}</span>
+                  </span>
+                  <em>{item.id === "sonic" ? faqCopy.openTour : faqCopy.readMore}</em>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {(faqView === "scanner" || faqView === "auto") && (
+            <div className="profile-faq-detail">
+              <span className="profile-faq-marker large">{faqView === "scanner" ? "SCN" : "AUTO"}</span>
+              <h3>{faqCopy.cards[faqView].title}</h3>
+              <p>{faqCopy.cards[faqView].body}</p>
+              <div className="profile-faq-warning">{faqCopy.riskNote}</div>
+            </div>
+          )}
+
+          {faqView === "news" && (
+            <div className="profile-faq-detail">
+              <span className="profile-faq-marker large">NEWS</span>
+              <h3>{faqCopy.cards.news.title}</h3>
+              <p>{faqCopy.cards.news.body}</p>
+              <div className="profile-faq-note-list">
+                {faqCopy.newsGuide.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+              <div className="profile-faq-warning">{faqCopy.riskNote}</div>
+            </div>
+          )}
+
+          {faqView === "indicators" && (
+            <div className="profile-faq-indicators">
+              <div className="profile-faq-note-list">
+                {faqCopy.indicatorGuide.map((item) => (
+                  <span key={item}>{item}</span>
+                ))}
+              </div>
+              <div className="profile-faq-indicator-grid">
+                {faqIndicators.map((item) => (
+                  <button
+                    type="button"
+                    key={item.code}
+                    className="profile-faq-indicator-card"
+                    onClick={() => {
+                      setSelectedFaqIndicator(item.code);
+                      setFaqView("indicator");
+                    }}
+                  >
+                    <span className={`indicator-inline-code tone-${item.meta.tone}`}>{item.meta.short}</span>
+                    <strong>{item.meta.title}</strong>
+                    <small>{item.description}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {faqView === "indicator" && selectedIndicatorInfo && (
+            <div className="profile-faq-detail">
+              <span className={`indicator-inline-code tone-${selectedIndicatorInfo.meta.tone}`}>
+                {selectedIndicatorInfo.meta.short}
+              </span>
+              <h3>{selectedIndicatorInfo.meta.title}</h3>
+              <p>{selectedIndicatorInfo.description}</p>
+              <div className="profile-faq-note-list">
+                <span>{faqCopy.howItHelps}: {faqCopy.indicatorUseLine}</span>
+                <span>{faqCopy.riskNote}</span>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="card profile-section profile-settings-shell">
         <div className="profile-section-head">

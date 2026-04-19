@@ -1126,7 +1126,6 @@ export default function HomePage({ t, notify }) {
                 <SelectedModeIcon />
               </span>
               <div className="mode-info-copy">
-                <span>{t.home.infoActionTitle || "Инфо"}</span>
                 <strong>{activeModeInfo.title}</strong>
                 <small>{selectedMode.hint}</small>
               </div>

@@ -143,6 +143,7 @@ export default function HomePage({ t, notify }) {
   const [availableMarkets, setAvailableMarkets] = useState([]);
   const [isActionSheetOpen, setIsActionSheetOpen] = useState(false);
   const [isLinkSheetOpen, setIsLinkSheetOpen] = useState(false);
+  const [isInfoSheetOpen, setIsInfoSheetOpen] = useState(false);
   const [linkInputValue, setLinkInputValue] = useState("");
   const [deviceProfile, setDeviceProfile] = useState(() => getDeviceProfile());
   const [pickerSheet, setPickerSheet] = useState(null);
@@ -426,6 +427,21 @@ export default function HomePage({ t, notify }) {
   const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
   const selectedMode = signalModes.find((item) => item.id === signalMode) || signalModes[0];
   const SelectedModeIcon = selectedMode.icon;
+  const selectedModeInfo = useMemo(() => ({
+    scanner: {
+      title: t.home.scannerInfoTitle || "SonicFX Scanner",
+      body: t.home.scannerInfoBody || "Add a chart screenshot or image link. The algorithm will run technical analysis, detect market dynamics and build a signal from price structure and key levels."
+    },
+    automatic: {
+      title: t.home.autoInfoTitle || "SonicFX Auto",
+      body: t.home.autoInfoBody || "The live chart is processed in real time. The system analyzes price movement, market structure and key zones, forming signals when suitable conditions appear."
+    },
+    indicators: {
+      title: t.home.indicatorsInfoTitle || "SonicFX Indicators",
+      body: t.home.indicatorsInfoBody || "Configure indicators, ticker and expiration. The algorithm analyzes the market with selected tools and forms a recommendation from the current price structure."
+    }
+  }), [t.home]);
+  const activeModeInfo = selectedModeInfo[signalMode] || selectedModeInfo.scanner;
   const isIndicatorsMode = signalMode === "indicators";
   const selectedPairMeta = pairs.find((item) => item?.pair === asset) || null;
   const selectedExpirationMeta = expirations.find((item) => item?.value === expiration) || null;
@@ -1031,11 +1047,7 @@ export default function HomePage({ t, notify }) {
         <button
           type="button"
           className="home-quick-action analysis-side-action"
-          onClick={() => notify?.({
-            type: "info",
-            title: t.home.infoActionTitle || "Инфо",
-            message: t.home.infoActionMessage || "Здесь будет краткая справка по выбранному режиму."
-          })}
+          onClick={() => setIsInfoSheetOpen(true)}
           aria-label={t.home.infoActionTitle || "Инфо"}
         >
           <img src={homeInfoIcon} alt="" loading="lazy" aria-hidden="true" />
@@ -1098,6 +1110,37 @@ export default function HomePage({ t, notify }) {
 
         {errorText && <div className="form-error">{errorText}</div>}
       </div>
+
+      {isInfoSheetOpen && (
+        <div className="action-sheet-layer" role="presentation">
+          <button
+            className="action-sheet-backdrop"
+            type="button"
+            aria-label={t.home.close || "Close"}
+            onClick={() => setIsInfoSheetOpen(false)}
+          />
+          <div className="action-sheet mode-info-sheet" role="dialog" aria-modal="true" aria-label={activeModeInfo.title}>
+            <div className="action-sheet-handle" aria-hidden="true" />
+            <div className="mode-info-hero">
+              <span className="mode-info-icon" aria-hidden="true">
+                <SelectedModeIcon />
+              </span>
+              <div className="mode-info-copy">
+                <span>{t.home.infoActionTitle || "Инфо"}</span>
+                <strong>{activeModeInfo.title}</strong>
+                <small>{selectedMode.hint}</small>
+              </div>
+            </div>
+            <p className="mode-info-text">{activeModeInfo.body}</p>
+            <div className="mode-info-disclaimer">
+              {t.home.modeInfoDisclaimer || "Сигнал носит информационный характер и не является гарантией результата сделки."}
+            </div>
+            <button className="action-sheet-close" type="button" onClick={() => setIsInfoSheetOpen(false)}>
+              {t.home.close || "Close"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {isActionSheetOpen && (
         <div className="action-sheet-layer" role="presentation">

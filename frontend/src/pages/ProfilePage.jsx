@@ -103,8 +103,6 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   const [lang, setLang] = useState(user?.lang || "ru");
   const [theme, setTheme] = useState(user?.theme || "dark");
   const [timezone, setTimezone] = useState(user?.timezone || "Europe/Kiev");
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusTone, setStatusTone] = useState("success");
   const [saving, setSaving] = useState(false);
   const [avatarFailed, setAvatarFailed] = useState(false);
   const [isTimezoneExpanded, setIsTimezoneExpanded] = useState(false);
@@ -155,8 +153,6 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   );
 
   const handleUpgradeStatus = () => {
-    setStatusTone("success");
-    setStatusMessage(t.profile.upgradeStatusSoon || "Скоро здесь появится апгрейд статуса.");
     notify?.({
       type: "info",
       title: t.profile.upgradeStatus || "Повысить статус",
@@ -219,8 +215,6 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     });
     if (requestId === settingsRequestRef.current) {
       onUserUpdate?.(data?.user || user);
-      setStatusTone("success");
-      setStatusMessage(successMessage || t.profile.saved || "Настройки сохранены");
       notify?.({
         type: "success",
         title: t.profile.saved || "Настройки сохранены",
@@ -235,15 +229,12 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     const requestId = beginSettingsRequest();
     setTheme(nextTheme);
     onThemePreview?.(nextTheme);
-    setStatusMessage("");
     try {
       await saveSettings({ theme: nextTheme }, t.profile.saved || "Настройки сохранены", requestId);
     } catch (error) {
       if (requestId === settingsRequestRef.current) {
         setTheme(user?.theme || "dark");
         onThemePreview?.(user?.theme || "dark");
-        setStatusTone("error");
-        setStatusMessage(error.message || "Failed");
         notify?.({
           type: "error",
           title: t.profile.settingsErrorToast || "Не удалось сохранить настройки",
@@ -258,15 +249,12 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     const requestId = beginSettingsRequest();
     setLang(nextLang);
     onLangPreview?.(nextLang);
-    setStatusMessage("");
     try {
       await saveSettings({ lang: nextLang }, t.profile.saved || "Настройки сохранены", requestId);
     } catch (error) {
       if (requestId === settingsRequestRef.current) {
         setLang(user?.lang || "ru");
         onLangPreview?.(user?.lang || "ru");
-        setStatusTone("error");
-        setStatusMessage(error.message || "Failed");
         notify?.({
           type: "error",
           title: t.profile.settingsErrorToast || "Не удалось сохранить настройки",
@@ -279,13 +267,10 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   const handleSave = async () => {
     const requestId = beginSettingsRequest();
     setSaving(true);
-    setStatusMessage("");
     try {
       await saveSettings({ lang, theme, timezone }, t.profile.saved || "Настройки сохранены", requestId);
     } catch (error) {
       if (requestId === settingsRequestRef.current) {
-        setStatusTone("error");
-        setStatusMessage(error.message || "Failed");
         notify?.({
           type: "error",
           title: t.profile.settingsErrorToast || "Не удалось сохранить настройки",
@@ -465,7 +450,6 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
         <button className="primary-btn profile-save-btn" onClick={handleSave} disabled={saving}>
           {saving ? (t.profile.saving || "Saving...") : (t.profile.save || "Save")}
         </button>
-        {statusMessage && <div className={`form-status ${statusTone}`}>{statusMessage}</div>}
       </div>
     </section>
   );

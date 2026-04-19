@@ -324,6 +324,7 @@ def _serialize_scan_upload(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, 
         "file_path": row.get("file_path") or "",
         "public_path": row.get("public_path") or "",
         "source_url": row.get("source_url") or "",
+        "is_current": bool(row.get("is_current", 1)),
         "created_at": created_at.isoformat() if created_at else None,
     }
 
@@ -343,11 +344,15 @@ async def _record_scan_upload(
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(
+                "UPDATE scan_uploads SET is_current = 0 WHERE user_id = %s AND is_current = 1",
+                (int(user_id),),
+            )
+            await cur.execute(
                 """
                 INSERT INTO scan_uploads (
                     user_id, source_type, original_name, content_type, file_size,
-                    file_path, public_path, source_url
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    file_path, public_path, source_url, is_current
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
                 """,
                 (
                     int(user_id),
@@ -1182,7 +1187,7 @@ async def get_latest_scan_upload(user: Dict[str, Any] = Depends(get_telegram_use
                 """
                 SELECT *
                 FROM scan_uploads
-                WHERE user_id = %s
+                WHERE user_id = %s AND is_current = 1
                 ORDER BY created_at DESC, id DESC
                 LIMIT 1
                 """,
@@ -1190,6 +1195,20 @@ async def get_latest_scan_upload(user: Dict[str, Any] = Depends(get_telegram_use
             )
             row = await cur.fetchone()
     return {"file": _serialize_scan_upload(row)}
+
+
+@app.delete("/api/upload/scan/latest")
+async def reset_latest_scan_upload(user: Dict[str, Any] = Depends(get_telegram_user)):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "UPDATE scan_uploads SET is_current = 0 WHERE user_id = %s AND is_current = 1",
+                (user_id,),
+            )
+    return {"status": "success", "file": None}
 
 
 @app.post("/api/upload/scan")

@@ -11,7 +11,7 @@ import {
 import lightningCtaIcon from "../assets/cta-lightning.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
 import UploadScanAnimation from "../components/UploadScanAnimation";
-import { apiFetchJson } from "../lib/api";
+import { apiFetch, apiFetchJson } from "../lib/api";
 import { getDeviceProfile } from "../lib/device";
 import { getIndicatorMeta } from "../lib/indicatorMeta";
 import { QuoteStreamClient } from "../lib/quoteStream";
@@ -156,6 +156,7 @@ export default function HomePage({ t }) {
   const [quotePayload, setQuotePayload] = useState(null);
   const [quoteRenderReady, setQuoteRenderReady] = useState(false);
   const [scanUploadState, setScanUploadState] = useState({ status: "idle", file: null, detail: "" });
+  const [scanPreview, setScanPreview] = useState({ url: "", status: "idle" });
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const quoteClientRef = useRef(null);
@@ -251,6 +252,46 @@ export default function HomePage({ t }) {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    let objectUrl = "";
+    const publicPath = scanUploadState.file?.public_path || "";
+
+    if (scanUploadState.status !== "success" || !publicPath) {
+      setScanPreview({ url: "", status: "idle" });
+      return undefined;
+    }
+
+    async function loadPreview() {
+      setScanPreview({ url: "", status: "loading" });
+      try {
+        const response = await apiFetch(publicPath);
+        if (!response.ok) {
+          throw new Error("Preview request failed");
+        }
+
+        const blob = await response.blob();
+        if (!isActive) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setScanPreview({ url: objectUrl, status: "ready" });
+      } catch (_error) {
+        if (isActive) {
+          setScanPreview({ url: "", status: "error" });
+        }
+      }
+    }
+
+    loadPreview();
+
+    return () => {
+      isActive = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [scanUploadState.file?.public_path, scanUploadState.status]);
 
   useEffect(() => {
     let isActive = true;
@@ -727,7 +768,24 @@ export default function HomePage({ t }) {
     }
   }
 
+  function replaceScanUpload() {
+    if (scanUploadState.status === "uploading") return;
+    setIsActionSheetOpen(true);
+  }
+
+  async function resetScanUpload() {
+    if (scanUploadState.status === "uploading") return;
+    setErrorText("");
+    try {
+      await apiFetchJson("/api/upload/scan/latest", { method: "DELETE" });
+    } catch (_error) {
+      // The local reset still keeps the interface usable if the server is temporarily unavailable.
+    }
+    setScanUploadState({ status: "idle", file: null, detail: "" });
+  }
+
   const scanUploadFileLabel = scanUploadState.file?.original_name || scanUploadState.file?.public_path || "";
+  const hasScanUploadPreview = !isIndicatorsMode && scanUploadState.status === "success" && Boolean(scanUploadState.file);
   const scanUploadTitle = scanUploadState.status === "uploading"
     ? (t.home.uploadingFile || "Uploading file...")
     : scanUploadState.status === "success"
@@ -786,6 +844,42 @@ export default function HomePage({ t }) {
             payload={quoteRenderReady ? quotePayload : null}
             state={quoteState}
           />
+        </div>
+      ) : hasScanUploadPreview ? (
+        <div className="upload-zone upload-zone-preview">
+          <span className="frame-corner tl" />
+          <span className="frame-corner tr" />
+          <span className="frame-corner bl" />
+          <span className="frame-corner br" />
+
+          <div className="upload-preview-media">
+            {scanPreview.url ? (
+              <img
+                src={scanPreview.url}
+                alt={t.home.uploadPreviewAlt || "Uploaded chart"}
+              />
+            ) : (
+              <div className={`upload-preview-placeholder ${scanPreview.status === "error" ? "error" : ""}`}>
+                {scanPreview.status === "error"
+                  ? (t.home.uploadPreviewUnavailable || "Preview unavailable")
+                  : (t.home.uploadPreviewLoading || "Preparing preview...")}
+              </div>
+            )}
+          </div>
+
+          <div className="upload-preview-info">
+            <strong>{t.home.uploadPreviewTitle || "Chart uploaded"}</strong>
+            <small>{scanUploadFileLabel || t.home.uploadPreviewHint || "Ready for analysis"}</small>
+          </div>
+
+          <div className="upload-preview-actions">
+            <button className="upload-preview-btn replace" type="button" onClick={replaceScanUpload}>
+              {t.home.replaceUpload || "Replace"}
+            </button>
+            <button className="upload-preview-btn reset" type="button" onClick={resetScanUpload}>
+              {t.home.resetUpload || "Reset"}
+            </button>
+          </div>
         </div>
       ) : (
         <button

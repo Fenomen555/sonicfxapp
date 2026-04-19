@@ -336,6 +336,115 @@
   color: rgba(197, 213, 243, 0.82);
 }
 
+.upload-zone-preview {
+  display: grid;
+  gap: 13px;
+  padding: 18px;
+  cursor: default;
+  text-align: left;
+}
+
+.upload-preview-media,
+.upload-preview-info,
+.upload-preview-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.upload-preview-media {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 170px;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(137, 166, 219, 0.18);
+  background:
+    radial-gradient(circle at 50% 15%, rgba(126, 166, 255, 0.12), transparent 44%),
+    rgba(8, 14, 24, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 28px rgba(0, 0, 0, 0.18);
+}
+
+.upload-preview-media img {
+  width: 100%;
+  height: 100%;
+  min-height: 170px;
+  display: block;
+  object-fit: contain;
+  background: rgba(6, 11, 19, 0.86);
+}
+
+.upload-preview-placeholder {
+  min-height: 170px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  color: rgba(197, 213, 243, 0.78);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.upload-preview-placeholder.error {
+  color: #ffb2b2;
+}
+
+.upload-preview-info {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  text-align: center;
+}
+
+.upload-preview-info strong {
+  color: var(--text-main);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.upload-preview-info small {
+  max-width: 100%;
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-preview-actions {
+  width: min(100%, 330px);
+  margin-inline: auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.upload-preview-btn {
+  min-height: 42px;
+  border: 1px solid rgba(111, 141, 193, 0.28);
+  border-radius: 14px;
+  background: rgba(15, 23, 36, 0.72);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upload-preview-btn.replace {
+  border-color: rgba(123, 166, 255, 0.28);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(126, 166, 255, 0.22), transparent 56%),
+    linear-gradient(180deg, rgba(31, 48, 75, 0.96), rgba(18, 29, 47, 0.96));
+  box-shadow: 0 10px 20px rgba(71, 116, 210, 0.12);
+}
+
+.upload-preview-btn.reset {
+  color: rgba(218, 228, 247, 0.78);
+}
+
 .live-quote-zone {
   position: relative;
   z-index: 1;
@@ -573,6 +682,46 @@
 
 :root[data-theme="light"] .upload-subhint {
   color: #51627c;
+}
+
+:root[data-theme="light"] .upload-preview-media {
+  border-color: rgba(104, 127, 170, 0.2);
+  background:
+    radial-gradient(circle at 50% 15%, rgba(56, 104, 246, 0.08), transparent 44%),
+    rgba(248, 251, 255, 0.86);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 14px 24px rgba(115, 138, 179, 0.12);
+}
+
+:root[data-theme="light"] .upload-preview-media img {
+  background: rgba(245, 248, 255, 0.92);
+}
+
+:root[data-theme="light"] .upload-preview-placeholder {
+  color: #667894;
+}
+
+:root[data-theme="light"] .upload-preview-placeholder.error {
+  color: #b44545;
+}
+
+:root[data-theme="light"] .upload-preview-btn {
+  border-color: rgba(104, 127, 170, 0.22);
+  background: rgba(255, 255, 255, 0.82);
+  color: #1d2a3d;
+}
+
+:root[data-theme="light"] .upload-preview-btn.replace {
+  border-color: rgba(57, 103, 221, 0.24);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(64, 112, 238, 0.18), transparent 56%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 239, 254, 0.96));
+  box-shadow: 0 12px 20px rgba(64, 112, 238, 0.12);
+}
+
+:root[data-theme="light"] .upload-preview-btn.reset {
+  color: #64748b;
 }
 
 :root[data-theme="light"] .live-quote-badge {
@@ -1757,6 +1906,25 @@
 }
 
 @media (max-width: 560px) {
+  .upload-zone-preview {
+    padding: 14px;
+    gap: 11px;
+  }
+
+  .upload-preview-media,
+  .upload-preview-media img,
+  .upload-preview-placeholder {
+    min-height: 150px;
+  }
+
+  .upload-preview-actions {
+    width: 100%;
+  }
+
+  .upload-preview-btn {
+    min-height: 40px;
+  }
+
   .live-quote-head {
     gap: 10px;
   }

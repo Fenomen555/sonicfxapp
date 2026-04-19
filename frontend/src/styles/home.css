@@ -913,6 +913,9 @@
 .primary-btn.primary-btn-scanner {
   position: relative;
   display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
   margin-inline: auto;
   width: calc(100% - 24px);
   max-width: 420px;
@@ -964,11 +967,12 @@
 .analyze-cta-animation {
   position: relative;
   z-index: 1;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
+  margin-top: 1px;
   filter: drop-shadow(0 4px 10px rgba(248, 211, 93, 0.24));
 }
 
@@ -992,7 +996,7 @@
 .analyze-cta-lottie {
   display: block;
   opacity: 0;
-  transform: scale(1.16);
+  transform: scale(1.08);
   transition: opacity 0.18s ease;
 }
 
@@ -2424,8 +2428,8 @@
   }
 
   .analysis-action-row .analyze-cta-animation {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
   }
 
   .signal-panel-toggle {

@@ -36,6 +36,7 @@ export default function AnalyzeCtaAnimation() {
           preserveAspectRatio: "xMidYMid meet"
         }
       });
+      animationRef.current?.setSpeed?.(0.5);
 
       animationRef.current?.addEventListener?.("DOMLoaded", () => {
         if (cancelled) return;

@@ -967,6 +967,7 @@
 .analyze-cta-animation {
   position: relative;
   z-index: 1;
+  top: -2px;
   width: 24px;
   height: 24px;
   display: inline-grid;
@@ -1861,6 +1862,17 @@
     linear-gradient(180deg, rgba(255, 250, 240, 0.98), rgba(247, 240, 228, 0.98));
 }
 
+:root[data-theme="light"] .generator-panel .field-row {
+  border-color: rgba(119, 102, 78, 0.14);
+  background:
+    radial-gradient(circle at 88% 0%, rgba(56, 104, 246, 0.08), transparent 36%),
+    radial-gradient(circle at 12% 100%, rgba(185, 140, 69, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(255, 250, 240, 0.82), rgba(247, 240, 228, 0.92));
+  box-shadow:
+    0 14px 28px rgba(113, 92, 61, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
 :root[data-theme="light"] .generator-panel-badge {
   background: rgba(56, 104, 246, 0.08);
   border-color: rgba(56, 104, 246, 0.16);
@@ -2088,19 +2100,33 @@
     0 0 0 3px rgba(95, 143, 255, 0.08);
 }
 
-.field-row-indicators {
-  grid-template-columns: minmax(0, 1fr) 124px;
-}
-
 .field-row {
   display: grid;
   gap: 10px;
-  grid-template-columns: minmax(0, 1fr) 116px;
+  grid-template-columns: minmax(0, 1fr) 124px;
+}
+
+.field-row.field-row-indicators {
+  grid-template-columns: minmax(0, 1fr) 132px;
+}
+
+.generator-panel .field-row {
+  padding: 12px;
+  border: 1px solid rgba(77, 96, 128, 0.3);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 88% 0%, rgba(143, 184, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(14, 21, 32, 0.7), rgba(9, 15, 24, 0.74));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 14px 24px rgba(0, 0, 0, 0.12);
 }
 
 .field-grow,
 .field-mini {
   min-width: 0;
+  display: grid;
+  gap: 5px;
 }
 
 .ref-input {
@@ -2438,6 +2464,7 @@
   }
 
   .analysis-action-row .analyze-cta-animation {
+    top: -2px;
     width: 22px;
     height: 22px;
   }

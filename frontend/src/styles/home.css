@@ -136,6 +136,7 @@
 }
 
 .live-quote-stage {
+  position: relative;
   display: grid;
   gap: 12px;
   margin-top: 2px;
@@ -352,6 +353,7 @@
 }
 
 .upload-preview-media {
+  position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
   min-height: 170px;
@@ -443,6 +445,71 @@
 
 .upload-preview-btn.reset {
   color: rgba(218, 228, 247, 0.78);
+}
+
+.scan-analysis-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(7, 11, 19, 0.12), rgba(7, 11, 19, 0.2)),
+    radial-gradient(circle at 50% 50%, rgba(98, 112, 255, 0.1), transparent 52%);
+  mix-blend-mode: screen;
+}
+
+.scan-analysis-lottie {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 0.18s ease;
+}
+
+.scan-analysis-lottie.is-ready {
+  opacity: 0.95;
+}
+
+.scan-analysis-lottie svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.scan-analysis-fallback {
+  position: absolute;
+  inset: 0;
+  opacity: 1;
+  transition: opacity 0.18s ease;
+}
+
+.scan-analysis-fallback.is-hidden {
+  opacity: 0;
+}
+
+.scan-analysis-fallback::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(118, 132, 255, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(118, 132, 255, 0.08) 1px, transparent 1px);
+  background-size: 10px 10px;
+}
+
+.scan-analysis-fallback span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -18%;
+  height: 22%;
+  background:
+    linear-gradient(180deg, transparent, rgba(105, 118, 255, 0.36), transparent),
+    linear-gradient(90deg, transparent, rgba(214, 222, 255, 0.62), transparent);
+  box-shadow: 0 0 26px rgba(105, 118, 255, 0.42);
+  animation: scanFallbackSweep 1.6s ease-in-out infinite;
 }
 
 .live-quote-zone {
@@ -722,6 +789,12 @@
 
 :root[data-theme="light"] .upload-preview-btn.reset {
   color: #64748b;
+}
+
+:root[data-theme="light"] .scan-analysis-overlay {
+  background:
+    linear-gradient(180deg, rgba(244, 248, 255, 0.08), rgba(244, 248, 255, 0.18)),
+    radial-gradient(circle at 50% 50%, rgba(55, 84, 236, 0.08), transparent 52%);
 }
 
 :root[data-theme="light"] .live-quote-badge {
@@ -2036,6 +2109,18 @@
   50% {
     transform: scale(1.18);
     opacity: 0.72;
+  }
+}
+
+@keyframes scanFallbackSweep {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(560%);
+  }
+  100% {
+    transform: translateY(0);
   }
 }
 

@@ -10,6 +10,7 @@ import {
 } from "../components/AppIcons";
 import lightningCtaIcon from "../assets/cta-lightning.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
+import ScanAnalysisOverlay from "../components/ScanAnalysisOverlay";
 import UploadScanAnimation from "../components/UploadScanAnimation";
 import { apiFetch, apiFetchJson } from "../lib/api";
 import { getDeviceProfile } from "../lib/device";
@@ -157,8 +158,10 @@ export default function HomePage({ t }) {
   const [quoteRenderReady, setQuoteRenderReady] = useState(false);
   const [scanUploadState, setScanUploadState] = useState({ status: "idle", file: null, detail: "" });
   const [scanPreview, setScanPreview] = useState({ url: "", status: "idle" });
+  const [isAnalysisScanning, setIsAnalysisScanning] = useState(false);
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
+  const analysisScanTimerRef = useRef(0);
   const quoteClientRef = useRef(null);
   const currentQuoteSubscriptionRef = useRef(null);
   const quoteRenderReadyRef = useRef(false);
@@ -231,6 +234,13 @@ export default function HomePage({ t }) {
       window.removeEventListener("resize", refreshDeviceProfile);
       window.Telegram?.WebApp?.offEvent?.("viewportChanged", refreshDeviceProfile);
     };
+  }, []);
+
+  useEffect(() => () => {
+    if (analysisScanTimerRef.current) {
+      window.clearTimeout(analysisScanTimerRef.current);
+      analysisScanTimerRef.current = 0;
+    }
   }, []);
 
   useEffect(() => {
@@ -784,6 +794,17 @@ export default function HomePage({ t }) {
     setScanUploadState({ status: "idle", file: null, detail: "" });
   }
 
+  function handleAnalyzeClick() {
+    if (analysisScanTimerRef.current) {
+      window.clearTimeout(analysisScanTimerRef.current);
+    }
+    setIsAnalysisScanning(true);
+    analysisScanTimerRef.current = window.setTimeout(() => {
+      setIsAnalysisScanning(false);
+      analysisScanTimerRef.current = 0;
+    }, 3600);
+  }
+
   const scanUploadFileLabel = scanUploadState.file?.original_name || scanUploadState.file?.public_path || "";
   const hasScanUploadPreview = !isIndicatorsMode && scanUploadState.status === "success" && Boolean(scanUploadState.file);
   const scanUploadTitle = scanUploadState.status === "uploading"
@@ -844,6 +865,10 @@ export default function HomePage({ t }) {
             payload={quoteRenderReady ? quotePayload : null}
             state={quoteState}
           />
+          <ScanAnalysisOverlay
+            isActive={isAnalysisScanning}
+            label={t.home.scanAnalysisLabel || "Scanning chart"}
+          />
         </div>
       ) : hasScanUploadPreview ? (
         <div className="upload-zone upload-zone-preview">
@@ -861,6 +886,10 @@ export default function HomePage({ t }) {
                   : (t.home.uploadPreviewLoading || "Preparing preview...")}
               </div>
             )}
+            <ScanAnalysisOverlay
+              isActive={isAnalysisScanning}
+              label={t.home.scanAnalysisLabel || "Scanning chart"}
+            />
           </div>
 
           <div className="upload-preview-actions">
@@ -958,7 +987,7 @@ export default function HomePage({ t }) {
         )}
       </div>
 
-      <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button">
+      <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button" onClick={handleAnalyzeClick}>
         <span>{actionLabel}</span>
         <img className="primary-btn-icon primary-btn-icon-accent" src={lightningCtaIcon} alt="" loading="lazy" aria-hidden="true" />
       </button>

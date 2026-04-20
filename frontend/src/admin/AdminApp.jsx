@@ -13,23 +13,24 @@ const TABS = [
 ];
 
 const FLAG_META = {
+  mode_scanner_enabled: {
+    title: "Сканер",
+    short: "SCN",
+    description: "AI анализ графика по скриншоту или ссылке."
+  },
   mode_ai_enabled: {
-    title: "Автоматический режим",
-    description: "Разрешает потоковую генерацию сигналов и связанные сценарии."
+    title: "AI",
+    short: "AI",
+    description: "Автоматический live-поток сигналов по выбранной паре."
   },
   mode_indicators_enabled: {
     title: "Индикаторы",
-    description: "Открывает ручной режим по рынку, тикеру и экспирации."
-  },
-  mode_scanner_enabled: {
-    title: "Сканер",
-    description: "Оставляет доступным основной режим анализа по скриншоту графика."
-  },
-  news_enabled: {
-    title: "Новости",
-    description: "Показывает новостную ленту внутри mini app."
+    short: "IND",
+    description: "Сигналы по рынку, тикеру, экспирации и индикатору."
   }
 };
+
+const MODE_FLAG_KEYS = ["mode_scanner_enabled", "mode_ai_enabled", "mode_indicators_enabled"];
 
 const ACCOUNT_TIER_META = {
   trader: { label: "Trader", tone: "accent" },
@@ -148,6 +149,7 @@ function formatPercent(value) {
 function getFlagMeta(key) {
   return FLAG_META[key] || {
     title: key,
+    short: "FX",
     description: "Служебный переключатель приложения."
   };
 }
@@ -410,7 +412,12 @@ export default function AdminApp({ authError }) {
         return { ...item, metric: `${formatNumber(users.length)} карточек` };
       }
       if (item.id === "flags") {
-        return { ...item, metric: `${formatNumber(flags.filter((flag) => flag.is_enabled === 1).length)} активных` };
+        return {
+          ...item,
+          metric: `${formatNumber(
+            MODE_FLAG_KEYS.filter((key) => Number(flags.find((flag) => flag.key === key)?.is_enabled ?? 1) === 1).length
+          )} активных`
+        };
       }
       if (item.id === "indicators") {
         return { ...item, metric: `${formatNumber(indicatorSettings.summary?.enabled || 0)} включено` };
@@ -419,6 +426,14 @@ export default function AdminApp({ authError }) {
       return { ...item, metric: `${formatNumber(marketCount)} рынков` };
     });
   }, [flags, indicatorSettings.summary?.enabled, marketSettings.items, stats?.users_total, users.length]);
+
+  const modeFlags = useMemo(
+    () =>
+      MODE_FLAG_KEYS.map((key) => flags.find((item) => item.key === key) || { key, is_enabled: 1, updated_at: null }).filter(
+        (item) => Boolean(FLAG_META[item.key])
+      ),
+    [flags]
+  );
 
   const marketSummary = useMemo(() => {
     const items = marketSettings.items || [];
@@ -826,32 +841,34 @@ export default function AdminApp({ authError }) {
         )}
 
         {!loading && tab === "flags" && (
-          <section className="admin-control-grid">
-            {flags.map((item) => {
+          <section className="admin-control-grid admin-mode-control-grid">
+            {modeFlags.map((item) => {
               const meta = getFlagMeta(item.key);
               const enabled = item.is_enabled === 1;
               return (
-                <article className="admin-card admin-control-card" key={item.key}>
+                <article className={`admin-card admin-control-card admin-mode-control-card ${enabled ? "is-enabled" : "is-disabled"}`} key={item.key}>
                   <div className="admin-control-head">
-                    <div>
+                    <div className="admin-control-title-row">
+                      <span className="admin-mode-code">{meta.short}</span>
                       <strong>{meta.title}</strong>
-                      <span>Ключ: {item.key}</span>
                     </div>
-                    <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
-                      {enabled ? "Включено" : "Выключено"}
-                    </span>
-                  </div>
-                  <p>{meta.description}</p>
-                  <div className="admin-control-footer">
-                    <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
                     <button
-                      className="admin-primary-button"
+                      className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
                       disabled={flagSavingKey === item.key}
                       onClick={() => toggleFlag(item)}
                       type="button"
+                      aria-pressed={enabled}
                     >
-                      {flagSavingKey === item.key ? "Сохраняем..." : enabled ? "Отключить" : "Включить"}
+                      <span>{flagSavingKey === item.key ? "..." : enabled ? "Включено" : "Выключено"}</span>
+                      <i aria-hidden="true" />
                     </button>
+                  </div>
+                  <p>{meta.description}</p>
+                  <div className="admin-control-footer">
+                    <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
+                      {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
+                    </span>
+                    <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
                   </div>
                 </article>
               );

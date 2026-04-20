@@ -130,7 +130,7 @@ function payloadHasRenderableCandles(payload) {
 }
 
 
-export default function HomePage({ t, notify }) {
+export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
   const [isSignalModeExpanded, setIsSignalModeExpanded] = useState(false);
   const [marketKind, setMarketKind] = useState("otc");
@@ -184,22 +184,25 @@ export default function HomePage({ t, notify }) {
 
   const uploadAccept = "image/jpeg,image/png,image/webp,image/heic,image/heif";
 
-  const signalModes = useMemo(
+  const baseSignalModes = useMemo(
     () => [
       {
         id: "scanner",
+        flagKey: "mode_scanner_enabled",
         label: t.home.signalModeScannerLabel || "Scanner",
         hint: t.home.signalModeScannerHint || "Screenshot + AI breakdown",
         icon: ScannerModeIcon
       },
       {
         id: "automatic",
+        flagKey: "mode_ai_enabled",
         label: t.home.signalModeAutomaticLabel || "Automatic",
         hint: t.home.signalModeAutomaticHint || "AI drives the signal flow",
         icon: AutoModeIcon
       },
       {
         id: "indicators",
+        flagKey: "mode_indicators_enabled",
         label: t.home.signalModeIndicatorsLabel || "Indicators",
         hint: t.home.signalModeIndicatorsHint || "Market, symbol and expiration",
         icon: IndicatorModeIcon
@@ -207,6 +210,19 @@ export default function HomePage({ t, notify }) {
     ],
     [t.home]
   );
+
+  const signalModes = useMemo(
+    () => baseSignalModes.filter((item) => Number(featureFlags?.[item.flagKey] ?? 1) === 1),
+    [baseSignalModes, featureFlags]
+  );
+
+  useEffect(() => {
+    if (!signalModes.length) return;
+    if (!signalModes.some((item) => item.id === signalMode)) {
+      setSignalMode(signalModes[0].id);
+      setIsSignalModeExpanded(false);
+    }
+  }, [signalMode, signalModes]);
 
   const allowedMarkets = useMemo(
     () => (signalMode === "indicators" ? INDICATOR_MARKETS : BASIC_MARKETS),
@@ -425,7 +441,7 @@ export default function HomePage({ t, notify }) {
   }, [availableMarkets]);
 
   const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
-  const selectedMode = signalModes.find((item) => item.id === signalMode) || signalModes[0];
+  const selectedMode = signalModes.find((item) => item.id === signalMode) || signalModes[0] || baseSignalModes[0];
   const SelectedModeIcon = selectedMode.icon;
   const selectedModeInfo = useMemo(() => ({
     scanner: {

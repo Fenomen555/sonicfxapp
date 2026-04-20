@@ -31,7 +31,12 @@ const FALLBACK_USER = {
   trader_id: "",
   scanner_access: 0,
   deposit_amount: 0,
-  onboarding_seen: 0
+  onboarding_seen: 0,
+  feature_flags: {
+    mode_scanner_enabled: 1,
+    mode_ai_enabled: 1,
+    mode_indicators_enabled: 1
+  }
 };
 
 export default function App() {
@@ -313,7 +318,7 @@ export default function App() {
         ) : (
           <>
             {tab === "news" && <NewsPage t={t} lang={lang} />}
-            {tab === "home" && <HomePage t={t} notify={notify} />}
+            {tab === "home" && <HomePage t={t} notify={notify} featureFlags={user.feature_flags || FALLBACK_USER.feature_flags} />}
             {tab === "profile" && (
               <ProfilePage
                 t={t}

@@ -88,6 +88,13 @@ DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) //
 DEFAULT_NEWS_SYNC_INTERVAL_MIN = 60
 VALID_NEWS_FEEDS = {"economic", "market"}
 NEWS_GENERAL_CATEGORY = "general"
+MODE_FEATURE_FLAG_KEYS = ("mode_scanner_enabled", "mode_ai_enabled", "mode_indicators_enabled")
+FEATURE_FLAG_DEFAULTS = {
+    "mode_scanner_enabled": 1,
+    "mode_ai_enabled": 1,
+    "mode_indicators_enabled": 1,
+    "news_enabled": 1,
+}
 MARKET_KIND_CONFIG = {
     "forex": {"title": "Forex", "path": "forex"},
     "otc": {"title": "OTC", "path": "otc"},
@@ -685,6 +692,20 @@ async def get_user_lang(user_id: int, fallback: str = "ru") -> str:
     return normalize_user_lang(str(row.get("lang") or fallback))
 
 
+async def get_feature_flags_payload() -> Dict[str, int]:
+    flags = dict(FEATURE_FLAG_DEFAULTS)
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT `key`, is_enabled FROM feature_flags")
+            rows = await cur.fetchall()
+    for row in rows or []:
+        key = str(row.get("key") or "").strip()
+        if key:
+            flags[key] = int(row.get("is_enabled") or 0)
+    return flags
+
+
 async def build_main_menu_keyboard(current_lang: str, user_id: Optional[int] = None) -> InlineKeyboardMarkup:
     lang = normalize_user_lang(current_lang)
     labels = WELCOME_TEXTS[lang]
@@ -727,6 +748,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
             row = await cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
+    feature_flags = await get_feature_flags_payload()
     return {
         "user_id": int(row["user_id"]),
         "tg_username": row.get("tg_username") or "",
@@ -747,6 +769,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
         "last_active_at": row.get("last_active_at").isoformat() if row.get("last_active_at") else None,
+        "feature_flags": feature_flags,
     }
 
 
@@ -2464,7 +2487,11 @@ async def admin_get_feature_flags(admin: Dict[str, Any] = Depends(get_admin_user
     pool = await require_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute("SELECT `key`, is_enabled, updated_at FROM feature_flags ORDER BY `key` ASC")
+            placeholders = ",".join(["%s"] * len(MODE_FEATURE_FLAG_KEYS))
+            await cur.execute(
+                f"SELECT `key`, is_enabled, updated_at FROM feature_flags WHERE `key` IN ({placeholders}) ORDER BY FIELD(`key`, {placeholders})",
+                (*MODE_FEATURE_FLAG_KEYS, *MODE_FEATURE_FLAG_KEYS),
+            )
             rows = await cur.fetchall()
     items = []
     for row in rows:
@@ -2486,6 +2513,8 @@ async def admin_update_feature_flag(
     key = (payload.key or "").strip()
     if not key:
         raise HTTPException(status_code=400, detail="Flag key is required")
+    if key not in MODE_FEATURE_FLAG_KEYS:
+        raise HTTPException(status_code=400, detail="Unsupported feature flag")
     enabled = 1 if int(payload.is_enabled or 0) == 1 else 0
     pool = await require_db_pool()
     async with pool.acquire() as conn:

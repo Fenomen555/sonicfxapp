@@ -255,6 +255,11 @@
   color: #ffedc2;
 }
 
+.admin-section-card[data-tab="support"] .admin-section-accent {
+  border-color: rgba(118, 199, 156, 0.24);
+  color: #d8f8e7;
+}
+
 .admin-page-stack {
   display: grid;
   gap: 14px;
@@ -736,6 +741,88 @@
   opacity: 0.72;
 }
 
+.admin-support-hero,
+.admin-support-save-panel {
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-support-hero-copy {
+  display: grid;
+  gap: 6px;
+  max-width: 520px;
+}
+
+.admin-support-hero-copy p,
+.admin-support-card span {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-support-preview-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-support-preview-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.admin-support-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-support-card {
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.admin-support-card-head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.admin-support-card-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-support-card-head strong {
+  font-size: 17px;
+  line-height: 1.08;
+}
+
+.admin-support-code {
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(118, 199, 156, 0.24);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(118, 199, 156, 0.24), transparent 64%),
+    linear-gradient(180deg, rgba(31, 47, 65, 0.98), rgba(14, 24, 35, 0.98));
+  color: #d8f8e7;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
 .admin-market-detail-list,
 .admin-info-list {
   display: grid;
@@ -902,6 +989,8 @@
   .admin-toolbar,
   .admin-empty-state,
   .admin-market-settings,
+  .admin-support-hero,
+  .admin-support-save-panel,
   .admin-filter-head,
   .admin-details-panel-head,
   .admin-control-footer,
@@ -916,6 +1005,7 @@
   .admin-highlight-grid,
   .market-summary-grid,
   .admin-indicator-summary-grid,
+  .admin-support-grid,
   .admin-user-detail-grid,
   .admin-filter-grid,
   .admin-editor-grid {
@@ -933,7 +1023,8 @@
   }
 
   .admin-topbar-actions,
-  .admin-toolbar-actions {
+  .admin-toolbar-actions,
+  .admin-support-preview-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -961,7 +1052,8 @@
   .admin-control-grid,
   .admin-user-grid,
   .admin-market-grid,
-  .admin-indicator-grid {
+  .admin-indicator-grid,
+  .admin-support-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -969,6 +1061,7 @@
   .admin-section-card,
   .admin-user-card,
   .admin-market-card,
+  .admin-support-card,
   .admin-control-card,
   .admin-filter-card,
   .admin-market-hero,
@@ -993,6 +1086,7 @@
   .admin-user-grid,
   .admin-market-grid,
   .admin-indicator-grid,
+  .admin-support-grid,
   .admin-filter-grid,
   .admin-editor-grid,
   .admin-user-detail-grid {

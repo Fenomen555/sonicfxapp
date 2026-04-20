@@ -181,6 +181,8 @@ async def _seed_app_settings(conn) -> None:
         ("market_enabled_commodities", "1"),
         ("market_enabled_stocks", "1"),
         ("market_enabled_crypto", "1"),
+        ("support_channel_url", os.getenv("SUPPORT_CHANNEL_URL") or os.getenv("CHANNEL_URL") or "https://t.me/+TthmjdpAkv5hNjdi"),
+        ("support_contact_url", os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"),
     )
     async with conn.cursor() as cur:
         for key, value in defaults:

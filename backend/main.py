@@ -86,6 +86,12 @@ SCAN_UPLOAD_RETENTION_DAYS = int((os.getenv("SCAN_UPLOAD_RETENTION_DAYS") or "7"
 SCAN_UPLOAD_ARCHIVE_INTERVAL_SEC = int((os.getenv("SCAN_UPLOAD_ARCHIVE_INTERVAL_SEC") or str(6 * 60 * 60)).strip() or str(6 * 60 * 60))
 DEFAULT_MARKET_SYNC_INTERVAL_MIN = min(max(max(MARKET_SYNC_INTERVAL_SEC, 120) // 60, 2), 30)
 DEFAULT_NEWS_SYNC_INTERVAL_MIN = 60
+DEFAULT_SUPPORT_CHANNEL_URL = (
+    os.getenv("SUPPORT_CHANNEL_URL") or os.getenv("CHANNEL_URL") or "https://t.me/+TthmjdpAkv5hNjdi"
+).strip()
+DEFAULT_SUPPORT_CONTACT_URL = (
+    os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"
+).strip()
 VALID_NEWS_FEEDS = {"economic", "market"}
 NEWS_GENERAL_CATEGORY = "general"
 MODE_FEATURE_FLAG_KEYS = ("mode_scanner_enabled", "mode_ai_enabled", "mode_indicators_enabled")
@@ -236,6 +242,11 @@ class AdminMarketStatusUpdateRequest(BaseModel):
 class AdminIndicatorUpdateRequest(BaseModel):
     code: str
     is_enabled: int
+
+
+class AdminSupportSettingsUpdateRequest(BaseModel):
+    channel_url: str = Field(min_length=8, max_length=500)
+    support_url: str = Field(min_length=8, max_length=500)
 
 
 def _normalize_tg_language(raw: str) -> str:
@@ -823,6 +834,29 @@ async def set_app_setting(key: str, value: str) -> None:
             )
 
 
+def _normalize_telegram_support_url(value: Any, fallback: str) -> str:
+    url = str(value or "").strip() or fallback
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail="Support link must start with https://t.me/")
+    if parsed.netloc.lower() not in {"t.me", "telegram.me"}:
+        raise HTTPException(status_code=400, detail="Only Telegram support links are allowed")
+    if parsed.scheme == "http":
+        url = f"https://{parsed.netloc}{parsed.path}"
+        if parsed.query:
+            url = f"{url}?{parsed.query}"
+    return url
+
+
+async def get_support_settings_payload() -> Dict[str, str]:
+    channel_url = await get_app_setting("support_channel_url", DEFAULT_SUPPORT_CHANNEL_URL)
+    support_url = await get_app_setting("support_contact_url", DEFAULT_SUPPORT_CONTACT_URL)
+    return {
+        "channel_url": _normalize_telegram_support_url(channel_url, DEFAULT_SUPPORT_CHANNEL_URL),
+        "support_url": _normalize_telegram_support_url(support_url, DEFAULT_SUPPORT_CONTACT_URL),
+    }
+
+
 async def get_market_sync_interval_min() -> int:
     raw = await get_app_setting("market_pairs_sync_interval_min", str(DEFAULT_MARKET_SYNC_INTERVAL_MIN))
     return _sanitize_market_sync_interval_min(raw)
@@ -1326,9 +1360,7 @@ async def api_health():
 
 @app.get("/api/support/links")
 async def get_support_links():
-    channel_url = (os.getenv("CHANNEL_URL") or "").strip()
-    support_url = (os.getenv("SUPPORT_URL") or "").strip()
-    return {"channel_url": channel_url, "support_url": support_url}
+    return await get_support_settings_payload()
 
 
 @app.get("/api/webapp/bot-info")
@@ -2587,6 +2619,28 @@ async def admin_update_feature_flag(
             )
     await add_admin_audit(int(admin["user_id"]), "admin_update_feature_flag", payload.model_dump())
     return {"status": "success"}
+
+
+@app.get("/api/admin/support-settings")
+async def admin_get_support_settings(admin: Dict[str, Any] = Depends(get_admin_user)):
+    return await get_support_settings_payload()
+
+
+@app.post("/api/admin/support-settings")
+async def admin_update_support_settings(
+    payload: AdminSupportSettingsUpdateRequest,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    channel_url = _normalize_telegram_support_url(payload.channel_url, DEFAULT_SUPPORT_CHANNEL_URL)
+    support_url = _normalize_telegram_support_url(payload.support_url, DEFAULT_SUPPORT_CONTACT_URL)
+    await set_app_setting("support_channel_url", channel_url)
+    await set_app_setting("support_contact_url", support_url)
+    await add_admin_audit(
+        int(admin["user_id"]),
+        "admin_update_support_settings",
+        {"channel_url": channel_url, "support_url": support_url},
+    )
+    return {"channel_url": channel_url, "support_url": support_url}
 
 
 @app.get("/api/admin/market-settings")

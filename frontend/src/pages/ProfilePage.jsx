@@ -26,6 +26,11 @@ const PROFILE_BOTTOM_ACTIONS = [
   { key: "notifications", fallback: "Уведомления", image: profileNotificationsIcon }
 ];
 
+const SUPPORT_LINK_DEFAULTS = {
+  channel_url: "https://t.me/+TthmjdpAkv5hNjdi",
+  support_url: "https://t.me/WaySonic"
+};
+
 const FAQ_INDICATORS = [
   {
     code: "rsi",
@@ -199,6 +204,58 @@ function getFaqCopy(lang, t) {
   return ru;
 }
 
+function getSupportCopy(lang) {
+  const ru = {
+    title: "Поддержка",
+    subtitle: "Поможем быстро разобраться",
+    faqLine: "Все ответы можно найти в FAQ.",
+    channelLine: "Также загляните в наш Telegram-канал: там публикуем обновления, подсказки и важные новости по SonicFX.",
+    contactLine: "Если остались вопросы, пишите нам напрямую.",
+    channelButton: "Открыть канал",
+    supportButton: "Написать в поддержку",
+    close: "Закрыть"
+  };
+  if (lang === "en") {
+    return {
+      ...ru,
+      title: "Support",
+      subtitle: "Fast help when something is unclear",
+      faqLine: "Most answers are available in FAQ.",
+      channelLine: "You can also join our Telegram channel for updates, tips and important SonicFX news.",
+      contactLine: "If you still have questions, message us directly.",
+      channelButton: "Open channel",
+      supportButton: "Message support",
+      close: "Close"
+    };
+  }
+  if (lang === "uk") {
+    return {
+      ...ru,
+      title: "Підтримка",
+      subtitle: "Допоможемо швидко розібратися",
+      faqLine: "Всі відповіді можна знайти у FAQ.",
+      channelLine: "Також відкрийте наш Telegram-канал: там публікуємо оновлення, підказки та важливі новини SonicFX.",
+      contactLine: "Якщо питання залишились, напишіть нам напряму.",
+      channelButton: "Відкрити канал",
+      supportButton: "Написати в підтримку",
+      close: "Закрити"
+    };
+  }
+  return ru;
+}
+
+function normalizeSupportLinks(data) {
+  return {
+    channel_url: data?.channel_url || SUPPORT_LINK_DEFAULTS.channel_url,
+    support_url: data?.support_url || SUPPORT_LINK_DEFAULTS.support_url
+  };
+}
+
+function openExternalLink(url) {
+  if (!url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
 function getInitials(user, fallback) {
   const source = [user?.first_name, user?.last_name, user?.tg_username].filter(Boolean).join(" ").trim();
   if (!source) return fallback;
@@ -282,6 +339,8 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   const [isTimezoneExpanded, setIsTimezoneExpanded] = useState(false);
   const [faqView, setFaqView] = useState("closed");
   const [selectedFaqIndicator, setSelectedFaqIndicator] = useState("");
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [supportLinks, setSupportLinks] = useState(SUPPORT_LINK_DEFAULTS);
   const settingsRequestRef = useRef(0);
 
   useEffect(() => {
@@ -293,13 +352,27 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   }, [user]);
 
   useEffect(() => {
-    if (faqView === "closed") return undefined;
+    if (faqView === "closed" && !isSupportOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [faqView]);
+  }, [faqView, isSupportOpen]);
+
+  useEffect(() => {
+    let isActive = true;
+    apiFetchJson("/api/support/links")
+      .then((data) => {
+        if (isActive) setSupportLinks(normalizeSupportLinks(data));
+      })
+      .catch(() => {
+        if (isActive) setSupportLinks(SUPPORT_LINK_DEFAULTS);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const profileName = useMemo(() => {
     const full = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
@@ -349,6 +422,10 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     if (key === "faq") {
       setFaqView("home");
       setSelectedFaqIndicator("");
+      return;
+    }
+    if (key === "support") {
+      setIsSupportOpen(true);
       return;
     }
     notify?.({
@@ -402,6 +479,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   }), [t.profile?.actions]);
 
   const faqCopy = useMemo(() => getFaqCopy(lang, t), [lang, t]);
+  const supportCopy = useMemo(() => getSupportCopy(lang), [lang]);
   const faqIndicators = useMemo(
     () => FAQ_INDICATORS.map((item) => ({
       ...item,
@@ -718,6 +796,53 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                 }}
               >
                 {faqCopy.close}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isSupportOpen && (
+        <div
+          className="profile-faq-modal-backdrop"
+          role="presentation"
+          onClick={() => setIsSupportOpen(false)}
+        >
+          <section
+            className="card profile-faq-panel profile-faq-modal profile-support-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={supportCopy.title}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="profile-faq-head profile-support-head">
+              <span className="profile-faq-kicker">{supportCopy.title}</span>
+              <strong>{supportCopy.subtitle}</strong>
+            </div>
+
+            <div className="profile-support-body">
+              <p>{supportCopy.faqLine}</p>
+              <p>{supportCopy.channelLine}</p>
+              <button
+                type="button"
+                className="profile-support-link-button primary"
+                onClick={() => openExternalLink(supportLinks.channel_url)}
+              >
+                {supportCopy.channelButton}
+              </button>
+              <p>{supportCopy.contactLine}</p>
+              <button
+                type="button"
+                className="profile-support-link-button"
+                onClick={() => openExternalLink(supportLinks.support_url)}
+              >
+                {supportCopy.supportButton}
+              </button>
+            </div>
+
+            <div className="profile-faq-controls profile-faq-footer">
+              <button type="button" className="profile-faq-ghost-btn" onClick={() => setIsSupportOpen(false)}>
+                {supportCopy.close}
               </button>
             </div>
           </section>

@@ -9,7 +9,8 @@ const TABS = [
   { id: "users", label: "Пользователи", subtitle: "Карточки, поиск и фильтры" },
   { id: "flags", label: "Функции", subtitle: "Управление режимами" },
   { id: "market", label: "Рынок", subtitle: "Пары и синхронизация" },
-  { id: "indicators", label: "Индикаторы", subtitle: "Каталог и доступность" }
+  { id: "indicators", label: "Индикаторы", subtitle: "Каталог и доступность" },
+  { id: "support", label: "Поддержка", subtitle: "Ссылки и контакты" }
 ];
 
 const FLAG_META = {
@@ -60,6 +61,11 @@ const EMPTY_INDICATOR_SETTINGS = {
   }
 };
 
+const EMPTY_SUPPORT_SETTINGS = {
+  channel_url: "https://t.me/+TthmjdpAkv5hNjdi",
+  support_url: "https://t.me/WaySonic"
+};
+
 function TabGlyph({ kind }) {
   if (kind === "stats") {
     return (
@@ -99,6 +105,16 @@ function TabGlyph({ kind }) {
         <path d="M5 10.5h3" />
         <path d="M11 8.5h3" />
         <path d="M15 12.5h3" />
+      </svg>
+    );
+  }
+  if (kind === "support") {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6.5 17.5H6a3 3 0 0 1-3-3v-2a8.5 8.5 0 0 1 17 0v2a3 3 0 0 1-3 3h-.5" />
+        <path d="M7 12.5v3.2a2 2 0 0 1-2 2" />
+        <path d="M17 12.5v3.2a2 2 0 0 0 2 2" />
+        <path d="M9.5 19h5" />
       </svg>
     );
   }
@@ -199,9 +215,12 @@ export default function AdminApp({ authError }) {
   const [flags, setFlags] = useState([]);
   const [marketSettings, setMarketSettings] = useState(EMPTY_MARKET_SETTINGS);
   const [indicatorSettings, setIndicatorSettings] = useState(EMPTY_INDICATOR_SETTINGS);
+  const [supportSettings, setSupportSettings] = useState(EMPTY_SUPPORT_SETTINGS);
+  const [supportEditor, setSupportEditor] = useState(EMPTY_SUPPORT_SETTINGS);
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
   const [marketSavingKey, setMarketSavingKey] = useState("");
+  const [supportSaving, setSupportSaving] = useState(false);
   const [indicatorSearch, setIndicatorSearch] = useState("");
   const [indicatorSavingCode, setIndicatorSavingCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -319,6 +338,12 @@ export default function AdminApp({ authError }) {
         const data = await apiAdminFetchJson("/api/admin/indicators");
         setIndicatorSettings(data || EMPTY_INDICATOR_SETTINGS);
       }
+      if (targetTab === "support") {
+        const data = await apiAdminFetchJson("/api/admin/support-settings");
+        const next = { ...EMPTY_SUPPORT_SETTINGS, ...(data || {}) };
+        setSupportSettings(next);
+        setSupportEditor(next);
+      }
     } catch (error) {
       pushToast("error", "Не удалось загрузить раздел", error.message || "Попробуйте обновить данные ещё раз.");
     } finally {
@@ -423,10 +448,22 @@ export default function AdminApp({ authError }) {
       if (item.id === "indicators") {
         return { ...item, metric: `${formatNumber(indicatorSettings.summary?.enabled || 0)} включено` };
       }
+      if (item.id === "support") {
+        const configured = [supportSettings.channel_url, supportSettings.support_url].filter(Boolean).length;
+        return { ...item, metric: `${formatNumber(configured)} ссылки` };
+      }
       const activeMarketCount = (marketSettings.items || []).filter((market) => Number(market.is_enabled ?? 1) === 1).length;
       return { ...item, metric: `${formatNumber(activeMarketCount)} активных` };
     });
-  }, [flags, indicatorSettings.summary?.enabled, marketSettings.items, stats?.users_total, users.length]);
+  }, [
+    flags,
+    indicatorSettings.summary?.enabled,
+    marketSettings.items,
+    stats?.users_total,
+    supportSettings.channel_url,
+    supportSettings.support_url,
+    users.length
+  ]);
 
   const modeFlags = useMemo(
     () =>
@@ -559,6 +596,28 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось сохранить интервал", error.message || "Проверьте значение и повторите попытку.");
     } finally {
       setMarketSaving(false);
+    }
+  };
+
+  const saveSupportSettings = async () => {
+    setSupportSaving(true);
+    try {
+      const payload = {
+        channel_url: supportEditor.channel_url.trim(),
+        support_url: supportEditor.support_url.trim()
+      };
+      const data = await apiAdminFetchJson("/api/admin/support-settings", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      const next = { ...EMPTY_SUPPORT_SETTINGS, ...(data || payload) };
+      setSupportSettings(next);
+      setSupportEditor(next);
+      pushToast("success", "Ссылки поддержки сохранены", "Mini app получит актуальные кнопки поддержки.");
+    } catch (error) {
+      pushToast("error", "Не удалось сохранить поддержку", error.message || "Проверьте Telegram-ссылки и повторите попытку.");
+    } finally {
+      setSupportSaving(false);
     }
   };
 
@@ -1081,6 +1140,76 @@ export default function AdminApp({ authError }) {
                   ))}
                 </div>
               )}
+            </section>
+          </>
+        )}
+        {!loading && tab === "support" && (
+          <>
+            <section className="admin-card admin-support-hero">
+              <div className="admin-support-hero-copy">
+                <div className="admin-section-title">Поддержка в профиле</div>
+                <p>Эти ссылки показываются пользователю в плитке “Поддержка”: канал для быстрых ответов и прямой контакт, если вопрос остался.</p>
+              </div>
+              <div className="admin-support-preview-actions">
+                <a className="admin-ghost-button" href={supportSettings.channel_url} target="_blank" rel="noreferrer">
+                  Проверить канал
+                </a>
+                <a className="admin-ghost-button" href={supportSettings.support_url} target="_blank" rel="noreferrer">
+                  Проверить контакт
+                </a>
+              </div>
+            </section>
+
+            <section className="admin-support-grid">
+              <article className="admin-card admin-support-card">
+                <div className="admin-support-card-head">
+                  <span className="admin-support-code">TG</span>
+                  <div>
+                    <strong>Telegram-канал</strong>
+                    <span>Кнопка для перехода в канал SonicFX.</span>
+                  </div>
+                </div>
+                <label className="admin-field">
+                  <span>Ссылка на канал</span>
+                  <input
+                    className="admin-input"
+                    type="url"
+                    value={supportEditor.channel_url}
+                    onChange={(event) => setSupportEditor((prev) => ({ ...prev, channel_url: event.target.value }))}
+                    placeholder="https://t.me/+..."
+                  />
+                </label>
+              </article>
+
+              <article className="admin-card admin-support-card">
+                <div className="admin-support-card-head">
+                  <span className="admin-support-code">DM</span>
+                  <div>
+                    <strong>Контакт поддержки</strong>
+                    <span>Кнопка “Написать в поддержку”.</span>
+                  </div>
+                </div>
+                <label className="admin-field">
+                  <span>Ссылка на поддержку</span>
+                  <input
+                    className="admin-input"
+                    type="url"
+                    value={supportEditor.support_url}
+                    onChange={(event) => setSupportEditor((prev) => ({ ...prev, support_url: event.target.value }))}
+                    placeholder="https://t.me/WaySonic"
+                  />
+                </label>
+              </article>
+            </section>
+
+            <section className="admin-card admin-support-save-panel">
+              <div>
+                <div className="admin-section-title">Сохранение</div>
+                <div className="admin-muted-text">Разрешены только Telegram-ссылки t.me или telegram.me.</div>
+              </div>
+              <button className="admin-primary-button" type="button" disabled={supportSaving} onClick={saveSupportSettings}>
+                {supportSaving ? "Сохраняем..." : "Сохранить ссылки"}
+              </button>
             </section>
           </>
         )}

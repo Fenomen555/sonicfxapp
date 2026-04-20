@@ -271,6 +271,49 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+.profile-faq-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding:
+    calc(14px + var(--tg-content-safe-area-inset-top, env(safe-area-inset-top)))
+    calc(12px + var(--tg-content-safe-area-inset-right, 0px))
+    calc(14px + var(--tg-content-safe-area-inset-bottom, env(safe-area-inset-bottom)))
+    calc(12px + var(--tg-content-safe-area-inset-left, 0px));
+  background:
+    radial-gradient(circle at 50% 0%, rgba(143, 184, 255, 0.12), transparent 42%),
+    rgba(3, 6, 11, 0.72);
+  backdrop-filter: blur(14px);
+  animation: faqBackdropIn 0.18s ease both;
+}
+
+.profile-faq-modal {
+  width: min(100%, 440px);
+  max-height: calc(100dvh - var(--tg-content-safe-area-inset-top, env(safe-area-inset-top)) - var(--tg-content-safe-area-inset-bottom, env(safe-area-inset-bottom)) - 28px);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border-radius: 26px;
+  animation: faqModalIn 0.22s ease both;
+}
+
+.profile-faq-modal-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
+.profile-faq-modal-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.profile-faq-modal-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(143, 184, 255, 0.28);
+}
+
 .profile-faq-head {
   display: grid;
   gap: 7px;
@@ -490,6 +533,26 @@
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.06),
       0 18px 30px rgba(5, 10, 18, 0.16);
+  }
+}
+
+@keyframes faqBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes faqModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -999,6 +1062,12 @@
     linear-gradient(180deg, rgba(255, 250, 240, 0.98), rgba(247, 240, 228, 0.98));
 }
 
+:root[data-theme="light"] .profile-faq-modal-backdrop {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(56, 104, 246, 0.1), transparent 42%),
+    rgba(238, 229, 214, 0.68);
+}
+
 :root[data-theme="light"] .profile-faq-kicker,
 :root[data-theme="light"] .profile-faq-marker {
   border-color: rgba(56, 104, 246, 0.16);
@@ -1269,6 +1338,20 @@
 
   .profile-faq-panel {
     gap: 12px;
+  }
+
+  .profile-faq-modal-backdrop {
+    place-items: end center;
+    padding:
+      calc(10px + var(--tg-content-safe-area-inset-top, env(safe-area-inset-top)))
+      calc(8px + var(--tg-content-safe-area-inset-right, 0px))
+      calc(10px + var(--tg-content-safe-area-inset-bottom, env(safe-area-inset-bottom)))
+      calc(8px + var(--tg-content-safe-area-inset-left, 0px));
+  }
+
+  .profile-faq-modal {
+    max-height: calc(100dvh - var(--tg-content-safe-area-inset-top, env(safe-area-inset-top)) - var(--tg-content-safe-area-inset-bottom, env(safe-area-inset-bottom)) - 20px);
+    border-radius: 24px;
   }
 
   .profile-faq-grid,

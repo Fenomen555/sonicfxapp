@@ -292,6 +292,15 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     setIsTimezoneExpanded(false);
   }, [user]);
 
+  useEffect(() => {
+    if (faqView === "closed") return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [faqView]);
+
   const profileName = useMemo(() => {
     const full = [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
     return full || user?.tg_username || t.profile.nameFallback || "Trader";
@@ -581,122 +590,139 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
       </div>
 
       {faqView !== "closed" && (
-        <section className="card profile-faq-panel" aria-label={faqCopy.title}>
-          <div className="profile-faq-head">
-            <span className="profile-faq-kicker">{faqCopy.title}</span>
-            <strong>
-              {faqView === "home"
-                ? faqCopy.subtitle
-                : faqView === "indicators"
-                ? faqCopy.indicatorList
-                : faqView === "indicator" && selectedIndicatorInfo
-                ? selectedIndicatorInfo.meta.title
-                : faqCopy.cards[faqView]?.title || faqCopy.title}
-            </strong>
-            <div className="profile-faq-controls">
-              {faqView !== "home" && (
-                <button type="button" className="profile-faq-ghost-btn" onClick={handleFaqBack}>
-                  {faqCopy.back}
-                </button>
-              )}
-              <button
-                type="button"
-                className="profile-faq-ghost-btn"
-                onClick={() => {
-                  setFaqView("closed");
-                  setSelectedFaqIndicator("");
-                }}
-              >
-                {faqCopy.close}
-              </button>
-            </div>
-          </div>
-
-          {faqView === "home" && (
-            <div className="profile-faq-grid">
-              {faqCards.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`profile-faq-card profile-faq-card-${item.id}`}
-                  onClick={() => handleFaqCardClick(item.id)}
-                >
-                  <span className="profile-faq-marker">{item.marker}</span>
-                  <span className="profile-faq-card-copy">
-                    <strong>{item.title}</strong>
-                    <small>{item.subtitle}</small>
-                    <span>{item.body}</span>
-                  </span>
-                  <em>{item.id === "sonic" ? faqCopy.openTour : faqCopy.readMore}</em>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {(faqView === "scanner" || faqView === "auto") && (
-            <div className="profile-faq-detail">
-              <span className="profile-faq-marker large">{faqView === "scanner" ? "SCN" : "AUTO"}</span>
-              <h3>{faqCopy.cards[faqView].title}</h3>
-              <p>{faqCopy.cards[faqView].body}</p>
-              <div className="profile-faq-warning">{faqCopy.riskNote}</div>
-            </div>
-          )}
-
-          {faqView === "news" && (
-            <div className="profile-faq-detail">
-              <span className="profile-faq-marker large">NEWS</span>
-              <h3>{faqCopy.cards.news.title}</h3>
-              <p>{faqCopy.cards.news.body}</p>
-              <div className="profile-faq-note-list">
-                {faqCopy.newsGuide.map((item) => (
-                  <span key={item}>{item}</span>
-                ))}
-              </div>
-              <div className="profile-faq-warning">{faqCopy.riskNote}</div>
-            </div>
-          )}
-
-          {faqView === "indicators" && (
-            <div className="profile-faq-indicators">
-              <div className="profile-faq-note-list">
-                {faqCopy.indicatorGuide.map((item) => (
-                  <span key={item}>{item}</span>
-                ))}
-              </div>
-              <div className="profile-faq-indicator-grid">
-                {faqIndicators.map((item) => (
-                  <button
-                    type="button"
-                    key={item.code}
-                    className="profile-faq-indicator-card"
-                    onClick={() => {
-                      setSelectedFaqIndicator(item.code);
-                      setFaqView("indicator");
-                    }}
-                  >
-                    <span className={`indicator-inline-code tone-${item.meta.tone}`}>{item.meta.short}</span>
-                    <strong>{item.meta.title}</strong>
-                    <small>{item.description}</small>
+        <div
+          className="profile-faq-modal-backdrop"
+          role="presentation"
+          onClick={() => {
+            setFaqView("closed");
+            setSelectedFaqIndicator("");
+          }}
+        >
+          <section
+            className="card profile-faq-panel profile-faq-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={faqCopy.title}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="profile-faq-head">
+              <span className="profile-faq-kicker">{faqCopy.title}</span>
+              <strong>
+                {faqView === "home"
+                  ? faqCopy.subtitle
+                  : faqView === "indicators"
+                  ? faqCopy.indicatorList
+                  : faqView === "indicator" && selectedIndicatorInfo
+                  ? selectedIndicatorInfo.meta.title
+                  : faqCopy.cards[faqView]?.title || faqCopy.title}
+              </strong>
+              <div className="profile-faq-controls">
+                {faqView !== "home" && (
+                  <button type="button" className="profile-faq-ghost-btn" onClick={handleFaqBack}>
+                    {faqCopy.back}
                   </button>
-                ))}
+                )}
+                <button
+                  type="button"
+                  className="profile-faq-ghost-btn"
+                  onClick={() => {
+                    setFaqView("closed");
+                    setSelectedFaqIndicator("");
+                  }}
+                >
+                  {faqCopy.close}
+                </button>
               </div>
             </div>
-          )}
 
-          {faqView === "indicator" && selectedIndicatorInfo && (
-            <div className="profile-faq-detail">
-              <span className={`indicator-inline-code tone-${selectedIndicatorInfo.meta.tone}`}>
-                {selectedIndicatorInfo.meta.short}
-              </span>
-              <h3>{selectedIndicatorInfo.meta.title}</h3>
-              <p>{selectedIndicatorInfo.description}</p>
-              <div className="profile-faq-note-list">
-                <span>{faqCopy.howItHelps}: {faqCopy.indicatorUseLine}</span>
-                <span>{faqCopy.riskNote}</span>
-              </div>
+            <div className="profile-faq-modal-scroll">
+              {faqView === "home" && (
+                <div className="profile-faq-grid">
+                  {faqCards.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`profile-faq-card profile-faq-card-${item.id}`}
+                      onClick={() => handleFaqCardClick(item.id)}
+                    >
+                      <span className="profile-faq-marker">{item.marker}</span>
+                      <span className="profile-faq-card-copy">
+                        <strong>{item.title}</strong>
+                        <small>{item.subtitle}</small>
+                        <span>{item.body}</span>
+                      </span>
+                      <em>{item.id === "sonic" ? faqCopy.openTour : faqCopy.readMore}</em>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {(faqView === "scanner" || faqView === "auto") && (
+                <div className="profile-faq-detail">
+                  <span className="profile-faq-marker large">{faqView === "scanner" ? "SCN" : "AUTO"}</span>
+                  <h3>{faqCopy.cards[faqView].title}</h3>
+                  <p>{faqCopy.cards[faqView].body}</p>
+                  <div className="profile-faq-warning">{faqCopy.riskNote}</div>
+                </div>
+              )}
+
+              {faqView === "news" && (
+                <div className="profile-faq-detail">
+                  <span className="profile-faq-marker large">NEWS</span>
+                  <h3>{faqCopy.cards.news.title}</h3>
+                  <p>{faqCopy.cards.news.body}</p>
+                  <div className="profile-faq-note-list">
+                    {faqCopy.newsGuide.map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                  <div className="profile-faq-warning">{faqCopy.riskNote}</div>
+                </div>
+              )}
+
+              {faqView === "indicators" && (
+                <div className="profile-faq-indicators">
+                  <div className="profile-faq-note-list">
+                    {faqCopy.indicatorGuide.map((item) => (
+                      <span key={item}>{item}</span>
+                    ))}
+                  </div>
+                  <div className="profile-faq-indicator-grid">
+                    {faqIndicators.map((item) => (
+                      <button
+                        type="button"
+                        key={item.code}
+                        className="profile-faq-indicator-card"
+                        onClick={() => {
+                          setSelectedFaqIndicator(item.code);
+                          setFaqView("indicator");
+                        }}
+                      >
+                        <span className={`indicator-inline-code tone-${item.meta.tone}`}>{item.meta.short}</span>
+                        <strong>{item.meta.title}</strong>
+                        <small>{item.description}</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {faqView === "indicator" && selectedIndicatorInfo && (
+                <div className="profile-faq-detail">
+                  <span className={`indicator-inline-code tone-${selectedIndicatorInfo.meta.tone}`}>
+                    {selectedIndicatorInfo.meta.short}
+                  </span>
+                  <h3>{selectedIndicatorInfo.meta.title}</h3>
+                  <p>{selectedIndicatorInfo.description}</p>
+                  <div className="profile-faq-note-list">
+                    <span>{faqCopy.howItHelps}: {faqCopy.indicatorUseLine}</span>
+                    <span>{faqCopy.riskNote}</span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </section>
+        </div>
       )}
 
       <div className="card profile-section profile-settings-shell">

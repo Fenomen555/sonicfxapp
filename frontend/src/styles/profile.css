@@ -315,11 +315,10 @@
 }
 
 .profile-faq-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
 }
 
 .profile-faq-kicker {
@@ -351,7 +350,7 @@
 }
 
 .profile-faq-footer {
-  justify-content: flex-end;
+  justify-content: center;
   padding-top: 2px;
 }
 
@@ -374,7 +373,7 @@
 }
 
 .profile-faq-grid {
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .profile-faq-indicator-grid {
@@ -398,17 +397,16 @@
 }
 
 .profile-faq-card {
-  min-height: 78px;
+  min-height: 126px;
   padding: 12px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 12px;
+  align-content: start;
+  gap: 9px;
 }
 
 .profile-faq-card-news,
 .profile-faq-card-sonic {
-  min-height: 78px;
+  min-height: 126px;
 }
 
 .profile-faq-card-indicators {
@@ -461,7 +459,7 @@
 }
 
 .profile-faq-card em {
-  align-self: center;
+  align-self: end;
   width: fit-content;
   min-height: 28px;
   display: inline-flex;
@@ -1377,15 +1375,14 @@
   }
 
   .profile-faq-card {
-    min-height: 72px;
+    min-height: 118px;
     padding: 11px;
     border-radius: 18px;
-    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .profile-faq-card-sonic,
   .profile-faq-card-news {
-    min-height: 72px;
+    min-height: 118px;
   }
 
   .profile-faq-card-copy strong,
@@ -1401,7 +1398,6 @@
   }
 
   .profile-faq-card em {
-    grid-column: 2;
     min-height: 24px;
     font-size: 11px;
   }

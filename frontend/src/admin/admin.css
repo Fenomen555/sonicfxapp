@@ -899,3 +899,28 @@
 .admin-modal-card .admin-editor-grid {
   grid-template-columns: minmax(0, 1fr);
 }
+
+.admin-kpi-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.admin-kpi-card {
+  min-height: clamp(112px, 19vw, 136px);
+  align-content: space-between;
+  padding: clamp(12px, 2.6vw, 18px);
+}
+
+.admin-kpi-label {
+  font-size: clamp(9px, 2.3vw, 12px);
+  letter-spacing: 0.07em;
+  line-height: 1.25;
+}
+
+.admin-kpi-value {
+  font-size: clamp(28px, 7vw, 38px);
+}
+
+.admin-kpi-note {
+  font-size: clamp(10px, 2.5vw, 12px);
+  line-height: 1.3;
+}

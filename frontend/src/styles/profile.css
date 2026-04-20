@@ -292,7 +292,7 @@
 .profile-faq-modal {
   width: min(100%, 440px);
   max-height: calc(100dvh - var(--tg-content-safe-area-inset-top, env(safe-area-inset-top)) - var(--tg-content-safe-area-inset-bottom, env(safe-area-inset-bottom)) - 28px);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
   border-radius: 26px;
   animation: faqModalIn 0.22s ease both;
@@ -348,6 +348,11 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.profile-faq-footer {
+  justify-content: flex-end;
+  padding-top: 2px;
 }
 
 .profile-faq-ghost-btn {

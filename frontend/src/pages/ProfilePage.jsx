@@ -616,23 +616,6 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                   ? selectedIndicatorInfo.meta.title
                   : faqCopy.cards[faqView]?.title || faqCopy.title}
               </strong>
-              <div className="profile-faq-controls">
-                {faqView !== "home" && (
-                  <button type="button" className="profile-faq-ghost-btn" onClick={handleFaqBack}>
-                    {faqCopy.back}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="profile-faq-ghost-btn"
-                  onClick={() => {
-                    setFaqView("closed");
-                    setSelectedFaqIndicator("");
-                  }}
-                >
-                  {faqCopy.close}
-                </button>
-              </div>
             </div>
 
             <div className="profile-faq-modal-scroll">
@@ -719,6 +702,24 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="profile-faq-controls profile-faq-footer">
+              {faqView !== "home" && (
+                <button type="button" className="profile-faq-ghost-btn" onClick={handleFaqBack}>
+                  {faqCopy.back}
+                </button>
+              )}
+              <button
+                type="button"
+                className="profile-faq-ghost-btn"
+                onClick={() => {
+                  setFaqView("closed");
+                  setSelectedFaqIndicator("");
+                }}
+              >
+                {faqCopy.close}
+              </button>
             </div>
           </section>
         </div>

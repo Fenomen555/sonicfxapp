@@ -206,7 +206,8 @@ class ScanLinkUploadRequest(BaseModel):
 
 class AdminSetActivationRequest(BaseModel):
     user_id: int
-    activation_status: str
+    activation_status: Optional[str] = None
+    account_tier: Optional[str] = Field(default=None, max_length=16)
     deposit_amount: Optional[float] = None
     trader_id: Optional[str] = Field(default=None, max_length=128)
 
@@ -2397,28 +2398,64 @@ async def admin_set_activation(
     payload: AdminSetActivationRequest,
     admin: Dict[str, Any] = Depends(get_admin_user),
 ):
-    status = _coerce_activation(payload.activation_status)
-    deposit_amount = float(payload.deposit_amount or 0)
     trader_id = (payload.trader_id or "").strip() or None
-    scanner_access = scanner_access_from_deposit(deposit_amount, 1 if status == "active_scanner" else 0)
-    if status == "active_scanner":
-        scanner_access = 1
     pool = await require_db_pool()
     async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                "SELECT activation_status, account_tier, deposit_amount, scanner_access FROM users WHERE user_id = %s LIMIT 1",
+                (int(payload.user_id),),
+            )
+            existing = await cur.fetchone()
+            if not existing:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            status = _coerce_activation(payload.activation_status or existing.get("activation_status") or "inactive")
+            account_tier = normalize_account_tier(payload.account_tier or existing.get("account_tier") or "trader")
+            deposit_amount = float(existing.get("deposit_amount") if payload.deposit_amount is None else payload.deposit_amount or 0)
+            scanner_access = scanner_access_from_deposit(deposit_amount, int(existing.get("scanner_access") or 0))
+            if status == "active_scanner":
+                scanner_access = 1
+
             await cur.execute(
                 """
                 UPDATE users
                 SET activation_status = %s,
+                    account_tier = %s,
                     trader_id = %s,
                     deposit_amount = %s,
                     scanner_access = %s,
                     updated_at = NOW()
                 WHERE user_id = %s
                 """,
-                (status, trader_id, deposit_amount, int(scanner_access), int(payload.user_id)),
+                (status, account_tier, trader_id, deposit_amount, int(scanner_access), int(payload.user_id)),
             )
     await add_admin_audit(int(admin["user_id"]), "admin_set_activation", payload.model_dump())
+    return {"status": "success"}
+
+
+@app.delete("/api/admin/users/{user_id}")
+async def admin_delete_user(
+    user_id: int,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    target_user_id = int(user_id)
+    if target_user_id == int(admin["user_id"]):
+        raise HTTPException(status_code=400, detail="Cannot delete current admin user")
+
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT user_id FROM users WHERE user_id = %s LIMIT 1", (target_user_id,))
+            if not await cur.fetchone():
+                raise HTTPException(status_code=404, detail="User not found")
+
+            await cur.execute("DELETE FROM scan_uploads WHERE user_id = %s", (target_user_id,))
+            await cur.execute("DELETE FROM signals WHERE user_id = %s", (target_user_id,))
+            await cur.execute("DELETE FROM admin_users WHERE user_id = %s", (target_user_id,))
+            await cur.execute("DELETE FROM users WHERE user_id = %s", (target_user_id,))
+
+    await add_admin_audit(int(admin["user_id"]), "admin_delete_user", {"user_id": target_user_id})
     return {"status": "success"}
 
 

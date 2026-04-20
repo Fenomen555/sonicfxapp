@@ -31,10 +31,10 @@ const FLAG_META = {
   }
 };
 
-const USER_STATUS_META = {
-  inactive: { label: "Не активирован", tone: "neutral" },
-  active: { label: "Активен", tone: "success" },
-  active_scanner: { label: "Сканер активен", tone: "accent" }
+const ACCOUNT_TIER_META = {
+  trader: { label: "Trader", tone: "accent" },
+  pro: { label: "PRO", tone: "success" },
+  vip: { label: "VIP", tone: "warning" }
 };
 
 const FILTER_DEFAULTS = {
@@ -141,14 +141,6 @@ function formatNumber(value) {
   return new Intl.NumberFormat("ru-RU").format(numeric);
 }
 
-function formatDeposit(value) {
-  const numeric = Number(value || 0);
-  return new Intl.NumberFormat("ru-RU", {
-    minimumFractionDigits: numeric % 1 === 0 ? 0 : 2,
-    maximumFractionDigits: 2
-  }).format(numeric);
-}
-
 function formatPercent(value) {
   return `${Math.round(Number(value || 0))}%`;
 }
@@ -160,19 +152,8 @@ function getFlagMeta(key) {
   };
 }
 
-function getUserStatusMeta(status) {
-  return USER_STATUS_META[status] || { label: status || "-", tone: "neutral" };
-}
-
-function getRegistrationFilterLabel(value) {
-  const labels = {
-    all: "Все даты",
-    today: "Сегодня",
-    week: "Последние 7 дней",
-    month: "Последние 30 дней",
-    quarter: "Последние 90 дней"
-  };
-  return labels[value] || labels.all;
+function getAccountTierMeta(tier) {
+  return ACCOUNT_TIER_META[tier] || ACCOUNT_TIER_META.trader;
 }
 
 function isWithinRegistrationRange(value, filter) {
@@ -225,8 +206,9 @@ export default function AdminApp({ authError }) {
   const [userSearch, setUserSearch] = useState("");
   const [userFilters, setUserFilters] = useState(FILTER_DEFAULTS);
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const [userEditor, setUserEditor] = useState({ activation_status: "inactive", trader_id: "", deposit_amount: "0" });
+  const [userEditor, setUserEditor] = useState({ account_tier: "trader", trader_id: "" });
   const [userSaving, setUserSaving] = useState(false);
+  const [userDeleting, setUserDeleting] = useState(false);
   const [flagSavingKey, setFlagSavingKey] = useState("");
 
   const pushToast = (type, title, message) => {
@@ -305,9 +287,8 @@ export default function AdminApp({ authError }) {
   useEffect(() => {
     if (!selectedUser) return;
     setUserEditor({
-      activation_status: selectedUser.activation_status || "inactive",
-      trader_id: selectedUser.trader_id || "",
-      deposit_amount: String(selectedUser.deposit_amount ?? 0)
+      account_tier: selectedUser.account_tier || "trader",
+      trader_id: selectedUser.trader_id || ""
     });
   }, [selectedUser]);
   const loadCurrentTab = async (targetTab = tab, options = {}) => {
@@ -370,7 +351,7 @@ export default function AdminApp({ authError }) {
         .toLowerCase();
 
       if (query && !haystack.includes(query)) return false;
-      if (userFilters.status !== "all" && item.activation_status !== userFilters.status) return false;
+      if (userFilters.status !== "all" && item.account_tier !== userFilters.status) return false;
       if (userFilters.access === "with_access" && !item.scanner_access) return false;
       if (userFilters.access === "without_access" && item.scanner_access) return false;
       if (userFilters.deposit === "with_deposit" && Number(item.deposit_amount || 0) <= 0) return false;
@@ -570,9 +551,8 @@ export default function AdminApp({ authError }) {
         method: "POST",
         body: JSON.stringify({
           user_id: selectedUser.user_id,
-          activation_status: userEditor.activation_status,
-          trader_id: userEditor.trader_id || "",
-          deposit_amount: Number(userEditor.deposit_amount || 0)
+          account_tier: userEditor.account_tier,
+          trader_id: userEditor.trader_id || ""
         })
       });
 
@@ -585,6 +565,27 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось сохранить пользователя", error.message || "Изменения не были применены.");
     } finally {
       setUserSaving(false);
+    }
+  };
+
+  const deleteUserCard = async () => {
+    if (!selectedUser) return;
+    const confirmed = window.confirm(`Удалить пользователя ${selectedUser.user_id}? Это действие нельзя отменить.`);
+    if (!confirmed) return;
+
+    setUserDeleting(true);
+    try {
+      await apiAdminFetchJson(`/api/admin/users/${selectedUser.user_id}`, { method: "DELETE" });
+      setSelectedUserId(null);
+      const data = await apiAdminFetchJson("/api/admin/users?limit=200");
+      setUsers(data?.items || []);
+      const nextStats = await apiAdminFetchJson("/api/admin/stats");
+      setStats(nextStats);
+      pushToast("success", "Пользователь удалён", `Карточка ${selectedUser.user_id} удалена из базы.`);
+    } catch (error) {
+      pushToast("error", "Не удалось удалить пользователя", error.message || "Попробуйте повторить действие позже.");
+    } finally {
+      setUserDeleting(false);
     }
   };
   if (authError) {
@@ -720,7 +721,7 @@ export default function AdminApp({ authError }) {
               <div className="admin-filter-head">
                 <div>
                   <div className="admin-section-title">Поиск и фильтры</div>
-                  <div className="admin-muted-text">Ищем по user id, trader id, username, mini username и имени пользователя.</div>
+                  <div className="admin-muted-text">Ищем по user id, trader id, username и имени пользователя.</div>
                 </div>
                 <div className="admin-filter-meta">Найдено: {filteredUsers.length}</div>
               </div>
@@ -741,9 +742,9 @@ export default function AdminApp({ authError }) {
                   <span>Статус</span>
                   <select className="admin-select" value={userFilters.status} onChange={(e) => handleFilterChange("status", e.target.value)}>
                     <option value="all">Все статусы</option>
-                    <option value="inactive">Не активирован</option>
-                    <option value="active">Активен</option>
-                    <option value="active_scanner">Сканер активен</option>
+                    <option value="trader">Trader</option>
+                    <option value="pro">PRO</option>
+                    <option value="vip">VIP</option>
                   </select>
                 </label>
 
@@ -790,7 +791,7 @@ export default function AdminApp({ authError }) {
 
             <section className="admin-user-grid">
               {filteredUsers.map((item) => {
-                const statusMeta = getUserStatusMeta(item.activation_status);
+                const tierMeta = getAccountTierMeta(item.account_tier);
                 return (
                   <button
                     className={`admin-user-card ${selectedUserId === item.user_id ? "active" : ""}`}
@@ -803,13 +804,12 @@ export default function AdminApp({ authError }) {
                         <strong>{item.first_name || item.tg_username || "Без имени"}</strong>
                         <span>#{item.user_id}</span>
                       </div>
-                      <span className={`admin-badge tone-${statusMeta.tone}`}>{statusMeta.label}</span>
+                      <span className={`admin-badge tone-${tierMeta.tone}`}>{tierMeta.label}</span>
                     </div>
 
                     <div className="admin-user-card-body">
                       <div className="admin-user-line">@{item.tg_username || "-"}</div>
                       <div className="admin-user-line">Trader ID: {item.trader_id || "-"}</div>
-                      <div className="admin-user-line">Mini app: {item.mini_username || "-"}</div>
                     </div>
 
                     <div className="admin-user-chip-row">
@@ -1035,55 +1035,42 @@ export default function AdminApp({ authError }) {
               <div>
                 <span className="admin-kicker">Карточка пользователя</span>
                 <h2>{selectedUser.first_name || selectedUser.tg_username || "Без имени"}</h2>
-                <p>Полный профиль пользователя, доступы и ручное изменение статуса.</p>
+                <p>Основные данные, Trader ID и статус аккаунта.</p>
               </div>
               <button className="admin-modal-close" type="button" onClick={() => setSelectedUserId(null)}>x</button>
             </div>
             <div className="admin-user-detail-grid">
               <article className="admin-card admin-user-detail-card">
                 <div className="admin-user-detail-head">
-                  <strong>Основное</strong>
-                  <span className={`admin-badge tone-${getUserStatusMeta(selectedUser.activation_status).tone}`}>
-                    {getUserStatusMeta(selectedUser.activation_status).label}
+                  <strong>Управление пользователем</strong>
+                  <span className={`admin-badge tone-${getAccountTierMeta(selectedUser.account_tier).tone}`}>
+                    {getAccountTierMeta(selectedUser.account_tier).label}
                   </span>
                 </div>
                 <div className="admin-info-list">
                   <div><span>User ID</span><strong>{selectedUser.user_id}</strong></div>
                   <div><span>Trader ID</span><strong>{selectedUser.trader_id || "-"}</strong></div>
                   <div><span>Username</span><strong>@{selectedUser.tg_username || "-"}</strong></div>
-                  <div><span>Mini app</span><strong>{selectedUser.mini_username || "-"}</strong></div>
+                  <div><span>Статус</span><strong>{getAccountTierMeta(selectedUser.account_tier).label}</strong></div>
+                  <div><span>Сканер</span><strong>{selectedUser.scanner_access ? "Есть доступ" : "Нет доступа"}</strong></div>
+                  <div><span>Блокировка</span><strong>{selectedUser.is_blocked ? "Заблокирован" : "Не заблокирован"}</strong></div>
                   <div><span>Язык</span><strong>{selectedUser.lang || "-"}</strong></div>
                   <div><span>Тема</span><strong>{selectedUser.theme || "-"}</strong></div>
                   <div><span>Регистрация</span><strong>{formatDateTime(selectedUser.created_at)}</strong></div>
                   <div><span>Последняя активность</span><strong>{formatDateTime(selectedUser.last_active_at)}</strong></div>
                 </div>
-              </article>
-
-              <article className="admin-card admin-user-detail-card">
-                <div className="admin-user-detail-head">
-                  <strong>Доступы и идентификаторы</strong>
-                  <span className={`admin-badge ${selectedUser.is_blocked ? "tone-danger" : "tone-success"}`}>
-                    {selectedUser.is_blocked ? "Заблокирован" : "Не заблокирован"}
-                  </span>
-                </div>
-                <div className="admin-info-list">
-                  <div><span>Сканер</span><strong>{selectedUser.scanner_access ? "Есть доступ" : "Нет доступа"}</strong></div>
-                  <div><span>Trader ID</span><strong>{selectedUser.trader_id || "-"}</strong></div>
-                  <div><span>Депозит</span><strong>{formatDeposit(selectedUser.deposit_amount)}</strong></div>
-                  <div><span>Фильтр даты</span><strong>{getRegistrationFilterLabel(userFilters.registered)}</strong></div>
-                </div>
 
                 <div className="admin-editor-grid">
                   <label className="admin-field">
-                    <span>Новый статус</span>
+                    <span>Статус</span>
                     <select
                       className="admin-select"
-                      value={userEditor.activation_status}
-                      onChange={(e) => setUserEditor((prev) => ({ ...prev, activation_status: e.target.value }))}
+                      value={userEditor.account_tier}
+                      onChange={(e) => setUserEditor((prev) => ({ ...prev, account_tier: e.target.value }))}
                     >
-                      <option value="inactive">Не активирован</option>
-                      <option value="active">Активен</option>
-                      <option value="active_scanner">Сканер активен</option>
+                      <option value="trader">Trader</option>
+                      <option value="pro">PRO</option>
+                      <option value="vip">VIP</option>
                     </select>
                   </label>
 
@@ -1099,23 +1086,14 @@ export default function AdminApp({ authError }) {
                     />
                   </label>
 
-                  <label className="admin-field">
-                    <span>Депозит</span>
-                    <input
-                      className="admin-input"
-                      inputMode="decimal"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={userEditor.deposit_amount}
-                      onChange={(e) => setUserEditor((prev) => ({ ...prev, deposit_amount: e.target.value }))}
-                    />
-                  </label>
                 </div>
 
                 <div className="admin-modal-actions">
                   <button className="admin-ghost-button" type="button" onClick={() => setSelectedUserId(null)}>Закрыть</button>
-                  <button className="admin-primary-button" disabled={userSaving} type="button" onClick={saveUserCard}>
+                  <button className="admin-danger-button" disabled={userDeleting || userSaving} type="button" onClick={deleteUserCard}>
+                    {userDeleting ? "Удаляем..." : "Удалить пользователя"}
+                  </button>
+                  <button className="admin-primary-button" disabled={userSaving || userDeleting} type="button" onClick={saveUserCard}>
                     {userSaving ? "Сохраняем..." : "Сохранить изменения"}
                   </button>
                 </div>

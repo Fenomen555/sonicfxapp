@@ -80,6 +80,7 @@
 
 .admin-primary-button,
 .admin-ghost-button,
+.admin-danger-button,
 .admin-modal-close {
   border-radius: 16px;
   font-weight: 800;
@@ -106,13 +107,25 @@
   color: var(--text-main);
 }
 
+.admin-danger-button {
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 122, 122, 0.3);
+  background:
+    radial-gradient(circle at top right, rgba(255, 122, 122, 0.14), transparent 55%),
+    rgba(45, 18, 22, 0.78);
+  color: #ffd6d6;
+}
+
 .admin-primary-button,
-.admin-ghost-button {
+.admin-ghost-button,
+.admin-danger-button {
   font-size: 13px;
 }
 
 .admin-primary-button:disabled,
-.admin-ghost-button:disabled {
+.admin-ghost-button:disabled,
+.admin-danger-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -360,6 +373,10 @@
   border-color: rgba(228, 196, 134, 0.3);
 }
 
+.admin-badge.tone-warning {
+  border-color: rgba(242, 200, 122, 0.32);
+}
+
 .admin-kpi-card.tone-neutral,
 .admin-badge.tone-neutral {
   border-color: rgba(170, 183, 206, 0.22);
@@ -564,6 +581,11 @@
   color: #dde4f2;
 }
 
+.admin-badge.tone-warning {
+  background: rgba(242, 200, 122, 0.12);
+  color: #ffe0a1;
+}
+
 .admin-badge.tone-danger {
   background: rgba(255, 107, 107, 0.12);
   border-color: rgba(255, 107, 107, 0.24);
@@ -653,7 +675,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: min(920px, calc(100vw - 24px));
+  width: min(720px, calc(100vw - 24px));
   max-height: calc(100dvh - 32px);
   overflow: auto;
   border-radius: 28px;
@@ -684,12 +706,13 @@
 
 .admin-user-detail-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
 }
 
-.admin-editor-grid {
-  margin-top: 6px;
+.admin-modal-card .admin-editor-grid {
+  margin-top: 14px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .admin-toast-stack {
@@ -732,6 +755,7 @@
 @media (hover: hover) {
   .admin-primary-button:hover,
   .admin-ghost-button:hover,
+  .admin-danger-button:hover,
   .admin-section-card:hover,
   .admin-user-card:hover,
   .admin-modal-close:hover {
@@ -869,4 +893,9 @@
   .admin-field-wide {
     grid-column: span 1;
   }
+}
+
+.admin-modal-card .admin-user-detail-grid,
+.admin-modal-card .admin-editor-grid {
+  grid-template-columns: minmax(0, 1fr);
 }

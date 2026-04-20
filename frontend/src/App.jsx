@@ -28,6 +28,7 @@ const FALLBACK_USER = {
   timezone: "Europe/Kiev",
   theme: "dark",
   activation_status: "inactive",
+  trader_id: "",
   scanner_access: 0,
   deposit_amount: 0,
   onboarding_seen: 0

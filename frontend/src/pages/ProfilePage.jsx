@@ -324,9 +324,9 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
         value: user?.tg_username ? `@${user.tg_username}` : "-"
       },
       {
-        key: "balance",
-        label: t.profile.balanceLabel || "Баланс",
-        value: `$${Number(user?.deposit_amount || 0).toFixed(2)}`
+        key: "trader_id",
+        label: t.profile.traderId || "Trader ID",
+        value: user?.trader_id || "-"
       },
       {
         key: "joined",

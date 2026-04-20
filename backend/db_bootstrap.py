@@ -207,6 +207,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev',
                     theme VARCHAR(16) NOT NULL DEFAULT 'dark',
                     account_tier VARCHAR(16) NOT NULL DEFAULT 'trader',
+                    trader_id VARCHAR(128) NULL,
                     activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive',
                     deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
                     scanner_access TINYINT(1) NOT NULL DEFAULT 0,
@@ -374,6 +375,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "users", "mini_username", "ALTER TABLE users ADD COLUMN mini_username VARCHAR(64) NULL")
         await _ensure_column(conn, db_name, "users", "photo_url", "ALTER TABLE users ADD COLUMN photo_url TEXT NULL")
         await _ensure_column(conn, db_name, "users", "account_tier", "ALTER TABLE users ADD COLUMN account_tier VARCHAR(16) NOT NULL DEFAULT 'trader'")
+        await _ensure_column(conn, db_name, "users", "trader_id", "ALTER TABLE users ADD COLUMN trader_id VARCHAR(128) NULL")
         await _ensure_column(conn, db_name, "users", "activation_status", "ALTER TABLE users ADD COLUMN activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive'")
         await _ensure_column(conn, db_name, "users", "deposit_amount", "ALTER TABLE users ADD COLUMN deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "scanner_access", "ALTER TABLE users ADD COLUMN scanner_access TINYINT(1) NOT NULL DEFAULT 0")
@@ -418,6 +420,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "news_items", "idx_news_feed_category_visible", "CREATE INDEX idx_news_feed_category_visible ON news_items (feed_type, news_category, is_visible)")
         await _ensure_index(conn, db_name, "users", "idx_users_activation_status", "CREATE INDEX idx_users_activation_status ON users (activation_status)")
         await _ensure_index(conn, db_name, "users", "idx_users_account_tier", "CREATE INDEX idx_users_account_tier ON users (account_tier)")
+        await _ensure_index(conn, db_name, "users", "idx_users_trader_id", "CREATE INDEX idx_users_trader_id ON users (trader_id)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_kind_active", "CREATE INDEX idx_market_pairs_kind_active ON market_pairs (pair_kind, is_active)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_last_seen", "CREATE INDEX idx_market_pairs_last_seen ON market_pairs (last_seen_at)")
         await _ensure_index(conn, db_name, "signal_indicators", "idx_signal_indicators_enabled_order", "CREATE INDEX idx_signal_indicators_enabled_order ON signal_indicators (is_enabled, sort_order)")

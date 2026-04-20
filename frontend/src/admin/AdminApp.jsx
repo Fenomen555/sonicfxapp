@@ -225,7 +225,7 @@ export default function AdminApp({ authError }) {
   const [userSearch, setUserSearch] = useState("");
   const [userFilters, setUserFilters] = useState(FILTER_DEFAULTS);
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const [userEditor, setUserEditor] = useState({ activation_status: "inactive", deposit_amount: "0" });
+  const [userEditor, setUserEditor] = useState({ activation_status: "inactive", trader_id: "", deposit_amount: "0" });
   const [userSaving, setUserSaving] = useState(false);
   const [flagSavingKey, setFlagSavingKey] = useState("");
 
@@ -306,6 +306,7 @@ export default function AdminApp({ authError }) {
     if (!selectedUser) return;
     setUserEditor({
       activation_status: selectedUser.activation_status || "inactive",
+      trader_id: selectedUser.trader_id || "",
       deposit_amount: String(selectedUser.deposit_amount ?? 0)
     });
   }, [selectedUser]);
@@ -360,6 +361,7 @@ export default function AdminApp({ authError }) {
     return users.filter((item) => {
       const haystack = [
         String(item.user_id || ""),
+        item.trader_id || "",
         item.tg_username || "",
         item.mini_username || "",
         item.first_name || ""
@@ -569,6 +571,7 @@ export default function AdminApp({ authError }) {
         body: JSON.stringify({
           user_id: selectedUser.user_id,
           activation_status: userEditor.activation_status,
+          trader_id: userEditor.trader_id || "",
           deposit_amount: Number(userEditor.deposit_amount || 0)
         })
       });
@@ -717,7 +720,7 @@ export default function AdminApp({ authError }) {
               <div className="admin-filter-head">
                 <div>
                   <div className="admin-section-title">Поиск и фильтры</div>
-                  <div className="admin-muted-text">Ищем по user id, username, mini username и имени пользователя.</div>
+                  <div className="admin-muted-text">Ищем по user id, trader id, username, mini username и имени пользователя.</div>
                 </div>
                 <div className="admin-filter-meta">Найдено: {filteredUsers.length}</div>
               </div>
@@ -728,7 +731,7 @@ export default function AdminApp({ authError }) {
                   <input
                     className="admin-input"
                     type="text"
-                    placeholder="Например: 7097, devsbite, Test"
+                    placeholder="Например: 7097, TR-1024, devsbite"
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
                   />
@@ -805,12 +808,13 @@ export default function AdminApp({ authError }) {
 
                     <div className="admin-user-card-body">
                       <div className="admin-user-line">@{item.tg_username || "-"}</div>
+                      <div className="admin-user-line">Trader ID: {item.trader_id || "-"}</div>
                       <div className="admin-user-line">Mini app: {item.mini_username || "-"}</div>
                     </div>
 
                     <div className="admin-user-chip-row">
                       <span className={`admin-mini-chip ${item.scanner_access ? "is-on" : ""}`}>{item.scanner_access ? "Сканер: да" : "Сканер: нет"}</span>
-                      <span className={`admin-mini-chip ${Number(item.deposit_amount || 0) > 0 ? "is-on" : ""}`}>Депозит: {formatDeposit(item.deposit_amount)}</span>
+                      <span className={`admin-mini-chip ${item.trader_id ? "is-on" : ""}`}>Trader ID: {item.trader_id || "-"}</span>
                     </div>
 
                     <div className="admin-user-card-footer">Регистрация: {formatDate(item.created_at)}</div>
@@ -1045,6 +1049,7 @@ export default function AdminApp({ authError }) {
                 </div>
                 <div className="admin-info-list">
                   <div><span>User ID</span><strong>{selectedUser.user_id}</strong></div>
+                  <div><span>Trader ID</span><strong>{selectedUser.trader_id || "-"}</strong></div>
                   <div><span>Username</span><strong>@{selectedUser.tg_username || "-"}</strong></div>
                   <div><span>Mini app</span><strong>{selectedUser.mini_username || "-"}</strong></div>
                   <div><span>Язык</span><strong>{selectedUser.lang || "-"}</strong></div>
@@ -1056,13 +1061,14 @@ export default function AdminApp({ authError }) {
 
               <article className="admin-card admin-user-detail-card">
                 <div className="admin-user-detail-head">
-                  <strong>Доступы и финансы</strong>
+                  <strong>Доступы и идентификаторы</strong>
                   <span className={`admin-badge ${selectedUser.is_blocked ? "tone-danger" : "tone-success"}`}>
                     {selectedUser.is_blocked ? "Заблокирован" : "Не заблокирован"}
                   </span>
                 </div>
                 <div className="admin-info-list">
                   <div><span>Сканер</span><strong>{selectedUser.scanner_access ? "Есть доступ" : "Нет доступа"}</strong></div>
+                  <div><span>Trader ID</span><strong>{selectedUser.trader_id || "-"}</strong></div>
                   <div><span>Депозит</span><strong>{formatDeposit(selectedUser.deposit_amount)}</strong></div>
                   <div><span>Фильтр даты</span><strong>{getRegistrationFilterLabel(userFilters.registered)}</strong></div>
                 </div>
@@ -1079,6 +1085,18 @@ export default function AdminApp({ authError }) {
                       <option value="active">Активен</option>
                       <option value="active_scanner">Сканер активен</option>
                     </select>
+                  </label>
+
+                  <label className="admin-field">
+                    <span>Trader ID</span>
+                    <input
+                      className="admin-input"
+                      type="text"
+                      maxLength="128"
+                      placeholder="Если не указан, будет -"
+                      value={userEditor.trader_id}
+                      onChange={(e) => setUserEditor((prev) => ({ ...prev, trader_id: e.target.value }))}
+                    />
                   </label>
 
                   <label className="admin-field">

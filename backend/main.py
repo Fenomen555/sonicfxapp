@@ -208,6 +208,7 @@ class AdminSetActivationRequest(BaseModel):
     user_id: int
     activation_status: str
     deposit_amount: Optional[float] = None
+    trader_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class AdminFlagUpdateRequest(BaseModel):
@@ -736,6 +737,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "timezone": row.get("timezone") or "Europe/Kiev",
         "theme": _coerce_theme(row.get("theme") or "dark"),
         "account_tier": normalize_account_tier(row.get("account_tier") or "trader"),
+        "trader_id": row.get("trader_id") or "",
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
         "deposit_amount": float(row.get("deposit_amount") or 0),
         "scanner_access": int(row.get("scanner_access") or 0),
@@ -2358,7 +2360,7 @@ async def admin_users(
                 """
                 SELECT
                     user_id, tg_username, first_name, mini_username, lang, theme,
-                    activation_status, deposit_amount, scanner_access, is_blocked,
+                    activation_status, account_tier, trader_id, deposit_amount, scanner_access, is_blocked,
                     created_at, last_active_at
                 FROM users
                 ORDER BY created_at DESC
@@ -2377,6 +2379,8 @@ async def admin_users(
                 "mini_username": row.get("mini_username") or "",
                 "lang": normalize_user_lang(row.get("lang") or "ru"),
                 "theme": _coerce_theme(row.get("theme") or "dark"),
+                "account_tier": normalize_account_tier(row.get("account_tier") or "trader"),
+                "trader_id": row.get("trader_id") or "",
                 "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
                 "deposit_amount": float(row.get("deposit_amount") or 0),
                 "scanner_access": int(row.get("scanner_access") or 0),
@@ -2395,6 +2399,7 @@ async def admin_set_activation(
 ):
     status = _coerce_activation(payload.activation_status)
     deposit_amount = float(payload.deposit_amount or 0)
+    trader_id = (payload.trader_id or "").strip() or None
     scanner_access = scanner_access_from_deposit(deposit_amount, 1 if status == "active_scanner" else 0)
     if status == "active_scanner":
         scanner_access = 1
@@ -2405,12 +2410,13 @@ async def admin_set_activation(
                 """
                 UPDATE users
                 SET activation_status = %s,
+                    trader_id = %s,
                     deposit_amount = %s,
                     scanner_access = %s,
                     updated_at = NOW()
                 WHERE user_id = %s
                 """,
-                (status, deposit_amount, int(scanner_access), int(payload.user_id)),
+                (status, trader_id, deposit_amount, int(scanner_access), int(payload.user_id)),
             )
     await add_admin_audit(int(admin["user_id"]), "admin_set_activation", payload.model_dump())
     return {"status": "success"}

@@ -628,7 +628,6 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                       className={`profile-faq-card profile-faq-card-${item.id}`}
                       onClick={() => handleFaqCardClick(item.id)}
                     >
-                      <span className="profile-faq-marker">{item.marker}</span>
                       <span className="profile-faq-card-copy">
                         <strong>{item.title}</strong>
                         <small>{item.subtitle}</small>

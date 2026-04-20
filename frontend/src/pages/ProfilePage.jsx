@@ -93,7 +93,7 @@ function getFaqCopy(lang, t) {
   const modeDisclaimer = t.home?.modeInfoDisclaimer || "Сигнал носит информационный характер и не является гарантией результата сделки.";
   const ru = {
     title: "FAQ",
-    subtitle: "Короткие подсказки по SonicFX, режимам, индикаторам и новостям.",
+    subtitle: "Выберите раздел",
     close: "Закрыть",
     back: "Назад",
     openTour: "Открыть обучение",
@@ -145,7 +145,7 @@ function getFaqCopy(lang, t) {
     return {
       ...ru,
       title: "FAQ",
-      subtitle: "Short guides for SonicFX, modes, indicators, and news.",
+      subtitle: "Choose a section",
       close: "Close",
       back: "Back",
       openTour: "Open tour",
@@ -175,7 +175,7 @@ function getFaqCopy(lang, t) {
     return {
       ...ru,
       title: "FAQ",
-      subtitle: "Короткі підказки по SonicFX, режимах, індикаторах і новинах.",
+      subtitle: "Оберіть розділ",
       close: "Закрити",
       back: "Назад",
       openTour: "Відкрити навчання",
@@ -649,7 +649,6 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                       <span className="profile-faq-card-copy">
                         <strong>{item.title}</strong>
                         <small>{item.subtitle}</small>
-                        <span>{item.body}</span>
                       </span>
                       <em>{item.id === "sonic" ? faqCopy.openTour : faqCopy.readMore}</em>
                     </button>

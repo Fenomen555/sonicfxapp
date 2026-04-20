@@ -961,21 +961,23 @@ export default function AdminApp({ authError }) {
                           <span>{item.description || "Индикатор доступен для ручной генерации сигнала."}</span>
                         </div>
                       </div>
-                      <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
-                        {enabled ? "Включён" : "Скрыт"}
-                      </span>
-                    </div>
-
-                    <div className="admin-indicator-footer">
-                      <span className="admin-muted-text">Обновлён: {formatDateTime(item.updated_at)}</span>
                       <button
-                        className={enabled ? "admin-ghost-button" : "admin-primary-button"}
+                        className={`admin-indicator-switch ${enabled ? "is-on" : ""}`}
                         disabled={indicatorSavingCode === item.code}
                         onClick={() => toggleIndicator(item)}
                         type="button"
+                        aria-pressed={enabled}
                       >
-                        {indicatorSavingCode === item.code ? "Сохраняем..." : enabled ? "Отключить" : "Включить"}
+                        <span>{indicatorSavingCode === item.code ? "..." : enabled ? "Активный" : "Не активный"}</span>
+                        <i aria-hidden="true" />
                       </button>
+                    </div>
+
+                    <div className="admin-indicator-footer">
+                      <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
+                        {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
+                      </span>
+                      <span className="admin-muted-text">Обновлён: {formatDateTime(item.updated_at)}</span>
                     </div>
                   </article>
                 );

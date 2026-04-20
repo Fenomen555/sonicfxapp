@@ -421,16 +421,23 @@
 .admin-indicator-card {
   padding: 18px;
   display: grid;
-  gap: 14px;
+  gap: 16px;
+  min-height: 196px;
+  align-content: space-between;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(111, 164, 255, 0.13), transparent 34%),
+    linear-gradient(145deg, rgba(18, 31, 51, 0.98), rgba(7, 13, 24, 0.98));
 }
 
 .admin-indicator-card.is-enabled {
-  border-color: rgba(118, 199, 156, 0.22);
+  border-color: rgba(118, 199, 156, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 46px rgba(46, 124, 91, 0.1);
 }
 
 .admin-indicator-card.is-disabled {
   border-color: rgba(170, 183, 206, 0.16);
-  opacity: 0.92;
+  opacity: 0.72;
 }
 
 .admin-indicator-copy {
@@ -443,7 +450,7 @@
 .admin-indicator-copy strong {
   display: block;
   margin-bottom: 4px;
-  font-size: 17px;
+  font-size: clamp(14px, 2.7vw, 17px);
   line-height: 1.08;
 }
 
@@ -484,6 +491,53 @@
 .admin-indicator-badge.tone-aqua { color: #70f1ee; }
 .admin-indicator-badge.tone-sky { color: #8fd4ff; }
 .admin-indicator-badge.tone-lime { color: #b6ef74; }
+
+.admin-indicator-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 136px;
+  min-height: 36px;
+  padding: 4px 5px 4px 12px;
+  border: 1px solid rgba(154, 184, 229, 0.22);
+  border-radius: 999px;
+  color: rgba(229, 237, 250, 0.68);
+  background: rgba(6, 12, 22, 0.64);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+}
+
+.admin-indicator-switch span {
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.admin-indicator-switch i {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #75839b, #d7e1f1);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.admin-indicator-switch.is-on {
+  color: #dfffea;
+  border-color: rgba(96, 224, 152, 0.42);
+  background: linear-gradient(135deg, rgba(27, 88, 61, 0.92), rgba(20, 47, 76, 0.92));
+}
+
+.admin-indicator-switch.is-on i {
+  background: linear-gradient(145deg, #f5fff8, #63ee9f);
+}
+
+.admin-indicator-switch:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
 
 .admin-field {
   display: grid;
@@ -1117,6 +1171,34 @@
 }
 
 @media (max-width: 390px) {
+  .admin-indicator-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-indicator-card {
+    min-height: 184px;
+    padding: 13px;
+  }
+
+  .admin-indicator-copy {
+    gap: 9px;
+  }
+
+  .admin-indicator-badge {
+    min-width: 44px;
+    min-height: 28px;
+    font-size: 10px;
+  }
+
+  .admin-indicator-switch {
+    min-width: 100%;
+    padding-left: 10px;
+  }
+
+  .admin-indicator-switch span {
+    font-size: 10px;
+  }
+
   .admin-mode-control-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -228,6 +228,11 @@ class AdminMarketSettingsUpdateRequest(BaseModel):
     market_pairs_sync_interval_min: int = Field(ge=2, le=30)
 
 
+class AdminMarketStatusUpdateRequest(BaseModel):
+    key: str
+    is_enabled: int
+
+
 class AdminIndicatorUpdateRequest(BaseModel):
     code: str
     is_enabled: int
@@ -823,6 +828,38 @@ async def get_market_sync_interval_min() -> int:
     return _sanitize_market_sync_interval_min(raw)
 
 
+def _market_enabled_setting_key(kind: str) -> str:
+    return f"market_enabled_{_pair_kind_normalized(kind)}"
+
+
+async def get_market_enabled_map() -> Dict[str, int]:
+    settings = {key: 1 for key in MARKET_KIND_CONFIG}
+    setting_to_kind = {_market_enabled_setting_key(key): key for key in MARKET_KIND_CONFIG}
+    placeholders = ",".join(["%s"] * len(setting_to_kind))
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                f"SELECT `key`, value_text FROM app_settings WHERE `key` IN ({placeholders})",
+                tuple(setting_to_kind.keys()),
+            )
+            rows = await cur.fetchall()
+    for row in rows or []:
+        kind = setting_to_kind.get(str(row.get("key") or ""))
+        if kind:
+            settings[kind] = 1 if str(row.get("value_text") or "1").strip() == "1" else 0
+    return settings
+
+
+async def set_market_enabled(kind: str, enabled: int) -> str:
+    raw = str(kind or "").strip().lower()
+    if raw not in MARKET_KIND_CONFIG and raw not in MARKET_KIND_ALIASES:
+        raise HTTPException(status_code=400, detail="Unsupported market")
+    pair_kind = _pair_kind_normalized(raw)
+    await set_app_setting(_market_enabled_setting_key(pair_kind), "1" if int(enabled or 0) == 1 else "0")
+    return pair_kind
+
+
 async def get_news_sync_interval_min() -> int:
     raw = await get_app_setting("news_sync_interval_min", str(DEFAULT_NEWS_SYNC_INTERVAL_MIN))
     try:
@@ -1121,7 +1158,11 @@ async def sync_market_pairs_kind(kind: str, min_payout: int) -> bool:
 
 async def sync_market_pairs_once() -> Dict[str, bool]:
     result: Dict[str, bool] = {}
+    enabled_map = await get_market_enabled_map()
     for kind in MARKET_KIND_CONFIG:
+        if int(enabled_map.get(kind, 1)) != 1:
+            result[kind] = False
+            continue
         try:
             result[kind] = await sync_market_pairs_kind(kind, DEVSBITE_MIN_PAYOUT)
         except Exception:
@@ -1176,6 +1217,26 @@ async def _get_active_pairs_from_db(kind: str, min_payout: int) -> List[Dict[str
 
 async def get_market_options_payload(kind: str, min_payout: int) -> Dict[str, Any]:
     pair_kind = _pair_kind_normalized(kind)
+    enabled_map = await get_market_enabled_map()
+    available_markets = [
+        {"key": key, "title": value["title"]}
+        for key, value in MARKET_KIND_CONFIG.items()
+        if int(enabled_map.get(key, 1)) == 1
+    ]
+    if available_markets and int(enabled_map.get(pair_kind, 1)) != 1:
+        pair_kind = available_markets[0]["key"]
+
+    if not available_markets:
+        expirations = await _fetch_expiration_options()
+        return {
+            "kind": pair_kind,
+            "market_title": MARKET_KIND_CONFIG.get(pair_kind, MARKET_KIND_CONFIG["forex"])["title"],
+            "available_markets": [],
+            "pairs": [],
+            "expirations": expirations,
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+        }
+
     pairs = await _get_active_pairs_from_db(pair_kind, min_payout)
     if not pairs:
         await sync_market_pairs_kind(pair_kind, min_payout)
@@ -1185,10 +1246,7 @@ async def get_market_options_payload(kind: str, min_payout: int) -> Dict[str, An
     payload = {
         "kind": pair_kind,
         "market_title": MARKET_KIND_CONFIG.get(pair_kind, MARKET_KIND_CONFIG["forex"])["title"],
-        "available_markets": [
-            {"key": key, "title": value["title"]}
-            for key, value in MARKET_KIND_CONFIG.items()
-        ],
+        "available_markets": available_markets,
         "pairs": pairs,
         "expirations": expirations,
         "fetched_at": datetime.now(timezone.utc).isoformat(),
@@ -2534,6 +2592,7 @@ async def admin_update_feature_flag(
 @app.get("/api/admin/market-settings")
 async def admin_get_market_settings(admin: Dict[str, Any] = Depends(get_admin_user)):
     interval_min = await get_market_sync_interval_min()
+    enabled_map = await get_market_enabled_map()
     pool = await require_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
@@ -2558,6 +2617,7 @@ async def admin_get_market_settings(admin: Dict[str, Any] = Depends(get_admin_us
             {
                 "key": key,
                 "title": config["title"],
+                "is_enabled": int(enabled_map.get(key, 1)),
                 "active_count": int((row or {}).get("active_count") or 0),
                 "total_count": int((row or {}).get("total_count") or 0),
                 "last_seen_at": ((row or {}).get("last_seen_at").isoformat() if (row or {}).get("last_seen_at") else None),
@@ -2584,6 +2644,24 @@ async def admin_update_market_settings(
         {"market_pairs_sync_interval_min": interval_min},
     )
     return {"status": "success", "market_pairs_sync_interval_min": interval_min}
+
+
+@app.post("/api/admin/market-status")
+async def admin_update_market_status(
+    payload: AdminMarketStatusUpdateRequest,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    market_key = (payload.key or "").strip()
+    if not market_key:
+        raise HTTPException(status_code=400, detail="Market key is required")
+    enabled = 1 if int(payload.is_enabled or 0) == 1 else 0
+    normalized_key = await set_market_enabled(market_key, enabled)
+    await add_admin_audit(
+        int(admin["user_id"]),
+        "admin_update_market_status",
+        {"key": normalized_key, "is_enabled": enabled},
+    )
+    return {"status": "success", "key": normalized_key, "is_enabled": enabled}
 
 
 @app.get("/api/admin/indicators")

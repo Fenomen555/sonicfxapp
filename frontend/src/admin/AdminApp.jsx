@@ -201,6 +201,7 @@ export default function AdminApp({ authError }) {
   const [indicatorSettings, setIndicatorSettings] = useState(EMPTY_INDICATOR_SETTINGS);
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
+  const [marketSavingKey, setMarketSavingKey] = useState("");
   const [indicatorSearch, setIndicatorSearch] = useState("");
   const [indicatorSavingCode, setIndicatorSavingCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -422,8 +423,8 @@ export default function AdminApp({ authError }) {
       if (item.id === "indicators") {
         return { ...item, metric: `${formatNumber(indicatorSettings.summary?.enabled || 0)} включено` };
       }
-      const marketCount = marketSettings.items?.length || 0;
-      return { ...item, metric: `${formatNumber(marketCount)} рынков` };
+      const activeMarketCount = (marketSettings.items || []).filter((market) => Number(market.is_enabled ?? 1) === 1).length;
+      return { ...item, metric: `${formatNumber(activeMarketCount)} активных` };
     });
   }, [flags, indicatorSettings.summary?.enabled, marketSettings.items, stats?.users_total, users.length]);
 
@@ -441,18 +442,21 @@ export default function AdminApp({ authError }) {
       (acc, item) => {
         acc.totalPairs += Number(item.total_count || 0);
         acc.activePairs += Number(item.active_count || 0);
+        if (Number(item.is_enabled ?? 1) === 1) {
+          acc.activeMarkets += 1;
+        }
         if (item.last_seen_at && (!acc.lastSeenAt || new Date(item.last_seen_at) > new Date(acc.lastSeenAt))) {
           acc.lastSeenAt = item.last_seen_at;
         }
         return acc;
       },
-      { totalPairs: 0, activePairs: 0, lastSeenAt: null }
+      { totalPairs: 0, activePairs: 0, activeMarkets: 0, lastSeenAt: null }
     );
 
     return [
       { key: "active_pairs", label: "Активных пар", value: formatNumber(totals.activePairs), note: "Сейчас доступны в локальном кеше" },
       { key: "total_pairs", label: "Всего пар", value: formatNumber(totals.totalPairs), note: "Полный объём по всем рынкам" },
-      { key: "markets_total", label: "Рынков", value: formatNumber(items.length), note: "Категории, которые мониторим" },
+      { key: "markets_total", label: "Активных рынков", value: formatNumber(totals.activeMarkets), note: `Всего категорий: ${formatNumber(items.length)}` },
       { key: "last_sync", label: "Последний sync", value: totals.lastSeenAt ? formatDateTime(totals.lastSeenAt) : "-", note: "Время последнего обновления" }
     ];
   }, [marketSettings.items]);
@@ -555,6 +559,31 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось сохранить интервал", error.message || "Проверьте значение и повторите попытку.");
     } finally {
       setMarketSaving(false);
+    }
+  };
+
+  const toggleMarketStatus = async (item) => {
+    const enabled = Number(item?.is_enabled ?? 1) === 1;
+    const key = item?.key || "";
+    if (!key) return;
+    setMarketSavingKey(key);
+    try {
+      await apiAdminFetchJson("/api/admin/market-status", {
+        method: "POST",
+        body: JSON.stringify({ key, is_enabled: enabled ? 0 : 1 })
+      });
+      const data = await apiAdminFetchJson("/api/admin/market-settings");
+      setMarketSettings(data || EMPTY_MARKET_SETTINGS);
+      setMarketInterval(String(data?.market_pairs_sync_interval_min || marketInterval || 5));
+      pushToast(
+        "success",
+        enabled ? "Рынок выключен" : "Рынок включён",
+        `${item.title || key} ${enabled ? "скрыт из mini app" : "снова доступен пользователям"}.`
+      );
+    } catch (error) {
+      pushToast("error", "Не удалось обновить рынок", error.message || "Попробуйте ещё раз.");
+    } finally {
+      setMarketSavingKey("");
     }
   };
 
@@ -992,11 +1021,21 @@ export default function AdminApp({ authError }) {
                 const totalCount = Number(item.total_count || 0);
                 const activeCount = Number(item.active_count || 0);
                 const progress = totalCount > 0 ? Math.min((activeCount / totalCount) * 100, 100) : 0;
+                const marketEnabled = Number(item.is_enabled ?? 1) === 1;
                 return (
-                  <article className="admin-card admin-market-card" key={item.key}>
+                  <article className={`admin-card admin-market-card ${marketEnabled ? "is-enabled" : "is-disabled"}`} key={item.key}>
                     <div className="admin-market-card-head">
                       <strong>{item.title}</strong>
-                      <span className="admin-badge tone-success">Активно {activeCount}</span>
+                      <button
+                        className={`admin-market-switch ${marketEnabled ? "is-on" : ""}`}
+                        disabled={marketSavingKey === item.key}
+                        onClick={() => toggleMarketStatus(item)}
+                        type="button"
+                        aria-pressed={marketEnabled}
+                      >
+                        <span>{marketSavingKey === item.key ? "..." : marketEnabled ? "Активный" : "Не активный"}</span>
+                        <i aria-hidden="true" />
+                      </button>
                     </div>
                     <div className="admin-market-main-metric">{formatNumber(totalCount)}</div>
                     <div className="admin-market-subtitle">Всего пар в кеше</div>
@@ -1004,6 +1043,7 @@ export default function AdminApp({ authError }) {
                       <span className="admin-progress-fill" style={{ width: `${progress}%` }} />
                     </div>
                     <div className="admin-market-meta-row">
+                      <span className={`admin-badge ${marketEnabled ? "tone-success" : "tone-neutral"}`}>Активно {activeCount}</span>
                       <span>Покрытие: {formatPercent(progress)}</span>
                       <span>{formatDateTime(item.last_seen_at)}</span>
                     </div>

@@ -342,6 +342,9 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         setPairs(nextPairs);
         setExpirations(nextExp);
         setAvailableMarkets(nextMarkets);
+        if (data?.kind && data.kind !== marketKind) {
+          setMarketKind(data.kind);
+        }
 
         setAsset((prev) => {
           if (prev && nextPairs.some((item) => item?.pair === prev)) return prev;
@@ -429,6 +432,16 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
 
   const isAutomaticMode = signalMode === "automatic";
 
+  const activeAvailableMarketKeys = useMemo(
+    () => new Set(availableMarkets.map((item) => item.key).filter(Boolean)),
+    [availableMarkets]
+  );
+
+  const basicMarkets = useMemo(
+    () => (activeAvailableMarketKeys.size ? BASIC_MARKETS.filter((item) => activeAvailableMarketKeys.has(item.key)) : BASIC_MARKETS),
+    [activeAvailableMarketKeys]
+  );
+
   const indicatorMarkets = useMemo(() => {
     if (!availableMarkets.length) return INDICATOR_MARKETS;
     const labels = new Map(INDICATOR_MARKETS.map((item) => [item.key, item.label]));
@@ -440,7 +453,13 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       }));
   }, [availableMarkets]);
 
-  const currentMarkets = signalMode === "indicators" ? indicatorMarkets : BASIC_MARKETS;
+  const currentMarkets = signalMode === "indicators" ? indicatorMarkets : basicMarkets;
+  useEffect(() => {
+    if (currentMarkets.length && !currentMarkets.some((item) => item.key === marketKind)) {
+      setMarketKind(currentMarkets[0].key);
+    }
+  }, [currentMarkets, marketKind]);
+
   const selectedMode = signalModes.find((item) => item.id === signalMode) || signalModes[0] || baseSignalModes[0];
   const SelectedModeIcon = selectedMode.icon;
   const selectedModeInfo = useMemo(() => ({

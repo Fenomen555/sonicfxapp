@@ -176,6 +176,11 @@ async def _seed_app_settings(conn) -> None:
     defaults: Tuple[Tuple[str, str], ...] = (
         ("market_pairs_sync_interval_min", str(default_interval_min)),
         ("news_sync_interval_min", "60"),
+        ("market_enabled_forex", "1"),
+        ("market_enabled_otc", "1"),
+        ("market_enabled_commodities", "1"),
+        ("market_enabled_stocks", "1"),
+        ("market_enabled_crypto", "1"),
     )
     async with conn.cursor() as cur:
         for key, value in defaults:

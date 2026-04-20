@@ -627,6 +627,61 @@
   background: linear-gradient(90deg, #6f9cff, #c9dcff);
 }
 
+.admin-market-card.is-disabled {
+  opacity: 0.68;
+}
+
+.admin-market-card.is-disabled .admin-progress-fill {
+  background: linear-gradient(90deg, rgba(130, 147, 173, 0.54), rgba(198, 208, 224, 0.6));
+}
+
+.admin-market-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 136px;
+  min-height: 36px;
+  padding: 4px 5px 4px 12px;
+  border: 1px solid rgba(154, 184, 229, 0.22);
+  border-radius: 999px;
+  color: rgba(229, 237, 250, 0.68);
+  background: rgba(6, 12, 22, 0.64);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, opacity 0.18s ease;
+}
+
+.admin-market-switch span {
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.admin-market-switch i {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #75839b, #d7e1f1);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.admin-market-switch.is-on {
+  color: #dfffea;
+  border-color: rgba(96, 224, 152, 0.42);
+  background: linear-gradient(135deg, rgba(27, 88, 61, 0.92), rgba(20, 47, 76, 0.92));
+}
+
+.admin-market-switch.is-on i {
+  background: linear-gradient(145deg, #f5fff8, #63ee9f);
+}
+
+.admin-market-switch:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .admin-market-detail-list,
 .admin-info-list {
   display: grid;

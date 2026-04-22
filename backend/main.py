@@ -733,6 +733,14 @@ async def get_feature_flags_payload() -> Dict[str, int]:
     return flags
 
 
+def _build_inline_button(**kwargs: Any) -> InlineKeyboardButton:
+    try:
+        return InlineKeyboardButton(**kwargs)
+    except Exception:
+        safe_kwargs = {key: value for key, value in kwargs.items() if key not in {"style", "icon_custom_emoji_id"}}
+        return InlineKeyboardButton(**safe_kwargs)
+
+
 async def build_main_menu_keyboard(current_lang: str, user_id: Optional[int] = None) -> InlineKeyboardMarkup:
     lang = normalize_user_lang(current_lang)
     labels = WELCOME_TEXTS[lang]
@@ -742,9 +750,10 @@ async def build_main_menu_keyboard(current_lang: str, user_id: Optional[int] = N
         lang_btns.append(InlineKeyboardButton(text=f"{item.upper()}{mark}", callback_data=f"lang:{item}"))
     inline_keyboard = [
         [
-            InlineKeyboardButton(
+            _build_inline_button(
                 text=labels["open_app"],
                 web_app=WebAppInfo(url=build_main_webapp_url()),
+                style="success",
             )
         ]
     ]
@@ -2381,10 +2390,7 @@ def _build_news_notification_keyboard(row: Dict[str, Any]) -> Optional[InlineKey
     source_url = str(row.get("source_url") or "").strip()
     if not source_url.startswith(("http://", "https://")):
         return None
-    try:
-        button = InlineKeyboardButton(text="Открыть новость", url=source_url, style="danger")
-    except Exception:
-        button = InlineKeyboardButton(text="Открыть новость", url=source_url)
+    button = _build_inline_button(text="Открыть новость", url=source_url, style="danger")
     return InlineKeyboardMarkup(inline_keyboard=[[button]])
 
 

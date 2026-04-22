@@ -2356,7 +2356,6 @@ def _format_news_notification_message(row: Dict[str, Any]) -> str:
     title = html.escape(str(row.get("title") or "Новость").strip())
     source_name = html.escape(str(row.get("source_name") or "SonicFX").strip())
     published_at = _format_news_notification_time(row.get("published_at"), row.get("timezone"))
-    source_url = str(row.get("source_url") or "").strip()
 
     if feed_type == "economic":
         lead = _normalize_news_lead_minutes(row.get("lead_minutes"))
@@ -2375,9 +2374,18 @@ def _format_news_notification_message(row: Dict[str, Any]) -> str:
 
     if source_name:
         details.append(f"Источник: {source_name}")
-    if source_url.startswith(("http://", "https://")):
-        details.append(f'<a href="{html.escape(source_url, quote=True)}">Открыть новость</a>')
     return f"{header}\n\n" + "\n".join(details)
+
+
+def _build_news_notification_keyboard(row: Dict[str, Any]) -> Optional[InlineKeyboardMarkup]:
+    source_url = str(row.get("source_url") or "").strip()
+    if not source_url.startswith(("http://", "https://")):
+        return None
+    try:
+        button = InlineKeyboardButton(text="Открыть новость", url=source_url, style="danger")
+    except Exception:
+        button = InlineKeyboardButton(text="Открыть новость", url=source_url)
+    return InlineKeyboardMarkup(inline_keyboard=[[button]])
 
 
 def _news_notification_media_url(row: Dict[str, Any]) -> str:
@@ -2448,6 +2456,7 @@ async def send_due_news_notifications_once() -> int:
         if not user_id or not news_item_id:
             continue
         message = _format_news_notification_message(row)
+        keyboard = _build_news_notification_keyboard(row)
         media_url = _news_notification_media_url(row)
         try:
             if media_url:
@@ -2457,6 +2466,7 @@ async def send_due_news_notifications_once() -> int:
                         photo=media_url,
                         caption=message,
                         parse_mode="HTML",
+                        reply_markup=keyboard,
                     )
                 except Exception as media_exc:
                     print(f"[Bot] news notification media fallback for {user_id}: {media_exc}")
@@ -2465,6 +2475,7 @@ async def send_due_news_notifications_once() -> int:
                         text=message,
                         parse_mode="HTML",
                         disable_web_page_preview=True,
+                        reply_markup=keyboard,
                     )
             else:
                 await bot.send_message(
@@ -2472,6 +2483,7 @@ async def send_due_news_notifications_once() -> int:
                     text=message,
                     parse_mode="HTML",
                     disable_web_page_preview=True,
+                    reply_markup=keyboard,
                 )
             sent += 1
         except Exception as exc:

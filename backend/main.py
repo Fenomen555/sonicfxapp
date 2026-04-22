@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import hashlib
+import html
 import json
 import mimetypes
 import os
@@ -94,6 +95,8 @@ DEFAULT_SUPPORT_CONTACT_URL = (
 ).strip()
 VALID_NEWS_FEEDS = {"economic", "market"}
 NEWS_GENERAL_CATEGORY = "general"
+NEWS_NOTIFICATION_LEAD_OPTIONS = (5, 15, 30, 60)
+NEWS_NOTIFICATION_CHECK_INTERVAL_SEC = int((os.getenv("NEWS_NOTIFICATION_CHECK_INTERVAL_SEC") or "60").strip() or "60")
 MODE_FEATURE_FLAG_KEYS = ("mode_scanner_enabled", "mode_ai_enabled", "mode_indicators_enabled")
 FEATURE_FLAG_DEFAULTS = {
     "mode_scanner_enabled": 1,
@@ -247,6 +250,13 @@ class AdminIndicatorUpdateRequest(BaseModel):
 class AdminSupportSettingsUpdateRequest(BaseModel):
     channel_url: str = Field(min_length=8, max_length=500)
     support_url: str = Field(min_length=8, max_length=500)
+
+
+class UserNewsNotificationSettingsUpdate(BaseModel):
+    news_enabled: int = 0
+    economic_enabled: int = 1
+    market_enabled: int = 1
+    lead_minutes: int = 15
 
 
 def _normalize_tg_language(raw: str) -> str:
@@ -857,6 +867,85 @@ async def get_support_settings_payload() -> Dict[str, str]:
     }
 
 
+def _coerce_bool_flag(value: Any, default: int = 0) -> int:
+    if value is None:
+        return 1 if int(default or 0) == 1 else 0
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        if raw in {"1", "true", "yes", "on", "enabled"}:
+            return 1
+        if raw in {"0", "false", "no", "off", "disabled"}:
+            return 0
+    try:
+        return 1 if int(value) == 1 else 0
+    except (TypeError, ValueError):
+        return 1 if int(default or 0) == 1 else 0
+
+
+def _normalize_news_lead_minutes(value: Any) -> int:
+    try:
+        lead = int(value)
+    except (TypeError, ValueError):
+        lead = 15
+    if lead in NEWS_NOTIFICATION_LEAD_OPTIONS:
+        return lead
+    return 15
+
+
+def _news_notification_payload(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    row = row or {}
+    return {
+        "news_enabled": _coerce_bool_flag(row.get("news_enabled"), 0),
+        "economic_enabled": _coerce_bool_flag(row.get("economic_enabled"), 1),
+        "market_enabled": _coerce_bool_flag(row.get("market_enabled"), 1),
+        "lead_minutes": _normalize_news_lead_minutes(row.get("lead_minutes")),
+        "lead_options": list(NEWS_NOTIFICATION_LEAD_OPTIONS),
+        "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
+    }
+
+
+async def get_user_news_notification_settings(user_id: int) -> Dict[str, Any]:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT news_enabled, economic_enabled, market_enabled, lead_minutes, updated_at
+                FROM user_notification_settings
+                WHERE user_id = %s
+                LIMIT 1
+                """,
+                (int(user_id),),
+            )
+            row = await cur.fetchone()
+    return _news_notification_payload(row)
+
+
+async def update_user_news_notification_settings(user_id: int, payload: UserNewsNotificationSettingsUpdate) -> Dict[str, Any]:
+    news_enabled = _coerce_bool_flag(payload.news_enabled, 0)
+    economic_enabled = _coerce_bool_flag(payload.economic_enabled, 1)
+    market_enabled = _coerce_bool_flag(payload.market_enabled, 1)
+    lead_minutes = _normalize_news_lead_minutes(payload.lead_minutes)
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO user_notification_settings
+                    (user_id, news_enabled, economic_enabled, market_enabled, lead_minutes)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    news_enabled = VALUES(news_enabled),
+                    economic_enabled = VALUES(economic_enabled),
+                    market_enabled = VALUES(market_enabled),
+                    lead_minutes = VALUES(lead_minutes)
+                """,
+                (int(user_id), news_enabled, economic_enabled, market_enabled, lead_minutes),
+            )
+            await cur.execute("UPDATE users SET last_active_at = NOW() WHERE user_id = %s", (int(user_id),))
+    return await get_user_news_notification_settings(user_id)
+
+
 async def get_market_sync_interval_min() -> int:
     raw = await get_app_setting("market_pairs_sync_interval_min", str(DEFAULT_MARKET_SYNC_INTERVAL_MIN))
     return _sanitize_market_sync_interval_min(raw)
@@ -1445,6 +1534,22 @@ async def update_user_settings(
                     tuple(values),
                 )
     return {"status": "success", "user": await fetch_user_profile(user_id)}
+
+
+@app.get("/api/user/news-notifications")
+async def get_user_news_notifications(user: Dict[str, Any] = Depends(get_telegram_user)):
+    await upsert_user_from_telegram(user)
+    return await get_user_news_notification_settings(int(user["user_id"]))
+
+
+@app.post("/api/user/news-notifications")
+async def update_user_news_notifications(
+    payload: UserNewsNotificationSettingsUpdate,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    settings = await update_user_news_notification_settings(int(user["user_id"]), payload)
+    return {"status": "success", "settings": settings}
 
 
 @app.get("/api/upload/scan/latest")
@@ -2228,6 +2333,135 @@ async def news_sync_loop() -> None:
             await asyncio.sleep(min(30, remaining))
 
 
+def _format_news_notification_time(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%d.%m %H:%M UTC")
+    text = str(value or "").strip()
+    return text or "-"
+
+
+def _format_news_notification_message(row: Dict[str, Any]) -> str:
+    feed_type = str(row.get("feed_type") or "").strip().lower()
+    title = html.escape(str(row.get("title") or "Новость").strip())
+    source_name = html.escape(str(row.get("source_name") or "SonicFX").strip())
+    published_at = _format_news_notification_time(row.get("published_at"))
+    source_url = str(row.get("source_url") or "").strip()
+
+    if feed_type == "economic":
+        lead = _normalize_news_lead_minutes(row.get("lead_minutes"))
+        currency = html.escape(str(row.get("currency_code") or row.get("country_code") or "").strip())
+        impact = html.escape(str(row.get("impact_level") or "").strip())
+        header = f"<b>SonicFX News</b>\nЗа {lead} мин до события"
+        details = [f"<b>{title}</b>", f"Время: {html.escape(published_at)}"]
+        if currency:
+            details.append(f"Актив: {currency}")
+        if impact:
+            details.append(f"Важность: {impact}")
+    else:
+        category = html.escape(str(row.get("news_category") or "general").strip())
+        header = "<b>SonicFX News</b>\nСвежая общерыночная новость"
+        details = [f"<b>{title}</b>", f"Категория: {category}", f"Время: {html.escape(published_at)}"]
+
+    if source_name:
+        details.append(f"Источник: {source_name}")
+    if source_url.startswith(("http://", "https://")):
+        details.append(f'<a href="{html.escape(source_url, quote=True)}">Открыть новость</a>')
+    details.append("Сигнал носит информационный характер и не является гарантией результата сделки.")
+    return f"{header}\n\n" + "\n".join(details)
+
+
+async def send_due_news_notifications_once() -> int:
+    if bot is None:
+        return 0
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT
+                    s.user_id,
+                    s.lead_minutes,
+                    n.id AS news_item_id,
+                    n.feed_type,
+                    n.news_category,
+                    n.title,
+                    n.source_name,
+                    n.source_url,
+                    n.country_code,
+                    n.currency_code,
+                    n.impact_level,
+                    n.published_at,
+                    CASE WHEN n.feed_type = 'economic' THEN s.lead_minutes ELSE 0 END AS delivery_lead_minutes
+                FROM user_notification_settings s
+                INNER JOIN users u ON u.user_id = s.user_id AND COALESCE(u.is_blocked, 0) = 0
+                INNER JOIN news_items n ON n.is_visible = 1 AND n.published_at IS NOT NULL
+                LEFT JOIN news_notification_deliveries d
+                  ON d.user_id = s.user_id
+                 AND d.news_item_id = n.id
+                 AND d.lead_minutes = CASE WHEN n.feed_type = 'economic' THEN s.lead_minutes ELSE 0 END
+                WHERE s.news_enabled = 1
+                  AND d.id IS NULL
+                  AND (
+                    (
+                      n.feed_type = 'economic'
+                      AND s.economic_enabled = 1
+                      AND TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), n.published_at)
+                          BETWEEN GREATEST(s.lead_minutes * 60 - 90, 0) AND s.lead_minutes * 60 + 90
+                    )
+                    OR
+                    (
+                      n.feed_type = 'market'
+                      AND s.market_enabled = 1
+                      AND n.published_at BETWEEN DATE_SUB(UTC_TIMESTAMP(), INTERVAL 90 MINUTE) AND UTC_TIMESTAMP()
+                    )
+                  )
+                ORDER BY n.published_at ASC
+                LIMIT 200
+                """
+            )
+            rows = await cur.fetchall()
+
+    sent = 0
+    for row in rows or []:
+        user_id = int(row.get("user_id") or 0)
+        news_item_id = int(row.get("news_item_id") or 0)
+        delivery_lead = int(row.get("delivery_lead_minutes") or 0)
+        if not user_id or not news_item_id:
+            continue
+        try:
+            await bot.send_message(
+                chat_id=user_id,
+                text=_format_news_notification_message(row),
+                parse_mode="HTML",
+                disable_web_page_preview=True,
+            )
+            sent += 1
+        except Exception as exc:
+            print(f"[Bot] news notification send error for {user_id}: {exc}")
+            continue
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT IGNORE INTO news_notification_deliveries
+                        (user_id, news_item_id, lead_minutes)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (user_id, news_item_id, delivery_lead),
+                )
+    return sent
+
+
+async def news_notification_loop() -> None:
+    await asyncio.sleep(10)
+    while True:
+        try:
+            await send_due_news_notifications_once()
+        except Exception as exc:
+            print(f"[Bot] news notification loop error: {exc}")
+        await asyncio.sleep(max(30, NEWS_NOTIFICATION_CHECK_INTERVAL_SEC))
+
+
 async def _get_news_updated_at(feed_type: str) -> str:
     pool = await require_db_pool()
     async with pool.acquire() as conn:
@@ -2817,7 +3051,15 @@ async def start_bot():
         )
     except Exception as exc:
         print(f"[Bot] set_my_commands error: {exc}")
-    await dp.start_polling(bot)
+    notification_task = asyncio.create_task(news_notification_loop())
+    try:
+        await dp.start_polling(bot)
+    finally:
+        notification_task.cancel()
+        try:
+            await notification_task
+        except asyncio.CancelledError:
+            pass
 
 
 async def start_api():

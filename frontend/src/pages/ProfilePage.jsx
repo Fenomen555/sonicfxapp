@@ -31,6 +31,14 @@ const SUPPORT_LINK_DEFAULTS = {
   support_url: "https://t.me/WaySonic"
 };
 
+const NEWS_NOTIFICATION_DEFAULTS = {
+  news_enabled: 0,
+  economic_enabled: 1,
+  market_enabled: 1,
+  lead_minutes: 15,
+  lead_options: [5, 15, 30, 60]
+};
+
 const FAQ_INDICATORS = [
   {
     code: "rsi",
@@ -251,6 +259,95 @@ function normalizeSupportLinks(data) {
   };
 }
 
+function getNotificationsCopy(lang) {
+  const ru = {
+    title: "Уведомления",
+    subtitle: "Новости в Telegram-боте",
+    intro: "Включите напоминания, чтобы бот заранее присылал важные события экономического календаря и свежие рыночные новости.",
+    masterOn: "Уведомления включены",
+    masterOff: "Уведомления выключены",
+    economic: "Экономический календарь",
+    economicHint: "Ставки, инфляция, занятость и выступления регуляторов.",
+    market: "Общерыночные новости",
+    marketHint: "Свежие заголовки рынка по факту появления.",
+    leadTitle: "Напоминать за",
+    leadSuffix: "мин",
+    leadHour: "1 час",
+    save: "Сохранить",
+    saving: "Сохраняем...",
+    close: "Закрыть",
+    saved: "Уведомления сохранены",
+    savedMessage: "Бот будет использовать новые настройки.",
+    error: "Не удалось сохранить уведомления",
+    botHint: "Если бот еще не писал вам, откройте его и нажмите /start."
+  };
+  if (lang === "en") {
+    return {
+      ...ru,
+      title: "Notifications",
+      subtitle: "News in the Telegram bot",
+      intro: "Enable reminders so the bot can send economic events in advance and fresh market headlines as they appear.",
+      masterOn: "Notifications enabled",
+      masterOff: "Notifications disabled",
+      economic: "Economic calendar",
+      economicHint: "Rates, inflation, employment and regulator speeches.",
+      market: "Market news",
+      marketHint: "Fresh market headlines as soon as they appear.",
+      leadTitle: "Remind before",
+      leadSuffix: "min",
+      leadHour: "1 hour",
+      save: "Save",
+      saving: "Saving...",
+      close: "Close",
+      saved: "Notifications saved",
+      savedMessage: "The bot will use the new settings.",
+      error: "Could not save notifications",
+      botHint: "If the bot has not messaged you yet, open it and tap /start."
+    };
+  }
+  if (lang === "uk") {
+    return {
+      ...ru,
+      title: "Сповіщення",
+      subtitle: "Новини в Telegram-боті",
+      intro: "Увімкніть нагадування, щоб бот завчасно надсилав важливі події економічного календаря та свіжі ринкові новини.",
+      masterOn: "Сповіщення увімкнені",
+      masterOff: "Сповіщення вимкнені",
+      economic: "Економічний календар",
+      economicHint: "Ставки, інфляція, зайнятість і виступи регуляторів.",
+      market: "Загальноринкові новини",
+      marketHint: "Свіжі ринкові заголовки одразу після появи.",
+      leadTitle: "Нагадувати за",
+      leadSuffix: "хв",
+      leadHour: "1 година",
+      save: "Зберегти",
+      saving: "Зберігаємо...",
+      close: "Закрити",
+      saved: "Сповіщення збережено",
+      savedMessage: "Бот використовуватиме нові налаштування.",
+      error: "Не вдалося зберегти сповіщення",
+      botHint: "Якщо бот ще не писав вам, відкрийте його та натисніть /start."
+    };
+  }
+  return ru;
+}
+
+function normalizeNewsNotificationSettings(data) {
+  const leadOptions = Array.isArray(data?.lead_options) && data.lead_options.length
+    ? data.lead_options.map((item) => Number(item)).filter(Boolean)
+    : NEWS_NOTIFICATION_DEFAULTS.lead_options;
+  const lead = leadOptions.includes(Number(data?.lead_minutes))
+    ? Number(data.lead_minutes)
+    : NEWS_NOTIFICATION_DEFAULTS.lead_minutes;
+  return {
+    news_enabled: Number(data?.news_enabled) === 1 ? 1 : 0,
+    economic_enabled: data?.economic_enabled === undefined || Number(data.economic_enabled) === 1 ? 1 : 0,
+    market_enabled: data?.market_enabled === undefined || Number(data.market_enabled) === 1 ? 1 : 0,
+    lead_minutes: lead,
+    lead_options: leadOptions
+  };
+}
+
 function openExternalLink(url) {
   if (!url) return;
   window.open(url, "_blank", "noopener,noreferrer");
@@ -341,6 +438,10 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   const [selectedFaqIndicator, setSelectedFaqIndicator] = useState("");
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportLinks, setSupportLinks] = useState(SUPPORT_LINK_DEFAULTS);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState(NEWS_NOTIFICATION_DEFAULTS);
+  const [notificationDraft, setNotificationDraft] = useState(NEWS_NOTIFICATION_DEFAULTS);
+  const [notificationsSaving, setNotificationsSaving] = useState(false);
   const settingsRequestRef = useRef(0);
 
   useEffect(() => {
@@ -352,13 +453,13 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   }, [user]);
 
   useEffect(() => {
-    if (faqView === "closed" && !isSupportOpen) return undefined;
+    if (faqView === "closed" && !isSupportOpen && !isNotificationsOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = previousOverflow;
     };
-  }, [faqView, isSupportOpen]);
+  }, [faqView, isSupportOpen, isNotificationsOpen]);
 
   useEffect(() => {
     let isActive = true;
@@ -368,6 +469,25 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
       })
       .catch(() => {
         if (isActive) setSupportLinks(SUPPORT_LINK_DEFAULTS);
+      });
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+    apiFetchJson("/api/user/news-notifications")
+      .then((data) => {
+        if (!isActive) return;
+        const nextSettings = normalizeNewsNotificationSettings(data);
+        setNotificationSettings(nextSettings);
+        setNotificationDraft(nextSettings);
+      })
+      .catch(() => {
+        if (!isActive) return;
+        setNotificationSettings(NEWS_NOTIFICATION_DEFAULTS);
+        setNotificationDraft(NEWS_NOTIFICATION_DEFAULTS);
       });
     return () => {
       isActive = false;
@@ -428,6 +548,11 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
       setIsSupportOpen(true);
       return;
     }
+    if (key === "notifications") {
+      setNotificationDraft(notificationSettings);
+      setIsNotificationsOpen(true);
+      return;
+    }
     notify?.({
       type: "info",
       title: t.profile?.actions?.[key] || key,
@@ -480,6 +605,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
 
   const faqCopy = useMemo(() => getFaqCopy(lang, t), [lang, t]);
   const supportCopy = useMemo(() => getSupportCopy(lang), [lang]);
+  const notificationsCopy = useMemo(() => getNotificationsCopy(lang), [lang]);
   const faqIndicators = useMemo(
     () => FAQ_INDICATORS.map((item) => ({
       ...item,
@@ -545,6 +671,44 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
       });
     }
     return data;
+  };
+
+  const handleNotificationDraftChange = (key, value) => {
+    setNotificationDraft((prev) => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  const handleSaveNotifications = async () => {
+    setNotificationsSaving(true);
+    try {
+      const data = await apiFetchJson("/api/user/news-notifications", {
+        method: "POST",
+        body: JSON.stringify({
+          news_enabled: notificationDraft.news_enabled,
+          economic_enabled: notificationDraft.economic_enabled,
+          market_enabled: notificationDraft.market_enabled,
+          lead_minutes: notificationDraft.lead_minutes
+        })
+      });
+      const nextSettings = normalizeNewsNotificationSettings(data?.settings || data);
+      setNotificationSettings(nextSettings);
+      setNotificationDraft(nextSettings);
+      notify?.({
+        type: "success",
+        title: notificationsCopy.saved,
+        message: notificationsCopy.savedMessage
+      });
+    } catch (error) {
+      notify?.({
+        type: "error",
+        title: notificationsCopy.error,
+        message: error.message || "Failed"
+      });
+    } finally {
+      setNotificationsSaving(false);
+    }
   };
 
   const handleThemeToggle = async () => {
@@ -843,6 +1007,100 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
             <div className="profile-faq-controls profile-faq-footer">
               <button type="button" className="profile-faq-ghost-btn" onClick={() => setIsSupportOpen(false)}>
                 {supportCopy.close}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isNotificationsOpen && (
+        <div
+          className="profile-faq-modal-backdrop"
+          role="presentation"
+          onClick={() => setIsNotificationsOpen(false)}
+        >
+          <section
+            className="card profile-faq-panel profile-faq-modal profile-notifications-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={notificationsCopy.title}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="profile-faq-head profile-notifications-head">
+              <span className="profile-faq-kicker">{notificationsCopy.title}</span>
+              <strong>{notificationsCopy.subtitle}</strong>
+            </div>
+
+            <div className="profile-notifications-body">
+              <p>{notificationsCopy.intro}</p>
+
+              <button
+                type="button"
+                className={`profile-notification-master ${notificationDraft.news_enabled ? "active" : ""}`}
+                onClick={() => handleNotificationDraftChange("news_enabled", notificationDraft.news_enabled ? 0 : 1)}
+                role="switch"
+                aria-checked={notificationDraft.news_enabled === 1}
+              >
+                <span>
+                  <strong>{notificationDraft.news_enabled ? notificationsCopy.masterOn : notificationsCopy.masterOff}</strong>
+                  <small>{notificationsCopy.botHint}</small>
+                </span>
+                <i aria-hidden="true" />
+              </button>
+
+              <div className="profile-notification-feed-grid">
+                {[
+                  {
+                    key: "economic_enabled",
+                    title: notificationsCopy.economic,
+                    hint: notificationsCopy.economicHint
+                  },
+                  {
+                    key: "market_enabled",
+                    title: notificationsCopy.market,
+                    hint: notificationsCopy.marketHint
+                  }
+                ].map((item) => (
+                  <button
+                    type="button"
+                    key={item.key}
+                    className={`profile-notification-feed ${notificationDraft[item.key] ? "active" : ""}`}
+                    onClick={() => handleNotificationDraftChange(item.key, notificationDraft[item.key] ? 0 : 1)}
+                  >
+                    <strong>{item.title}</strong>
+                    <span>{item.hint}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="profile-notification-lead">
+                <span>{notificationsCopy.leadTitle}</span>
+                <div className="profile-notification-lead-grid">
+                  {(notificationDraft.lead_options || NEWS_NOTIFICATION_DEFAULTS.lead_options).map((minutes) => (
+                    <button
+                      type="button"
+                      key={minutes}
+                      className={notificationDraft.lead_minutes === minutes ? "active" : ""}
+                      onClick={() => handleNotificationDraftChange("lead_minutes", minutes)}
+                    >
+                      {minutes === 60 ? notificationsCopy.leadHour : `${minutes} ${notificationsCopy.leadSuffix}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="profile-faq-controls profile-faq-footer">
+              <button
+                type="button"
+                className="profile-support-link-button primary profile-notifications-save"
+                onClick={handleSaveNotifications}
+                disabled={notificationsSaving}
+              >
+                {notificationsSaving ? notificationsCopy.saving : notificationsCopy.save}
+              </button>
+              <button type="button" className="profile-faq-ghost-btn" onClick={() => setIsNotificationsOpen(false)}>
+                {notificationsCopy.close}
               </button>
             </div>
           </section>

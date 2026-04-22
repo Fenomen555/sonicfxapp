@@ -279,6 +279,33 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
 
             await cur.execute(
                 """
+                CREATE TABLE IF NOT EXISTS user_notification_settings (
+                    user_id BIGINT NOT NULL PRIMARY KEY,
+                    news_enabled TINYINT(1) NOT NULL DEFAULT 0,
+                    economic_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    market_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    lead_minutes INT NOT NULL DEFAULT 15,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
+            await cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS news_notification_deliveries (
+                    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    news_item_id BIGINT NOT NULL,
+                    lead_minutes INT NOT NULL,
+                    delivered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_news_notification_delivery (user_id, news_item_id, lead_minutes)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
+            await cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS admin_users (
                     user_id BIGINT NOT NULL PRIMARY KEY,
                     is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -404,6 +431,11 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "news_items", "previous_value", "ALTER TABLE news_items ADD COLUMN previous_value VARCHAR(64) NULL")
         await _ensure_column(conn, db_name, "news_items", "unit", "ALTER TABLE news_items ADD COLUMN unit VARCHAR(32) NULL")
         await _ensure_column(conn, db_name, "news_items", "updated_at", "ALTER TABLE news_items ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+        await _ensure_column(conn, db_name, "user_notification_settings", "news_enabled", "ALTER TABLE user_notification_settings ADD COLUMN news_enabled TINYINT(1) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "user_notification_settings", "economic_enabled", "ALTER TABLE user_notification_settings ADD COLUMN economic_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "user_notification_settings", "market_enabled", "ALTER TABLE user_notification_settings ADD COLUMN market_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "user_notification_settings", "lead_minutes", "ALTER TABLE user_notification_settings ADD COLUMN lead_minutes INT NOT NULL DEFAULT 15")
+        await _ensure_column(conn, db_name, "user_notification_settings", "updated_at", "ALTER TABLE user_notification_settings ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
         await _ensure_column(conn, db_name, "market_pairs", "payout", "ALTER TABLE market_pairs ADD COLUMN payout INT NULL")
         await _ensure_column(conn, db_name, "market_pairs", "is_active", "ALTER TABLE market_pairs ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "market_pairs", "source", "ALTER TABLE market_pairs ADD COLUMN source VARCHAR(32) NOT NULL DEFAULT 'devsbite'")
@@ -425,6 +457,8 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "news_items", "uq_news_external_id", "CREATE UNIQUE INDEX uq_news_external_id ON news_items (external_id)")
         await _ensure_index(conn, db_name, "news_items", "idx_news_feed_visible_published", "CREATE INDEX idx_news_feed_visible_published ON news_items (feed_type, is_visible, published_at)")
         await _ensure_index(conn, db_name, "news_items", "idx_news_feed_category_visible", "CREATE INDEX idx_news_feed_category_visible ON news_items (feed_type, news_category, is_visible)")
+        await _ensure_index(conn, db_name, "news_notification_deliveries", "idx_news_notification_user", "CREATE INDEX idx_news_notification_user ON news_notification_deliveries (user_id, delivered_at)")
+        await _ensure_index(conn, db_name, "news_notification_deliveries", "idx_news_notification_item", "CREATE INDEX idx_news_notification_item ON news_notification_deliveries (news_item_id, delivered_at)")
         await _ensure_index(conn, db_name, "users", "idx_users_activation_status", "CREATE INDEX idx_users_activation_status ON users (activation_status)")
         await _ensure_index(conn, db_name, "users", "idx_users_account_tier", "CREATE INDEX idx_users_account_tier ON users (account_tier)")
         await _ensure_index(conn, db_name, "users", "idx_users_trader_id", "CREATE INDEX idx_users_trader_id ON users (trader_id)")

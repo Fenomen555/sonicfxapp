@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import aiomysql
 import httpx
@@ -2333,9 +2334,19 @@ async def news_sync_loop() -> None:
             await asyncio.sleep(min(30, remaining))
 
 
-def _format_news_notification_time(value: Any) -> str:
+def _format_news_notification_time(value: Any, timezone_name: Any) -> str:
+    zone_name = str(timezone_name or "").strip() or "UTC"
+    try:
+        user_zone = ZoneInfo(zone_name)
+    except ZoneInfoNotFoundError:
+        user_zone = timezone.utc
+        zone_name = "UTC"
+
     if isinstance(value, datetime):
-        return value.strftime("%d.%m %H:%M UTC")
+        event_time = value
+        if event_time.tzinfo is None:
+            event_time = event_time.replace(tzinfo=timezone.utc)
+        return f"{event_time.astimezone(user_zone).strftime('%d.%m %H:%M')} ({zone_name})"
     text = str(value or "").strip()
     return text or "-"
 
@@ -2344,7 +2355,7 @@ def _format_news_notification_message(row: Dict[str, Any]) -> str:
     feed_type = str(row.get("feed_type") or "").strip().lower()
     title = html.escape(str(row.get("title") or "Новость").strip())
     source_name = html.escape(str(row.get("source_name") or "SonicFX").strip())
-    published_at = _format_news_notification_time(row.get("published_at"))
+    published_at = _format_news_notification_time(row.get("published_at"), row.get("timezone"))
     source_url = str(row.get("source_url") or "").strip()
 
     if feed_type == "economic":
@@ -2366,8 +2377,14 @@ def _format_news_notification_message(row: Dict[str, Any]) -> str:
         details.append(f"Источник: {source_name}")
     if source_url.startswith(("http://", "https://")):
         details.append(f'<a href="{html.escape(source_url, quote=True)}">Открыть новость</a>')
-    details.append("Сигнал носит информационный характер и не является гарантией результата сделки.")
     return f"{header}\n\n" + "\n".join(details)
+
+
+def _news_notification_media_url(row: Dict[str, Any]) -> str:
+    image_url = str(row.get("image_url") or "").strip()
+    if image_url.startswith(("http://", "https://")):
+        return image_url
+    return ""
 
 
 async def send_due_news_notifications_once() -> int:
@@ -2381,10 +2398,12 @@ async def send_due_news_notifications_once() -> int:
                 SELECT
                     s.user_id,
                     s.lead_minutes,
+                    u.timezone,
                     n.id AS news_item_id,
                     n.feed_type,
                     n.news_category,
                     n.title,
+                    n.image_url,
                     n.source_name,
                     n.source_url,
                     n.country_code,
@@ -2428,13 +2447,32 @@ async def send_due_news_notifications_once() -> int:
         delivery_lead = int(row.get("delivery_lead_minutes") or 0)
         if not user_id or not news_item_id:
             continue
+        message = _format_news_notification_message(row)
+        media_url = _news_notification_media_url(row)
         try:
-            await bot.send_message(
-                chat_id=user_id,
-                text=_format_news_notification_message(row),
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-            )
+            if media_url:
+                try:
+                    await bot.send_photo(
+                        chat_id=user_id,
+                        photo=media_url,
+                        caption=message,
+                        parse_mode="HTML",
+                    )
+                except Exception as media_exc:
+                    print(f"[Bot] news notification media fallback for {user_id}: {media_exc}")
+                    await bot.send_message(
+                        chat_id=user_id,
+                        text=message,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                    )
+            else:
+                await bot.send_message(
+                    chat_id=user_id,
+                    text=message,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                )
             sent += 1
         except Exception as exc:
             print(f"[Bot] news notification send error for {user_id}: {exc}")

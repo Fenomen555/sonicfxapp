@@ -8,16 +8,35 @@ function getImpactLabel(impact, t) {
   return t.news.impactMedium || "Средний";
 }
 
-function formatUpdateTime(value, lang = "ru") {
+function getLocale(lang) {
+  if (lang === "uk") return "uk-UA";
+  if (lang === "en") return "en-US";
+  return "ru-RU";
+}
+
+function formatUpdateTime(value, lang = "ru", timezone = "") {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString(lang === "uk" ? "uk-UA" : lang === "en" ? "en-US" : "ru-RU", {
+  const options = {
     day: "2-digit",
     month: "2-digit",
     hour: "2-digit",
     minute: "2-digit"
-  });
+  };
+  if (timezone) {
+    options.timeZone = timezone;
+  }
+  try {
+    return new Intl.DateTimeFormat(getLocale(lang), options).format(date);
+  } catch {
+    return date.toLocaleString(getLocale(lang), {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
 }
 
 function hasCountryFlag(countryCode) {
@@ -139,7 +158,7 @@ function EconomicSection({ title, items, t }) {
   );
 }
 
-function MarketSection({ items, categories, selectedCategory, onSelectCategory, t, lang }) {
+function MarketSection({ items, categories, selectedCategory, onSelectCategory, t, lang, timezone }) {
   return (
     <section className="news-block">
       <div className="news-category-strip" role="tablist" aria-label={t.news.marketCategories || "Категории"}>
@@ -171,7 +190,7 @@ function MarketSection({ items, categories, selectedCategory, onSelectCategory, 
                 </span>
                 <span className="news-currency-chip">{getMarketCategoryLabel(item.category, t)}</span>
               </div>
-              <span className="news-time-chip">{formatUpdateTime(item.published_at, lang).split(", ").pop() || item.time_label || "--:--"}</span>
+              <span className="news-time-chip">{formatUpdateTime(item.published_at, lang, timezone).split(", ").pop() || item.time_label || "--:--"}</span>
             </div>
 
             <MarketNewsMedia src={item.image_url} alt={item.title} />
@@ -208,7 +227,7 @@ function MarketSection({ items, categories, selectedCategory, onSelectCategory, 
   );
 }
 
-export default function NewsPage({ t, lang = "ru" }) {
+export default function NewsPage({ t, lang = "ru", timezone = "" }) {
   const [feed, setFeed] = useState("economic");
   const [marketCategory, setMarketCategory] = useState("all");
   const [newsData, setNewsData] = useState({
@@ -308,6 +327,7 @@ export default function NewsPage({ t, lang = "ru" }) {
           onSelectCategory={setMarketCategory}
           t={t}
           lang={lang}
+          timezone={timezone}
         />
       )}
     </section>

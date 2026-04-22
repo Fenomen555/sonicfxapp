@@ -317,7 +317,7 @@ export default function App() {
           <OnboardingScreen t={t.onboarding} onFinish={handleOnboardingFinish} />
         ) : (
           <>
-            {tab === "news" && <NewsPage t={t} lang={lang} />}
+            {tab === "news" && <NewsPage t={t} lang={lang} timezone={user.timezone || FALLBACK_USER.timezone} />}
             {tab === "home" && <HomePage t={t} notify={notify} featureFlags={user.feature_flags || FALLBACK_USER.feature_flags} />}
             {tab === "profile" && (
               <ProfilePage

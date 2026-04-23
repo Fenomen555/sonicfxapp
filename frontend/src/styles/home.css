@@ -1513,6 +1513,13 @@
   gap: 4px;
 }
 
+.analysis-result-subcopy {
+  display: block;
+  color: var(--text-soft);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .analysis-result-card span,
 .analysis-result-note span {
   color: var(--text-muted);

@@ -175,6 +175,10 @@ function formatAnalysisPrice(value) {
   return numeric.toFixed(5).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+function formatSelectedExpirationLabel(selectedExpirationMeta, expirationValue) {
+  return selectedExpirationMeta?.label || String(expirationValue || "").trim() || "—";
+}
+
 
 export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -995,6 +999,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     : analysisSummary?.signal || "NO TRADE";
   const analysisAssetLabel = formatAnalysisAsset(analysisSummary?.asset, analysisSummary?.market_mode);
   const analysisPriceLabel = formatAnalysisPrice(analysisSummary?.entry_price);
+  const selectedExpirationLabel = formatSelectedExpirationLabel(selectedExpirationMeta, expiration);
 
   return (
     <section className="page page-home-ref">
@@ -1093,7 +1098,10 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
                   </article>
                   <article className="analysis-result-card">
                     <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
-                    <strong>{formatAnalysisExpiration(analysisSummary.expiration_minutes)}</strong>
+                    <strong>{selectedExpirationLabel}</strong>
+                    <small className="analysis-result-subcopy">
+                      {(t.home.analysisExpirationRecommendationPrefix || "ИИ рекомендует")}: {formatAnalysisExpiration(analysisSummary.expiration_minutes)}
+                    </small>
                   </article>
                 </div>
               </>

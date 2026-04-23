@@ -1011,11 +1011,25 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       ) : analysisSummary ? (
         <div className="upload-zone analysis-result-panel">
           <div className="analysis-result-sheet analysis-result-sheet-inline" role="region" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
+            {scanPreview.url ? (
+              <div className="upload-preview-media analysis-result-media">
+                <img
+                  className="upload-preview-backdrop"
+                  src={scanPreview.url}
+                  alt=""
+                  aria-hidden="true"
+                />
+                <img
+                  className="upload-preview-image"
+                  src={scanPreview.url}
+                  alt={t.home.uploadPreviewAlt || "Uploaded chart"}
+                  onError={() => setScanPreview((prev) => ({ ...prev, url: "", status: "error" }))}
+                />
+              </div>
+            ) : null}
+
             <div className="analysis-result-hero">
               <div className="analysis-result-copy">
-                <span className="analysis-result-kicker">
-                  {analysisResult?.mode_label || "АДАПТИВНЫЙ"}
-                </span>
                 <strong>{analysisTitle}</strong>
                 <small>
                   {analysisSummary.status === "graph_not_found"
@@ -1034,10 +1048,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
                   <article className="analysis-result-card">
                     <span>{t.home.analysisAssetLabel || "Актив"}</span>
                     <strong>{analysisSummary.asset || "не определен"}</strong>
-                  </article>
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisMarketLabel || "Режим"}</span>
-                    <strong>{analysisSummary.market_mode || "UNKNOWN"}</strong>
                   </article>
                   <article className="analysis-result-card">
                     <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>

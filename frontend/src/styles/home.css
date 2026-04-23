@@ -2316,6 +2316,11 @@
   grid-template-columns: minmax(0, 1fr) 132px;
 }
 
+.field-row.field-row-scanner {
+  grid-template-columns: minmax(0, 180px);
+  justify-content: end;
+}
+
 .generator-panel .field-row {
   padding: 12px;
   border: 1px solid rgba(77, 96, 128, 0.3);
@@ -2754,6 +2759,10 @@
     top: -5px;
     width: 22px;
     height: 22px;
+  }
+
+  .field-row.field-row-scanner {
+    grid-template-columns: 1fr;
   }
 
   .signal-panel-toggle {

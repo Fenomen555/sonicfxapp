@@ -1269,27 +1269,29 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       </div>
 
       <div className="card form-card ref-form-card generator-panel">
-        <div className={`field-row ${signalMode === "indicators" ? "field-row-indicators" : ""}`}>
-          <div className="field-grow">
-            <label className="field-label">{t.home.asset || "Symbol"}</label>
-            <button
-              type="button"
-              className="field-input ref-input field-picker-trigger"
-              onClick={() => openPickerSheet("asset")}
-            >
-              <span className="field-picker-copy">
-                <strong>
-                  {selectedPairMeta
-                    ? `${selectedPairMeta.pair}${typeof selectedPairMeta.payout === "number" ? ` (${selectedPairMeta.payout}%)` : ""}`
-                    : isLoading
-                      ? (t.home.loading || "Loading...")
-                      : (t.home.emptyPairs || "No pairs available")}
-                </strong>
-                <small>{t.home.assetPickerHint || "Tap to choose a currency pair"}</small>
-              </span>
-              <span className="field-picker-chevron" aria-hidden="true" />
-            </button>
-          </div>
+        <div className={`field-row ${signalMode === "indicators" ? "field-row-indicators" : ""} ${signalMode === "scanner" ? "field-row-scanner" : ""}`}>
+          {signalMode !== "scanner" && (
+            <div className="field-grow">
+              <label className="field-label">{t.home.asset || "Symbol"}</label>
+              <button
+                type="button"
+                className="field-input ref-input field-picker-trigger"
+                onClick={() => openPickerSheet("asset")}
+              >
+                <span className="field-picker-copy">
+                  <strong>
+                    {selectedPairMeta
+                      ? `${selectedPairMeta.pair}${typeof selectedPairMeta.payout === "number" ? ` (${selectedPairMeta.payout}%)` : ""}`
+                      : isLoading
+                        ? (t.home.loading || "Loading...")
+                        : (t.home.emptyPairs || "No pairs available")}
+                  </strong>
+                  <small>{t.home.assetPickerHint || "Tap to choose a currency pair"}</small>
+                </span>
+                <span className="field-picker-chevron" aria-hidden="true" />
+              </button>
+            </div>
+          )}
 
           <div className="field-mini">
             <label className="field-label">{t.home.expiration || "Expiration"}</label>

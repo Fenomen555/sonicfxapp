@@ -600,6 +600,9 @@
 .profile-notifications-body {
   display: grid;
   gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .profile-notifications-body p {
@@ -828,6 +831,14 @@
 .profile-notifications-save:disabled {
   cursor: wait;
   opacity: 0.68;
+}
+
+.profile-notifications-modal .profile-faq-footer {
+  position: relative;
+  z-index: 1;
+  background:
+    linear-gradient(180deg, rgba(11, 17, 27, 0), rgba(11, 17, 27, 0.96) 28%);
+  padding-top: 10px;
 }
 
 @media (hover: hover) {
@@ -1529,6 +1540,11 @@
     radial-gradient(circle at top left, rgba(255, 255, 255, 0.78), transparent 34%),
     linear-gradient(135deg, rgba(255, 250, 240, 0.98), rgba(239, 202, 124, 0.96));
   color: #26324a;
+}
+
+:root[data-theme="light"] .profile-notifications-modal .profile-faq-footer {
+  background:
+    linear-gradient(180deg, rgba(255, 248, 238, 0), rgba(247, 240, 228, 0.98) 28%);
 }
 
 :root[data-theme="light"] .profile-faq-warning {

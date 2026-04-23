@@ -1055,7 +1055,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
               <strong>{notificationsCopy.subtitle}</strong>
             </div>
 
-            <div className="profile-notifications-body">
+            <div className="profile-notifications-body profile-faq-modal-scroll">
               <p>{notificationsCopy.intro}</p>
 
               <button
@@ -1097,26 +1097,28 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                 ))}
               </div>
 
-              <div className="profile-notification-impact">
-                <span>{notificationsCopy.impactTitle}</span>
-                <small>{notificationsCopy.impactHint}</small>
-                <div className="profile-notification-impact-grid">
-                  {[
-                    { key: "impact_high_enabled", label: notificationsCopy.impactHigh, tone: "high" },
-                    { key: "impact_medium_enabled", label: notificationsCopy.impactMedium, tone: "medium" },
-                    { key: "impact_low_enabled", label: notificationsCopy.impactLow, tone: "low" }
-                  ].map((item) => (
-                    <button
-                      type="button"
-                      key={item.key}
-                      className={`profile-notification-impact-chip tone-${item.tone} ${notificationDraft[item.key] ? "active" : ""}`}
-                      onClick={() => handleNotificationDraftChange(item.key, notificationDraft[item.key] ? 0 : 1)}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
+              {notificationDraft.economic_enabled === 1 && (
+                <div className="profile-notification-impact">
+                  <span>{notificationsCopy.impactTitle}</span>
+                  <small>{notificationsCopy.impactHint}</small>
+                  <div className="profile-notification-impact-grid">
+                    {[
+                      { key: "impact_high_enabled", label: notificationsCopy.impactHigh, tone: "high" },
+                      { key: "impact_medium_enabled", label: notificationsCopy.impactMedium, tone: "medium" },
+                      { key: "impact_low_enabled", label: notificationsCopy.impactLow, tone: "low" }
+                    ].map((item) => (
+                      <button
+                        type="button"
+                        key={item.key}
+                        className={`profile-notification-impact-chip tone-${item.tone} ${notificationDraft[item.key] ? "active" : ""}`}
+                        onClick={() => handleNotificationDraftChange(item.key, notificationDraft[item.key] ? 0 : 1)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="profile-notification-lead">
                 <span>{notificationsCopy.leadTitle}</span>

@@ -159,6 +159,16 @@ function formatAnalysisExpiration(value) {
   return numeric > 0 ? `${numeric} мин` : "—";
 }
 
+function formatAnalysisAsset(asset, marketMode) {
+  const normalizedAsset = String(asset || "").trim() || "не определен";
+  const normalizedMode = String(marketMode || "").trim().toUpperCase();
+  if (normalizedAsset === "не определен") return normalizedAsset;
+  if (normalizedMode === "OTC" && !/\bOTC\b/i.test(normalizedAsset)) {
+    return `${normalizedAsset} OTC`;
+  }
+  return normalizedAsset;
+}
+
 
 export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -960,6 +970,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const analysisTitle = analysisSummary?.status === "graph_not_found"
     ? (t.home.analysisGraphNotFoundTitle || "График не обнаружен")
     : analysisSummary?.signal || "NO TRADE";
+  const analysisAssetLabel = formatAnalysisAsset(analysisSummary?.asset, analysisSummary?.market_mode);
 
   return (
     <section className="page page-home-ref">
@@ -1046,7 +1057,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
                 <div className="analysis-result-grid">
                   <article className="analysis-result-card">
                     <span>{t.home.analysisAssetLabel || "Актив"}</span>
-                    <strong>{analysisSummary.asset || "не определен"}</strong>
+                    <strong>{analysisAssetLabel}</strong>
                   </article>
                   <article className="analysis-result-card">
                     <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>

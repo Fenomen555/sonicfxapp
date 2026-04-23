@@ -1057,11 +1057,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
                     <strong>{formatAnalysisExpiration(analysisSummary.expiration_minutes)}</strong>
                   </article>
                 </div>
-
-                <div className="analysis-result-note">
-                  <span>{t.home.analysisCommentLabel || "Комментарий"}</span>
-                  <p>{analysisSummary.comment || "-"}</p>
-                </div>
               </>
             ) : (
               <div className="analysis-result-empty">

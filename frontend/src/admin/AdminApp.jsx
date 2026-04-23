@@ -31,6 +31,24 @@ const FLAG_META = {
   }
 };
 
+const SCANNER_MODE_META = {
+  aggressive: {
+    title: "Агрессивный",
+    short: "AGG",
+    description: "Максимум сигналов. Подойдет, когда важна частота входов."
+  },
+  adaptive: {
+    title: "Адаптивный",
+    short: "ADP",
+    description: "Баланс между частотой и качеством. Оптимальный режим по умолчанию."
+  },
+  minimal: {
+    title: "Минимальный",
+    short: "MIN",
+    description: "Только самые чистые сценарии с повышенной точностью."
+  }
+};
+
 const MODE_FLAG_KEYS = ["mode_scanner_enabled", "mode_ai_enabled", "mode_indicators_enabled"];
 
 const ACCOUNT_TIER_META = {
@@ -64,6 +82,19 @@ const EMPTY_INDICATOR_SETTINGS = {
 const EMPTY_SUPPORT_SETTINGS = {
   channel_url: "https://t.me/+TthmjdpAkv5hNjdi",
   support_url: "https://t.me/WaySonic"
+};
+
+const EMPTY_SCANNER_SETTINGS = {
+  analysis_mode: "adaptive",
+  analysis_mode_label: "АДАПТИВНЫЙ",
+  api_key_configured: false,
+  api_key_preview: "",
+  model: "gpt-4.1-mini",
+  mode_options: [
+    { key: "aggressive", label: "АГРЕССИВНЫЙ" },
+    { key: "adaptive", label: "АДАПТИВНЫЙ" },
+    { key: "minimal", label: "МИНИМАЛЬНЫЙ" }
+  ]
 };
 
 function TabGlyph({ kind }) {
@@ -217,10 +248,13 @@ export default function AdminApp({ authError }) {
   const [indicatorSettings, setIndicatorSettings] = useState(EMPTY_INDICATOR_SETTINGS);
   const [supportSettings, setSupportSettings] = useState(EMPTY_SUPPORT_SETTINGS);
   const [supportEditor, setSupportEditor] = useState(EMPTY_SUPPORT_SETTINGS);
+  const [scannerSettings, setScannerSettings] = useState(EMPTY_SCANNER_SETTINGS);
+  const [scannerEditor, setScannerEditor] = useState({ analysis_mode: "adaptive", api_key: "" });
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
   const [marketSavingKey, setMarketSavingKey] = useState("");
   const [supportSaving, setSupportSaving] = useState(false);
+  const [scannerSaving, setScannerSaving] = useState(false);
   const [indicatorSearch, setIndicatorSearch] = useState("");
   const [indicatorSavingCode, setIndicatorSavingCode] = useState("");
   const [loading, setLoading] = useState(false);
@@ -326,8 +360,14 @@ export default function AdminApp({ authError }) {
         setUsers(data?.items || []);
       }
       if (targetTab === "flags") {
-        const data = await apiAdminFetchJson("/api/admin/feature-flags");
-        setFlags(data?.items || []);
+        const [flagsData, scannerData] = await Promise.all([
+          apiAdminFetchJson("/api/admin/feature-flags"),
+          apiAdminFetchJson("/api/admin/scanner-settings")
+        ]);
+        setFlags(flagsData?.items || []);
+        const nextScanner = { ...EMPTY_SCANNER_SETTINGS, ...(scannerData || {}) };
+        setScannerSettings(nextScanner);
+        setScannerEditor({ analysis_mode: nextScanner.analysis_mode || "adaptive", api_key: "" });
       }
       if (targetTab === "market") {
         const data = await apiAdminFetchJson("/api/admin/market-settings");
@@ -554,6 +594,32 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось изменить функцию", error.message || "Попробуйте ещё раз.");
     } finally {
       setFlagSavingKey("");
+    }
+  };
+
+  const saveScannerSettings = async () => {
+    setScannerSaving(true);
+    try {
+      const payload = {
+        analysis_mode: scannerEditor.analysis_mode || "adaptive",
+        api_key: scannerEditor.api_key.trim()
+      };
+      const data = await apiAdminFetchJson("/api/admin/scanner-settings", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      const next = { ...EMPTY_SCANNER_SETTINGS, ...(data || {}) };
+      setScannerSettings(next);
+      setScannerEditor({ analysis_mode: next.analysis_mode || "adaptive", api_key: "" });
+      pushToast(
+        "success",
+        "Сканер обновлён",
+        payload.api_key ? "Режим анализа и GPT-ключ сохранены." : "Режим анализа сохранён. Текущий GPT-ключ оставлен без изменений."
+      );
+    } catch (error) {
+      pushToast("error", "Не удалось сохранить сканер", error.message || "Проверьте ключ и повторите попытку.");
+    } finally {
+      setScannerSaving(false);
     }
   };
 
@@ -929,39 +995,111 @@ export default function AdminApp({ authError }) {
         )}
 
         {!loading && tab === "flags" && (
-          <section className="admin-control-grid admin-mode-control-grid">
-            {modeFlags.map((item) => {
-              const meta = getFlagMeta(item.key);
-              const enabled = item.is_enabled === 1;
-              return (
-                <article className={`admin-card admin-control-card admin-mode-control-card ${enabled ? "is-enabled" : "is-disabled"}`} key={item.key}>
-                  <div className="admin-control-head">
-                    <div className="admin-control-title-row">
-                      <span className="admin-mode-code">{meta.short}</span>
-                      <strong>{meta.title}</strong>
-                    </div>
+          <>
+            <section className="admin-card admin-scanner-settings-card">
+              <div className="admin-filter-head">
+                <div>
+                  <div className="admin-section-title">SonicFX Scanner</div>
+                  <div className="admin-muted-text">Управление GPT-ключом и текущим режимом анализа скриншотов.</div>
+                </div>
+                <div className="admin-scanner-badge-row">
+                  <span className={`admin-badge ${scannerSettings.api_key_configured ? "tone-success" : "tone-neutral"}`}>
+                    {scannerSettings.api_key_configured ? "GPT ключ подключён" : "GPT ключ не задан"}
+                  </span>
+                  <span className="admin-badge tone-accent">{scannerSettings.model || "gpt-4.1-mini"}</span>
+                </div>
+              </div>
+
+              <div className="admin-scanner-mode-grid">
+                {(scannerSettings.mode_options || EMPTY_SCANNER_SETTINGS.mode_options).map((item) => {
+                  const meta = SCANNER_MODE_META[item.key] || SCANNER_MODE_META.adaptive;
+                  const isActive = scannerEditor.analysis_mode === item.key;
+                  return (
                     <button
-                      className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
-                      disabled={flagSavingKey === item.key}
-                      onClick={() => toggleFlag(item)}
+                      key={item.key}
                       type="button"
-                      aria-pressed={enabled}
+                      className={`admin-scanner-mode-card ${isActive ? "active" : ""}`}
+                      onClick={() => setScannerEditor((prev) => ({ ...prev, analysis_mode: item.key }))}
                     >
-                      <span>{flagSavingKey === item.key ? "..." : enabled ? "Включено" : "Выключено"}</span>
-                      <i aria-hidden="true" />
+                      <span className="admin-scanner-mode-top">
+                        <span className="admin-mode-code">{meta.short}</span>
+                        <span className={`admin-badge ${isActive ? "tone-success" : "tone-neutral"}`}>
+                          {isActive ? "Выбран" : "Доступен"}
+                        </span>
+                      </span>
+                      <strong>{meta.title}</strong>
+                      <p>{meta.description}</p>
                     </button>
-                  </div>
-                  <p>{meta.description}</p>
-                  <div className="admin-control-footer">
-                    <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
-                      {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
-                    </span>
-                    <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
-                  </div>
-                </article>
-              );
-            })}
-          </section>
+                  );
+                })}
+              </div>
+
+              <div className="admin-scanner-settings-grid">
+                <label className="admin-field admin-field-wide">
+                  <span>OpenAI API key</span>
+                  <input
+                    className="admin-input"
+                    type="password"
+                    autoComplete="off"
+                    placeholder={scannerSettings.api_key_configured ? "Оставьте пустым, чтобы не менять текущий ключ" : "sk-..."}
+                    value={scannerEditor.api_key}
+                    onChange={(e) => setScannerEditor((prev) => ({ ...prev, api_key: e.target.value }))}
+                  />
+                </label>
+
+                <div className="admin-card admin-scanner-key-panel">
+                  <span className="admin-kpi-label">Текущий ключ</span>
+                  <strong>{scannerSettings.api_key_preview || "Не задан"}</strong>
+                  <span className="admin-kpi-note">
+                    Пустое поле при сохранении оставит текущий ключ без изменений.
+                  </span>
+                </div>
+              </div>
+
+              <div className="admin-scanner-save-row">
+                <span className="admin-muted-text">
+                  Режим будет использоваться для всех новых запросов сканера в mini app.
+                </span>
+                <button className="admin-primary-button" type="button" disabled={scannerSaving} onClick={saveScannerSettings}>
+                  {scannerSaving ? "Сохраняем..." : "Сохранить сканер"}
+                </button>
+              </div>
+            </section>
+
+            <section className="admin-control-grid admin-mode-control-grid">
+              {modeFlags.map((item) => {
+                const meta = getFlagMeta(item.key);
+                const enabled = item.is_enabled === 1;
+                return (
+                  <article className={`admin-card admin-control-card admin-mode-control-card ${enabled ? "is-enabled" : "is-disabled"}`} key={item.key}>
+                    <div className="admin-control-head">
+                      <div className="admin-control-title-row">
+                        <span className="admin-mode-code">{meta.short}</span>
+                        <strong>{meta.title}</strong>
+                      </div>
+                      <button
+                        className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
+                        disabled={flagSavingKey === item.key}
+                        onClick={() => toggleFlag(item)}
+                        type="button"
+                        aria-pressed={enabled}
+                      >
+                        <span>{flagSavingKey === item.key ? "..." : enabled ? "Включено" : "Выключено"}</span>
+                        <i aria-hidden="true" />
+                      </button>
+                    </div>
+                    <p>{meta.description}</p>
+                    <div className="admin-control-footer">
+                      <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
+                        {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
+                      </span>
+                      <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+          </>
         )}
         {!loading && tab === "indicators" && (
           <>

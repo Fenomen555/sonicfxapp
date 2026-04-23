@@ -1132,6 +1132,91 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.admin-scanner-settings-card {
+  padding: 18px;
+  display: grid;
+  gap: 16px;
+}
+
+.admin-scanner-badge-row,
+.admin-scanner-save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-scanner-mode-grid,
+.admin-scanner-settings-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-scanner-mode-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-scanner-mode-card {
+  border: 1px solid rgba(77, 96, 128, 0.42);
+  border-radius: 20px;
+  padding: 15px;
+  text-align: left;
+  color: var(--text-main);
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.08), transparent 38%),
+    linear-gradient(180deg, rgba(17, 25, 39, 0.98), rgba(10, 16, 27, 0.98));
+  display: grid;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.admin-scanner-mode-card:hover {
+  transform: translateY(-1px);
+}
+
+.admin-scanner-mode-card.active {
+  border-color: rgba(143, 184, 255, 0.5);
+  box-shadow: 0 16px 28px rgba(24, 37, 62, 0.22), 0 0 0 3px rgba(95, 143, 255, 0.08);
+}
+
+.admin-scanner-mode-card strong {
+  font-size: 17px;
+  line-height: 1.05;
+}
+
+.admin-scanner-mode-card p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.admin-scanner-mode-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.admin-scanner-settings-grid {
+  grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr);
+  align-items: stretch;
+}
+
+.admin-scanner-key-panel {
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.admin-scanner-key-panel strong {
+  font-size: 18px;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
 .admin-mode-control-card {
   position: relative;
   overflow: hidden;
@@ -1245,6 +1330,22 @@
 }
 
 @media (max-width: 720px) {
+  .admin-scanner-mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-scanner-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-scanner-save-row {
+    align-items: stretch;
+  }
+
+  .admin-scanner-save-row .admin-primary-button {
+    width: 100%;
+  }
+
   .admin-mode-control-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

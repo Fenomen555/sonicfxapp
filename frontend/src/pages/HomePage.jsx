@@ -147,6 +147,18 @@ function getRenderableCandleCount(payload) {
   return maxCount;
 }
 
+function getAnalysisSignalTone(signal) {
+  const normalized = String(signal || "").trim().toUpperCase();
+  if (normalized === "BUY") return "buy";
+  if (normalized === "SELL") return "sell";
+  return "neutral";
+}
+
+function formatAnalysisExpiration(value) {
+  const numeric = Number(value || 0);
+  return numeric > 0 ? `${numeric} мин` : "—";
+}
+
 
 export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -180,6 +192,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const [scanUploadState, setScanUploadState] = useState({ status: "idle", file: null, detail: "" });
   const [scanPreview, setScanPreview] = useState({ url: "", status: "idle" });
   const [isAnalysisScanning, setIsAnalysisScanning] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const analysisScanTimerRef = useRef(0);
@@ -774,6 +787,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         body: formData
       });
       setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+      setAnalysisResult(null);
       notify?.({
         type: "success",
         title: t.home.uploadToastTitle || "Chart uploaded",
@@ -810,6 +824,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         body: JSON.stringify({ url: trimmedUrl })
       });
       setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+      setAnalysisResult(null);
       setIsLinkSheetOpen(false);
       setLinkInputValue("");
       notify?.({
@@ -871,6 +886,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     } catch (_error) {
       // The local reset still keeps the interface usable if the server is temporarily unavailable.
     }
+    setAnalysisResult(null);
     setScanUploadState({ status: "idle", file: null, detail: "" });
     notify?.({
       type: "info",
@@ -879,7 +895,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     });
   }
 
-  function handleAnalyzeClick() {
+  async function handleAnalyzeClick() {
     if (signalMode === "scanner" && !hasScanUploadPreview) {
       notify?.({
         type: "error",
@@ -889,14 +905,37 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       return;
     }
 
-    if (analysisScanTimerRef.current) {
-      window.clearTimeout(analysisScanTimerRef.current);
+    if (signalMode !== "scanner") {
+      notify?.({
+        type: "info",
+        title: t.home.analyzeSoonTitle || "Режим в работе",
+        message: t.home.analyzeSoonMessage || "GPT-анализ сейчас подключен для SonicFX Scanner. Для Auto и Indicators добавим отдельный поток."
+      });
+      return;
     }
+
+    if (isAnalysisScanning) return;
+
     setIsAnalysisScanning(true);
-    analysisScanTimerRef.current = window.setTimeout(() => {
+    setAnalysisResult(null);
+    setErrorText("");
+
+    try {
+      const data = await apiFetchJson("/api/analyze/scanner", {
+        method: "POST",
+        body: JSON.stringify({ upload_id: scanUploadState.file?.id || null })
+      });
+      setAnalysisResult(data || null);
+    } catch (error) {
+      notify?.({
+        type: "error",
+        title: t.home.analyzeFailedTitle || "Не удалось завершить анализ",
+        message: error.message || t.home.analyzeFailedMessage || "Попробуйте еще раз через несколько секунд."
+      });
+    } finally {
       setIsAnalysisScanning(false);
       analysisScanTimerRef.current = 0;
-    }, 3600);
+    }
   }
 
   const scanUploadFileLabel = scanUploadState.file?.original_name || scanUploadState.file?.public_path || "";
@@ -916,6 +955,11 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     : scanUploadState.status === "uploading"
       ? (t.home.uploadingHint || "Please wait, we are saving the chart")
       : (t.home.sourceHint || "Choose a chart source");
+  const analysisSummary = analysisResult?.result || null;
+  const analysisSignalTone = getAnalysisSignalTone(analysisSummary?.signal);
+  const analysisTitle = analysisSummary?.status === "graph_not_found"
+    ? (t.home.analysisGraphNotFoundTitle || "График не обнаружен")
+    : analysisSummary?.signal || "NO TRADE";
 
   return (
     <section className="page page-home-ref">
@@ -1103,7 +1147,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         >
           <img src={homeHistoryIcon} alt="" loading="lazy" aria-hidden="true" />
         </button>
-        <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button" onClick={handleAnalyzeClick}>
+        <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button" onClick={handleAnalyzeClick} disabled={isAnalysisScanning}>
           <span>{actionLabel}</span>
           <AnalyzeCtaAnimation />
         </button>
@@ -1158,6 +1202,75 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
 
         {errorText && <div className="form-error">{errorText}</div>}
       </div>
+
+      {analysisSummary && (
+        <div className="action-sheet-layer" role="presentation">
+          <button
+            className="action-sheet-backdrop"
+            type="button"
+            aria-label={t.home.close || "Close"}
+            onClick={() => setAnalysisResult(null)}
+          />
+          <div className="action-sheet analysis-result-sheet" role="dialog" aria-modal="true" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
+            <div className="action-sheet-handle" aria-hidden="true" />
+            <div className="analysis-result-hero">
+              <div className="analysis-result-copy">
+                <span className="analysis-result-kicker">
+                  {analysisResult?.mode_label || "АДАПТИВНЫЙ"}
+                </span>
+                <strong>{analysisTitle}</strong>
+                <small>
+                  {analysisSummary.status === "graph_not_found"
+                    ? (t.home.analysisGraphNotFoundHint || "Загрузите более читаемый скриншот с ценой, свечами и шкалой.")
+                    : (analysisSummary.comment || t.home.analysisResultHint || "Сигнал подготовлен по текущей структуре цены.")}
+                </small>
+              </div>
+              <span className={`analysis-result-signal signal-${analysisSignalTone}`}>
+                {analysisSummary.status === "graph_not_found" ? "NO DATA" : (analysisSummary.signal || "NO TRADE")}
+              </span>
+            </div>
+
+            {analysisSummary.status !== "graph_not_found" ? (
+              <>
+                <div className="analysis-result-grid">
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisAssetLabel || "Актив"}</span>
+                    <strong>{analysisSummary.asset || "не определен"}</strong>
+                  </article>
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisMarketLabel || "Режим"}</span>
+                    <strong>{analysisSummary.market_mode || "UNKNOWN"}</strong>
+                  </article>
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>
+                    <strong>{Number(analysisSummary.confidence || 0)}%</strong>
+                  </article>
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
+                    <strong>{formatAnalysisExpiration(analysisSummary.expiration_minutes)}</strong>
+                  </article>
+                </div>
+
+                <div className="analysis-result-note">
+                  <span>{t.home.analysisCommentLabel || "Комментарий"}</span>
+                  <p>{analysisSummary.comment || "-"}</p>
+                </div>
+              </>
+            ) : (
+              <div className="analysis-result-empty">
+                <strong>{t.home.analysisGraphNotFoundTitle || "График не обнаружен"}</strong>
+                <p>{t.home.analysisGraphNotFoundHint || "Попробуйте загрузить более четкий скриншот, где видны свечи, движение цены и шкала."}</p>
+              </div>
+            )}
+
+            <div className="analysis-result-actions">
+              <button className="action-sheet-close" type="button" onClick={() => setAnalysisResult(null)}>
+                {t.home.close || "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isInfoSheetOpen && (
         <div className="action-sheet-layer" role="presentation">

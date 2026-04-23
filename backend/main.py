@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import base64
 import hashlib
 import html
 import json
@@ -94,6 +95,198 @@ DEFAULT_SUPPORT_CHANNEL_URL = (
 DEFAULT_SUPPORT_CONTACT_URL = (
     os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"
 ).strip()
+DEFAULT_SCANNER_ANALYSIS_MODE = "adaptive"
+DEFAULT_SCANNER_OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip() or "gpt-4.1-mini"
+DEFAULT_SCANNER_OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
+OPENAI_API_BASE_URL = (os.getenv("OPENAI_API_BASE_URL") or "https://api.openai.com/v1").strip().rstrip("/")
+SCANNER_ANALYSIS_MODE_CHOICES = ("aggressive", "adaptive", "minimal")
+SCANNER_ANALYSIS_MODE_LABELS = {
+    "aggressive": "АГРЕССИВНЫЙ",
+    "adaptive": "АДАПТИВНЫЙ",
+    "minimal": "МИНИМАЛЬНЫЙ",
+}
+OPENAI_SCAN_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+SCANNER_ANALYSIS_PROMPT = """Ты — профессиональный трейдинг-аналитик.
+Анализируешь скриншот графика и даёшь краткий торговый сигнал.
+
+Работаешь с Forex и OTC.
+
+Режим анализа задаётся параметром:
+АГРЕССИВНЫЙ / АДАПТИВНЫЙ / МИНИМАЛЬНЫЙ
+
+Проверка изображения:
+
+Если нет:
+
+свечного графика
+движения цены
+шкалы
+
+ИЛИ изображение нечитабельно:
+
+считай, что график не обнаружен.
+
+Актив:
+
+если видно → укажи
+если нет → Актив: не определен
+
+Режим рынка:
+
+если есть OTC →
+Режим: OTC
+иначе →
+Режим: MARKET
+
+Анализ:
+
+Определи:
+
+тренд
+уровни
+импульс
+реакцию цены
+
+ЛОГИКА ПО РЕЖИМАМ
+🔴 АГРЕССИВНЫЙ
+
+Цель: максимум сигналов
+
+Сигнал даётся если:
+
+есть 1 любое подтверждение
+
+Допускается:
+
+слабый тренд
+слабый импульс
+вход по 2 свечам подряд
+
+NO TRADE только если:
+
+полный хаос
+нет направления вообще
+🟡 АДАПТИВНЫЙ
+
+Цель: баланс
+
+Сигнал если:
+
+1 сильное подтверждение
+ИЛИ
+2 слабых
+
+NO TRADE если:
+
+флет без границ
+нет импульса и реакции
+🟢 МИНИМАЛЬНЫЙ
+
+Цель: точность
+
+Сигнал только если:
+
+тренд + импульс
+ИЛИ
+чёткий отбой от уровня
+
+Дополнительно:
+
+движение должно быть чистым
+
+NO TRADE если:
+
+слабая структура
+мелкие свечи
+сомнение
+
+НАПРАВЛЕНИЕ
+
+BUY:
+
+тренд вверх
+или отбой от поддержки
+
+SELL:
+
+тренд вниз
+или отбой от сопротивления
+
+OTC ЛОГИКА
+
+Для всех режимов:
+
+игнорируй объем
+учитывай шум
+
+АГРЕССИВНЫЙ:
+
+можно входить по серии свечей
+
+АДАПТИВНЫЙ:
+
+нужен хотя бы слабый импульс
+
+МИНИМАЛЬНЫЙ:
+
+только чистый импульс или отбой
+
+ИНДИКАТОРЫ
+
+Если есть:
+
+RSI:
+
+>70 → SELL
+<30 → BUY
+
+MACD:
+вверх → BUY
+вниз → SELL
+
+Если против сигнала:
+
+АГРЕССИВНЫЙ → игнорировать
+АДАПТИВНЫЙ → снизить уверенность
+МИНИМАЛЬНЫЙ → NO TRADE
+
+УВЕРЕННОСТЬ
+
+АГРЕССИВНЫЙ:
+50–70%
+
+АДАПТИВНЫЙ:
+55–75%
+
+МИНИМАЛЬНЫЙ:
+65–85%
+
+<50% → NO TRADE
+
+85% не превышать.
+
+ЭКСПИРАЦИЯ
+
+импульс → 1–2 минуты
+средний → 2–3 минуты
+тренд → 3–5 минут
+
+ЗАПРЕЩЕНО
+не придумывать данные
+не угадывать актив
+не писать длинные тексты
+не давать сигнал без логики
+
+Верни только строгий JSON без markdown и без пояснений по схеме:
+{
+  "status": "ok" | "graph_not_found",
+  "asset": "string",
+  "market_mode": "OTC" | "MARKET" | "UNKNOWN",
+  "signal": "BUY" | "SELL" | "NO TRADE",
+  "confidence": 0,
+  "expiration_minutes": 0,
+  "comment": "string до 20 слов"
+}"""
 VALID_NEWS_FEEDS = {"economic", "market"}
 NEWS_GENERAL_CATEGORY = "general"
 NEWS_NOTIFICATION_LEAD_OPTIONS = (5, 15, 30, 60)
@@ -251,6 +444,15 @@ class AdminIndicatorUpdateRequest(BaseModel):
 class AdminSupportSettingsUpdateRequest(BaseModel):
     channel_url: str = Field(min_length=8, max_length=500)
     support_url: str = Field(min_length=8, max_length=500)
+
+
+class AdminScannerSettingsUpdateRequest(BaseModel):
+    analysis_mode: str = Field(min_length=4, max_length=16)
+    api_key: Optional[str] = Field(default=None, max_length=512)
+
+
+class ScannerAnalyzeRequest(BaseModel):
+    upload_id: Optional[int] = Field(default=None, ge=1)
 
 
 class UserNewsNotificationSettingsUpdate(BaseModel):
@@ -855,6 +1057,274 @@ async def set_app_setting(key: str, value: str) -> None:
                 """,
                 (key, str(value)),
             )
+
+
+def _normalize_scanner_analysis_mode(value: Any) -> str:
+    mode = str(value or "").strip().lower()
+    if mode in SCANNER_ANALYSIS_MODE_CHOICES:
+        return mode
+    return DEFAULT_SCANNER_ANALYSIS_MODE
+
+
+def _mask_secret(value: str) -> str:
+    secret = str(value or "").strip()
+    if not secret:
+        return ""
+    if len(secret) <= 8:
+        return "•" * len(secret)
+    return f"{secret[:4]}{'•' * (len(secret) - 8)}{secret[-4:]}"
+
+
+def _trim_comment_words(value: Any, limit: int = 20) -> str:
+    words = str(value or "").strip().split()
+    if not words:
+        return ""
+    return " ".join(words[: max(int(limit), 1)])
+
+
+def _build_scanner_analysis_text(result: Dict[str, Any]) -> str:
+    if (result.get("status") or "") == "graph_not_found":
+        return "График не обнаружен"
+
+    confidence = int(result.get("confidence") or 0)
+    expiration_minutes = int(result.get("expiration_minutes") or 0)
+    expiration_label = f"{expiration_minutes} мин" if expiration_minutes > 0 else "-"
+    comment = str(result.get("comment") or "").strip() or "-"
+    return "\n".join(
+        [
+            f"Актив: {result.get('asset') or 'не определен'}",
+            f"Режим: {result.get('market_mode') or 'UNKNOWN'}",
+            f"Сигнал: {result.get('signal') or 'NO TRADE'}",
+            f"Уверенность: {confidence}%",
+            f"Экспирация: {expiration_label}",
+            f"Комментарий: {comment}",
+        ]
+    )
+
+
+def _sanitize_scanner_analysis_result(payload: Dict[str, Any]) -> Dict[str, Any]:
+    status = str(payload.get("status") or "graph_not_found").strip().lower()
+    if status not in {"ok", "graph_not_found"}:
+        status = "graph_not_found"
+
+    asset = str(payload.get("asset") or "").strip() or "не определен"
+    market_mode = str(payload.get("market_mode") or "UNKNOWN").strip().upper()
+    if market_mode not in {"OTC", "MARKET", "UNKNOWN"}:
+        market_mode = "UNKNOWN"
+
+    signal = str(payload.get("signal") or "NO TRADE").strip().upper()
+    if signal not in {"BUY", "SELL", "NO TRADE"}:
+        signal = "NO TRADE"
+
+    try:
+        confidence = int(payload.get("confidence") or 0)
+    except (TypeError, ValueError):
+        confidence = 0
+    confidence = min(max(confidence, 0), 85)
+
+    try:
+        expiration_minutes = int(payload.get("expiration_minutes") or 0)
+    except (TypeError, ValueError):
+        expiration_minutes = 0
+    expiration_minutes = min(max(expiration_minutes, 0), 5)
+
+    comment = _trim_comment_words(payload.get("comment") or "", 20)
+
+    if status == "graph_not_found":
+        return {
+            "status": "graph_not_found",
+            "asset": "не определен",
+            "market_mode": "UNKNOWN",
+            "signal": "NO TRADE",
+            "confidence": 0,
+            "expiration_minutes": 0,
+            "comment": "",
+            "formatted_text": "График не обнаружен",
+        }
+
+    if confidence < 50:
+        signal = "NO TRADE"
+
+    if signal == "NO TRADE":
+        expiration_minutes = 0
+
+    sanitized = {
+        "status": "ok",
+        "asset": asset,
+        "market_mode": market_mode,
+        "signal": signal,
+        "confidence": confidence,
+        "expiration_minutes": expiration_minutes,
+        "comment": comment,
+    }
+    sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
+    return sanitized
+
+
+async def get_scanner_settings_payload() -> Dict[str, Any]:
+    analysis_mode = _normalize_scanner_analysis_mode(
+        await get_app_setting("scanner_analysis_mode", DEFAULT_SCANNER_ANALYSIS_MODE)
+    )
+    stored_key = await get_app_setting("scanner_openai_api_key", DEFAULT_SCANNER_OPENAI_API_KEY)
+    model = await get_app_setting("scanner_openai_model", DEFAULT_SCANNER_OPENAI_MODEL)
+    key_present = bool(str(stored_key or "").strip())
+    return {
+        "analysis_mode": analysis_mode,
+        "analysis_mode_label": SCANNER_ANALYSIS_MODE_LABELS[analysis_mode],
+        "api_key_configured": key_present,
+        "api_key_preview": _mask_secret(stored_key),
+        "model": str(model or DEFAULT_SCANNER_OPENAI_MODEL).strip() or DEFAULT_SCANNER_OPENAI_MODEL,
+        "mode_options": [
+            {"key": key, "label": SCANNER_ANALYSIS_MODE_LABELS[key]}
+            for key in SCANNER_ANALYSIS_MODE_CHOICES
+        ],
+    }
+
+
+async def _load_scan_upload_for_analysis(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            if upload_id:
+                await cur.execute(
+                    """
+                    SELECT *
+                    FROM scan_uploads
+                    WHERE id = %s AND user_id = %s
+                    LIMIT 1
+                    """,
+                    (int(upload_id), int(user_id)),
+                )
+            else:
+                await cur.execute(
+                    """
+                    SELECT *
+                    FROM scan_uploads
+                    WHERE user_id = %s AND is_current = 1
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (int(user_id),),
+                )
+            row = await cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Scan upload not found")
+    file_path = Path(str(row.get("file_path") or "")).resolve()
+    if not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Scan file is missing on disk")
+    try:
+        file_path.relative_to(scan_upload_dir.resolve())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Scan file path is invalid") from exc
+    row["resolved_file_path"] = str(file_path)
+    return row
+
+
+async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:
+    upload_row = await _load_scan_upload_for_analysis(user_id, upload_id)
+    settings = await get_scanner_settings_payload()
+    api_key = await get_app_setting("scanner_openai_api_key", DEFAULT_SCANNER_OPENAI_API_KEY)
+    api_key = str(api_key or "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Scanner AI key is not configured")
+
+    analysis_mode = settings["analysis_mode"]
+    analysis_mode_label = settings["analysis_mode_label"]
+    model = settings["model"]
+    file_path = Path(str(upload_row["resolved_file_path"]))
+    content_type = str(upload_row.get("content_type") or "").strip() or (mimetypes.guess_type(file_path.name)[0] or "image/png")
+    if content_type not in OPENAI_SCAN_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported image format for scanner AI. Use PNG, JPG, WEBP or GIF.",
+        )
+    image_bytes = file_path.read_bytes()
+    image_base64 = base64.b64encode(image_bytes).decode("ascii")
+    image_data_url = f"data:{content_type};base64,{image_base64}"
+
+    request_payload = {
+        "model": model,
+        "temperature": 0.2,
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "scanner_signal",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "status": {"type": "string", "enum": ["ok", "graph_not_found"]},
+                        "asset": {"type": "string"},
+                        "market_mode": {"type": "string", "enum": ["OTC", "MARKET", "UNKNOWN"]},
+                        "signal": {"type": "string", "enum": ["BUY", "SELL", "NO TRADE"]},
+                        "confidence": {"type": "integer", "minimum": 0, "maximum": 85},
+                        "expiration_minutes": {"type": "integer", "minimum": 0, "maximum": 5},
+                        "comment": {"type": "string"},
+                    },
+                    "required": ["status", "asset", "market_mode", "signal", "confidence", "expiration_minutes", "comment"],
+                },
+            },
+        },
+        "messages": [
+            {"role": "system", "content": SCANNER_ANALYSIS_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": f"Режим анализа: {analysis_mode_label}"},
+                    {"type": "image_url", "image_url": {"url": image_data_url, "detail": "high"}},
+                ],
+            },
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    url = f"{OPENAI_API_BASE_URL}/chat/completions"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(45.0, connect=10.0)) as client:
+            response = await client.post(url, headers=headers, json=request_payload)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = ""
+        try:
+            detail = exc.response.json().get("error", {}).get("message", "")
+        except Exception:
+            detail = exc.response.text.strip() if exc.response is not None else ""
+        raise HTTPException(status_code=502, detail=detail or "OpenAI request failed") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="OpenAI request failed") from exc
+
+    raw_content = ""
+    try:
+        content = payload["choices"][0]["message"]["content"]
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="OpenAI response is invalid") from exc
+    if isinstance(content, list):
+        parts: List[str] = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+        raw_content = "".join(parts).strip()
+    else:
+        raw_content = str(content or "").strip()
+    if not raw_content:
+        raise HTTPException(status_code=502, detail="OpenAI response is empty")
+
+    try:
+        parsed_result = json.loads(raw_content)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail="OpenAI response is not JSON") from exc
+
+    sanitized = _sanitize_scanner_analysis_result(parsed_result if isinstance(parsed_result, dict) else {})
+    return {
+        "result": sanitized,
+        "mode": analysis_mode,
+        "mode_label": analysis_mode_label,
+        "upload": _serialize_scan_upload(upload_row),
+    }
 
 
 def _normalize_telegram_support_url(value: Any, fallback: str) -> str:
@@ -1708,6 +2178,17 @@ async def upload_scan_from_link(
         raise HTTPException(status_code=400, detail="Unable to download file from URL") from exc
 
     return {"status": "success", "file": saved_file}
+
+
+@app.post("/api/analyze/scanner")
+async def analyze_scanner_chart(
+    payload: ScannerAnalyzeRequest,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    result = await run_scanner_analysis_for_upload(user_id=user_id, upload_id=payload.upload_id)
+    return {"status": "success", **result}
 
 
 @app.get("/api/upload/scan/{upload_id}/preview")
@@ -2955,6 +3436,34 @@ async def admin_update_feature_flag(
             )
     await add_admin_audit(int(admin["user_id"]), "admin_update_feature_flag", payload.model_dump())
     return {"status": "success"}
+
+
+@app.get("/api/admin/scanner-settings")
+async def admin_get_scanner_settings(admin: Dict[str, Any] = Depends(get_admin_user)):
+    return await get_scanner_settings_payload()
+
+
+@app.post("/api/admin/scanner-settings")
+async def admin_update_scanner_settings(
+    payload: AdminScannerSettingsUpdateRequest,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    analysis_mode = _normalize_scanner_analysis_mode(payload.analysis_mode)
+    await set_app_setting("scanner_analysis_mode", analysis_mode)
+
+    next_key = str(payload.api_key or "").strip()
+    if next_key:
+        await set_app_setting("scanner_openai_api_key", next_key)
+
+    await add_admin_audit(
+        int(admin["user_id"]),
+        "admin_update_scanner_settings",
+        {
+            "analysis_mode": analysis_mode,
+            "api_key_updated": bool(next_key),
+        },
+    )
+    return await get_scanner_settings_payload()
 
 
 @app.get("/api/admin/support-settings")

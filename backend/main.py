@@ -1255,7 +1255,7 @@ async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
     url = f"{DEVSBITE_API_BASE_URL}/quotes/price"
     headers = {
         "accept": "application/json",
-        "X-API-Token": DEVSBITE_CLIENT_TOKEN,
+        "X-Client-Token": DEVSBITE_CLIENT_TOKEN,
         "Cache-Control": "no-cache",
     }
     params = {

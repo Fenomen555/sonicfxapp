@@ -169,6 +169,12 @@ function formatAnalysisAsset(asset, marketMode) {
   return normalizedAsset;
 }
 
+function formatAnalysisPrice(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "—";
+  return numeric.toFixed(5).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 
 export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -971,6 +977,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     ? (t.home.analysisGraphNotFoundTitle || "График не обнаружен")
     : analysisSummary?.signal || "NO TRADE";
   const analysisAssetLabel = formatAnalysisAsset(analysisSummary?.asset, analysisSummary?.market_mode);
+  const analysisPriceLabel = formatAnalysisPrice(analysisSummary?.entry_price);
 
   return (
     <section className="page page-home-ref">
@@ -1058,6 +1065,10 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
                   <article className="analysis-result-card">
                     <span>{t.home.analysisAssetLabel || "Актив"}</span>
                     <strong>{analysisAssetLabel}</strong>
+                  </article>
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisPriceLabel || "Цена"}</span>
+                    <strong>{analysisPriceLabel}</strong>
                   </article>
                   <article className="analysis-result-card">
                     <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>

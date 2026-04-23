@@ -35,7 +35,7 @@ from db_bootstrap import (
     normalize_user_lang,
     scanner_access_from_deposit,
 )
-from quotes_hub import DevsbiteQuotesHub, SUPPORTED_QUOTE_CATEGORIES
+from quotes_hub import DevsbiteQuotesHub, SUPPORTED_QUOTE_CATEGORIES, normalize_quote_category, normalize_quote_symbol
 from telegram_auth import get_telegram_user, verify_telegram_init_data
 
 load_dotenv()
@@ -1090,9 +1090,12 @@ def _build_scanner_analysis_text(result: Dict[str, Any]) -> str:
     expiration_minutes = int(result.get("expiration_minutes") or 0)
     expiration_label = f"{expiration_minutes} мин" if expiration_minutes > 0 else "-"
     comment = str(result.get("comment") or "").strip() or "-"
+    price = result.get("entry_price")
+    price_label = str(price) if price is not None else "-"
     return "\n".join(
         [
             f"Актив: {result.get('asset') or 'не определен'}",
+            f"Цена: {price_label}",
             f"Режим: {result.get('market_mode') or 'UNKNOWN'}",
             f"Сигнал: {result.get('signal') or 'NO TRADE'}",
             f"Уверенность: {confidence}%",
@@ -1138,6 +1141,7 @@ def _sanitize_scanner_analysis_result(payload: Dict[str, Any]) -> Dict[str, Any]
             "signal": "NO TRADE",
             "confidence": 0,
             "expiration_minutes": 0,
+            "entry_price": None,
             "comment": "",
             "formatted_text": "График не обнаружен",
         }
@@ -1155,6 +1159,7 @@ def _sanitize_scanner_analysis_result(payload: Dict[str, Any]) -> Dict[str, Any]
         "signal": signal,
         "confidence": confidence,
         "expiration_minutes": expiration_minutes,
+        "entry_price": None,
         "comment": comment,
     }
     sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
@@ -1218,6 +1223,61 @@ async def _load_scan_upload_for_analysis(user_id: int, upload_id: Optional[int] 
         raise HTTPException(status_code=400, detail="Scan file path is invalid") from exc
     row["resolved_file_path"] = str(file_path)
     return row
+
+
+def _resolve_scanner_price_request(asset: Any, market_mode: Any) -> Optional[Dict[str, str]]:
+    normalized_asset = str(asset or "").strip()
+    normalized_market_mode = str(market_mode or "").strip().upper()
+    if not normalized_asset or normalized_asset == "не определен":
+        return None
+
+    symbol = re.sub(r"\s+OTC$", "", normalized_asset, flags=re.IGNORECASE).strip()
+    if not symbol:
+        return None
+
+    try:
+        normalized_symbol = normalize_quote_symbol(symbol)
+    except ValueError:
+        return None
+
+    category = "otc" if normalized_market_mode == "OTC" else "forex"
+    try:
+        normalized_category = normalize_quote_category(category)
+    except ValueError:
+        return None
+    return {"category": normalized_category, "symbol": normalized_symbol}
+
+
+async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
+    if not DEVSBITE_CLIENT_TOKEN:
+        return None
+
+    url = f"{DEVSBITE_API_BASE_URL}/quotes/price"
+    headers = {
+        "accept": "application/json",
+        "X-API-Token": DEVSBITE_CLIENT_TOKEN,
+        "Cache-Control": "no-cache",
+    }
+    params = {
+        "category": normalize_quote_category(category),
+        "symbol": normalize_quote_symbol(symbol),
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, params=params, timeout=10.0)
+            response.raise_for_status()
+            payload = response.json()
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    try:
+        return float(payload.get("price"))
+    except (TypeError, ValueError):
+        return None
 
 
 async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:
@@ -1319,6 +1379,12 @@ async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int]
         raise HTTPException(status_code=502, detail="OpenAI response is not JSON") from exc
 
     sanitized = _sanitize_scanner_analysis_result(parsed_result if isinstance(parsed_result, dict) else {})
+    price_request = _resolve_scanner_price_request(sanitized.get("asset"), sanitized.get("market_mode"))
+    if sanitized.get("status") == "ok" and price_request:
+        entry_price = await _fetch_quote_price(price_request["category"], price_request["symbol"])
+        if entry_price is not None:
+            sanitized["entry_price"] = entry_price
+            sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
     return {
         "result": sanitized,
         "mode": analysis_mode,

@@ -129,6 +129,24 @@ function payloadHasRenderableCandles(payload) {
   ));
 }
 
+function getRenderableCandleCount(payload) {
+  const root = getQuotePayloadRoot(payload);
+  const candidates = [root?.candles, root?.history, payload?.candles, payload?.history];
+
+  let maxCount = 0;
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    const renderableCount = candidate.filter((item) => (
+      [item?.open, item?.high, item?.low, item?.close].every((value) => Number.isFinite(Number(value)))
+    )).length;
+    if (renderableCount > maxCount) {
+      maxCount = renderableCount;
+    }
+  }
+
+  return maxCount;
+}
+
 
 export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -659,7 +677,8 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
           const nextPayload = (
             pendingPayload &&
             matchesQuotePayload(pendingPayload, currentItem) &&
-            payloadHasRenderableCandles(pendingPayload)
+            payloadHasRenderableCandles(pendingPayload) &&
+            getRenderableCandleCount(pendingPayload) > getRenderableCandleCount(data)
           )
             ? pendingPayload
             : data;

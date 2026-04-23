@@ -284,6 +284,9 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     news_enabled TINYINT(1) NOT NULL DEFAULT 0,
                     economic_enabled TINYINT(1) NOT NULL DEFAULT 1,
                     market_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    impact_high_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    impact_medium_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    impact_low_enabled TINYINT(1) NOT NULL DEFAULT 1,
                     lead_minutes INT NOT NULL DEFAULT 15,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -434,6 +437,9 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "user_notification_settings", "news_enabled", "ALTER TABLE user_notification_settings ADD COLUMN news_enabled TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "user_notification_settings", "economic_enabled", "ALTER TABLE user_notification_settings ADD COLUMN economic_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "user_notification_settings", "market_enabled", "ALTER TABLE user_notification_settings ADD COLUMN market_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "user_notification_settings", "impact_high_enabled", "ALTER TABLE user_notification_settings ADD COLUMN impact_high_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "user_notification_settings", "impact_medium_enabled", "ALTER TABLE user_notification_settings ADD COLUMN impact_medium_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "user_notification_settings", "impact_low_enabled", "ALTER TABLE user_notification_settings ADD COLUMN impact_low_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "user_notification_settings", "lead_minutes", "ALTER TABLE user_notification_settings ADD COLUMN lead_minutes INT NOT NULL DEFAULT 15")
         await _ensure_column(conn, db_name, "user_notification_settings", "updated_at", "ALTER TABLE user_notification_settings ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
         await _ensure_column(conn, db_name, "market_pairs", "payout", "ALTER TABLE market_pairs ADD COLUMN payout INT NULL")

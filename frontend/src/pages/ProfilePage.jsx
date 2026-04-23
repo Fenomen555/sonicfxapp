@@ -35,6 +35,9 @@ const NEWS_NOTIFICATION_DEFAULTS = {
   news_enabled: 0,
   economic_enabled: 1,
   market_enabled: 1,
+  impact_high_enabled: 1,
+  impact_medium_enabled: 1,
+  impact_low_enabled: 1,
   lead_minutes: 15,
   lead_options: [5, 15, 30, 60]
 };
@@ -270,6 +273,11 @@ function getNotificationsCopy(lang) {
     economicHint: "Ставки, инфляция, занятость и выступления регуляторов.",
     market: "Общерыночные новости",
     marketHint: "Свежие заголовки рынка по факту появления.",
+    impactTitle: "Важность экономических новостей",
+    impactHint: "Фильтр применяется к календарю. Для рыночных новостей важность не ограничивается.",
+    impactHigh: "Высокая",
+    impactMedium: "Средняя",
+    impactLow: "Низкая",
     leadTitle: "Напоминать за",
     leadSuffix: "мин",
     leadHour: "1 час",
@@ -293,6 +301,11 @@ function getNotificationsCopy(lang) {
       economicHint: "Rates, inflation, employment and regulator speeches.",
       market: "Market news",
       marketHint: "Fresh market headlines as soon as they appear.",
+      impactTitle: "Economic news impact",
+      impactHint: "This filter applies to the calendar. Market news are sent without impact filtering.",
+      impactHigh: "High",
+      impactMedium: "Medium",
+      impactLow: "Low",
       leadTitle: "Remind before",
       leadSuffix: "min",
       leadHour: "1 hour",
@@ -317,6 +330,11 @@ function getNotificationsCopy(lang) {
       economicHint: "Ставки, інфляція, зайнятість і виступи регуляторів.",
       market: "Загальноринкові новини",
       marketHint: "Свіжі ринкові заголовки одразу після появи.",
+      impactTitle: "Важливість економічних новин",
+      impactHint: "Фільтр працює для календаря. Ринкові новини надходять без обмеження за важливістю.",
+      impactHigh: "Висока",
+      impactMedium: "Середня",
+      impactLow: "Низька",
       leadTitle: "Нагадувати за",
       leadSuffix: "хв",
       leadHour: "1 година",
@@ -343,6 +361,9 @@ function normalizeNewsNotificationSettings(data) {
     news_enabled: Number(data?.news_enabled) === 1 ? 1 : 0,
     economic_enabled: data?.economic_enabled === undefined || Number(data.economic_enabled) === 1 ? 1 : 0,
     market_enabled: data?.market_enabled === undefined || Number(data.market_enabled) === 1 ? 1 : 0,
+    impact_high_enabled: data?.impact_high_enabled === undefined || Number(data.impact_high_enabled) === 1 ? 1 : 0,
+    impact_medium_enabled: data?.impact_medium_enabled === undefined || Number(data.impact_medium_enabled) === 1 ? 1 : 0,
+    impact_low_enabled: data?.impact_low_enabled === undefined || Number(data.impact_low_enabled) === 1 ? 1 : 0,
     lead_minutes: lead,
     lead_options: leadOptions
   };
@@ -689,6 +710,9 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
           news_enabled: notificationDraft.news_enabled,
           economic_enabled: notificationDraft.economic_enabled,
           market_enabled: notificationDraft.market_enabled,
+          impact_high_enabled: notificationDraft.impact_high_enabled,
+          impact_medium_enabled: notificationDraft.impact_medium_enabled,
+          impact_low_enabled: notificationDraft.impact_low_enabled,
           lead_minutes: notificationDraft.lead_minutes
         })
       });
@@ -1071,6 +1095,27 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                     <span>{item.hint}</span>
                   </button>
                 ))}
+              </div>
+
+              <div className="profile-notification-impact">
+                <span>{notificationsCopy.impactTitle}</span>
+                <small>{notificationsCopy.impactHint}</small>
+                <div className="profile-notification-impact-grid">
+                  {[
+                    { key: "impact_high_enabled", label: notificationsCopy.impactHigh, tone: "high" },
+                    { key: "impact_medium_enabled", label: notificationsCopy.impactMedium, tone: "medium" },
+                    { key: "impact_low_enabled", label: notificationsCopy.impactLow, tone: "low" }
+                  ].map((item) => (
+                    <button
+                      type="button"
+                      key={item.key}
+                      className={`profile-notification-impact-chip tone-${item.tone} ${notificationDraft[item.key] ? "active" : ""}`}
+                      onClick={() => handleNotificationDraftChange(item.key, notificationDraft[item.key] ? 0 : 1)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="profile-notification-lead">

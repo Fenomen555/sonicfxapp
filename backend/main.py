@@ -257,6 +257,9 @@ class UserNewsNotificationSettingsUpdate(BaseModel):
     news_enabled: int = 0
     economic_enabled: int = 1
     market_enabled: int = 1
+    impact_high_enabled: int = 1
+    impact_medium_enabled: int = 1
+    impact_low_enabled: int = 1
     lead_minutes: int = 15
 
 
@@ -908,6 +911,9 @@ def _news_notification_payload(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         "news_enabled": _coerce_bool_flag(row.get("news_enabled"), 0),
         "economic_enabled": _coerce_bool_flag(row.get("economic_enabled"), 1),
         "market_enabled": _coerce_bool_flag(row.get("market_enabled"), 1),
+        "impact_high_enabled": _coerce_bool_flag(row.get("impact_high_enabled"), 1),
+        "impact_medium_enabled": _coerce_bool_flag(row.get("impact_medium_enabled"), 1),
+        "impact_low_enabled": _coerce_bool_flag(row.get("impact_low_enabled"), 1),
         "lead_minutes": _normalize_news_lead_minutes(row.get("lead_minutes")),
         "lead_options": list(NEWS_NOTIFICATION_LEAD_OPTIONS),
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
@@ -920,7 +926,15 @@ async def get_user_news_notification_settings(user_id: int) -> Dict[str, Any]:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute(
                 """
-                SELECT news_enabled, economic_enabled, market_enabled, lead_minutes, updated_at
+                SELECT
+                    news_enabled,
+                    economic_enabled,
+                    market_enabled,
+                    impact_high_enabled,
+                    impact_medium_enabled,
+                    impact_low_enabled,
+                    lead_minutes,
+                    updated_at
                 FROM user_notification_settings
                 WHERE user_id = %s
                 LIMIT 1
@@ -935,6 +949,9 @@ async def update_user_news_notification_settings(user_id: int, payload: UserNews
     news_enabled = _coerce_bool_flag(payload.news_enabled, 0)
     economic_enabled = _coerce_bool_flag(payload.economic_enabled, 1)
     market_enabled = _coerce_bool_flag(payload.market_enabled, 1)
+    impact_high_enabled = _coerce_bool_flag(payload.impact_high_enabled, 1)
+    impact_medium_enabled = _coerce_bool_flag(payload.impact_medium_enabled, 1)
+    impact_low_enabled = _coerce_bool_flag(payload.impact_low_enabled, 1)
     lead_minutes = _normalize_news_lead_minutes(payload.lead_minutes)
     pool = await require_db_pool()
     async with pool.acquire() as conn:
@@ -942,15 +959,30 @@ async def update_user_news_notification_settings(user_id: int, payload: UserNews
             await cur.execute(
                 """
                 INSERT INTO user_notification_settings
-                    (user_id, news_enabled, economic_enabled, market_enabled, lead_minutes)
-                VALUES (%s, %s, %s, %s, %s)
+                    (
+                        user_id, news_enabled, economic_enabled, market_enabled,
+                        impact_high_enabled, impact_medium_enabled, impact_low_enabled, lead_minutes
+                    )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     news_enabled = VALUES(news_enabled),
                     economic_enabled = VALUES(economic_enabled),
                     market_enabled = VALUES(market_enabled),
+                    impact_high_enabled = VALUES(impact_high_enabled),
+                    impact_medium_enabled = VALUES(impact_medium_enabled),
+                    impact_low_enabled = VALUES(impact_low_enabled),
                     lead_minutes = VALUES(lead_minutes)
                 """,
-                (int(user_id), news_enabled, economic_enabled, market_enabled, lead_minutes),
+                (
+                    int(user_id),
+                    news_enabled,
+                    economic_enabled,
+                    market_enabled,
+                    impact_high_enabled,
+                    impact_medium_enabled,
+                    impact_low_enabled,
+                    lead_minutes,
+                ),
             )
             await cur.execute("UPDATE users SET last_active_at = NOW() WHERE user_id = %s", (int(user_id),))
     return await get_user_news_notification_settings(user_id)
@@ -2438,6 +2470,20 @@ async def send_due_news_notifications_once() -> int:
                     (
                       n.feed_type = 'economic'
                       AND s.economic_enabled = 1
+                      AND (
+                        (
+                          COALESCE(NULLIF(n.impact_level, ''), 'medium') = 'high'
+                          AND s.impact_high_enabled = 1
+                        )
+                        OR (
+                          COALESCE(NULLIF(n.impact_level, ''), 'medium') = 'medium'
+                          AND s.impact_medium_enabled = 1
+                        )
+                        OR (
+                          COALESCE(NULLIF(n.impact_level, ''), 'medium') = 'low'
+                          AND s.impact_low_enabled = 1
+                        )
+                      )
                       AND TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), n.published_at)
                           BETWEEN GREATEST(s.lead_minutes * 60 - 90, 0) AND s.lead_minutes * 60 + 90
                     )

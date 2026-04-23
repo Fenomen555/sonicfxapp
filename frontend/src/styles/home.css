@@ -1434,10 +1434,10 @@
 
 .analysis-result-hero {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 12px 16px;
   border-radius: 18px;
   border: 1px solid rgba(104, 129, 166, 0.24);
   background:
@@ -1448,14 +1448,7 @@
 .analysis-result-copy {
   min-width: 0;
   display: grid;
-  gap: 4px;
-}
-
-.analysis-result-copy strong {
-  font-size: 21px;
-  font-weight: 900;
-  letter-spacing: -0.05em;
-  line-height: 0.98;
+  gap: 0;
 }
 
 .analysis-result-copy small {

@@ -1030,7 +1030,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
 
             <div className="analysis-result-hero">
               <div className="analysis-result-copy">
-                <strong>{analysisTitle}</strong>
                 <small>
                   {analysisSummary.status === "graph_not_found"
                     ? (t.home.analysisGraphNotFoundHint || "Загрузите более читаемый скриншот с ценой, свечами и шкалой.")

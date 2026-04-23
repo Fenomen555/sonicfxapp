@@ -897,6 +897,12 @@
   max-width: none;
 }
 
+.analysis-action-row.is-result-state {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 380px;
+  margin-inline: auto;
+}
+
 .analysis-side-action {
   width: 42px;
   height: 42px;

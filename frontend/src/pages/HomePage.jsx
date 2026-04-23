@@ -911,6 +911,23 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     });
   }
 
+  async function startNewScannerAnalysis() {
+    if (scanUploadState.status === "uploading") return;
+    setErrorText("");
+    try {
+      await apiFetchJson("/api/upload/scan/latest", { method: "DELETE" });
+    } catch (_error) {
+      // Local reset is enough to return the user to the initial scanner state.
+    }
+    setAnalysisResult(null);
+    setScanPreview({ url: "", status: "idle" });
+    setScanUploadState({ status: "idle", file: null, detail: "" });
+    setSignalMode("scanner");
+    setIsSignalModeExpanded(false);
+    setIsActionSheetOpen(false);
+    setIsLinkSheetOpen(false);
+  }
+
   async function handleAnalyzeClick() {
     if (signalMode === "scanner" && !hasScanUploadPreview) {
       notify?.({
@@ -1087,11 +1104,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               </div>
             )}
 
-            <div className="analysis-result-actions">
-              <button className="action-sheet-close" type="button" onClick={() => setAnalysisResult(null)}>
-                {t.home.close || "Close"}
-              </button>
-            </div>
           </div>
         </div>
       ) : hasScanUploadPreview ? (
@@ -1220,31 +1232,40 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         )}
       </div>
 
-      <div className="analysis-action-row" aria-label={t.home.quickActionsLabel || "Quick actions"}>
+      <div className={`analysis-action-row ${analysisSummary ? "is-result-state" : ""}`} aria-label={t.home.quickActionsLabel || "Quick actions"}>
+        {!analysisSummary && (
+          <button
+            type="button"
+            className="home-quick-action analysis-side-action"
+            onClick={() => notify?.({
+              type: "info",
+              title: t.home.historyActionTitle || "История",
+              message: t.home.historyActionMessage || "История сигналов появится здесь."
+            })}
+            aria-label={t.home.historyActionTitle || "История"}
+          >
+            <img src={homeHistoryIcon} alt="" loading="lazy" aria-hidden="true" />
+          </button>
+        )}
         <button
+          className={`primary-btn ref-primary primary-btn-top primary-btn-scanner ${analysisSummary ? "is-reset-mode" : ""}`}
           type="button"
-          className="home-quick-action analysis-side-action"
-          onClick={() => notify?.({
-            type: "info",
-            title: t.home.historyActionTitle || "История",
-            message: t.home.historyActionMessage || "История сигналов появится здесь."
-          })}
-          aria-label={t.home.historyActionTitle || "История"}
+          onClick={analysisSummary ? startNewScannerAnalysis : handleAnalyzeClick}
+          disabled={isAnalysisScanning}
         >
-          <img src={homeHistoryIcon} alt="" loading="lazy" aria-hidden="true" />
+          <span>{analysisSummary ? (t.home.newAnalysis || "Новый анализ") : actionLabel}</span>
+          {!analysisSummary && <AnalyzeCtaAnimation />}
         </button>
-        <button className="primary-btn ref-primary primary-btn-top primary-btn-scanner" type="button" onClick={handleAnalyzeClick} disabled={isAnalysisScanning}>
-          <span>{actionLabel}</span>
-          <AnalyzeCtaAnimation />
-        </button>
-        <button
-          type="button"
-          className="home-quick-action analysis-side-action"
-          onClick={() => setIsInfoSheetOpen(true)}
-          aria-label={t.home.infoActionTitle || "Инфо"}
-        >
-          <img src={homeInfoIcon} alt="" loading="lazy" aria-hidden="true" />
-        </button>
+        {!analysisSummary && (
+          <button
+            type="button"
+            className="home-quick-action analysis-side-action"
+            onClick={() => setIsInfoSheetOpen(true)}
+            aria-label={t.home.infoActionTitle || "Инфо"}
+          >
+            <img src={homeInfoIcon} alt="" loading="lazy" aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       <div className="card form-card ref-form-card generator-panel">

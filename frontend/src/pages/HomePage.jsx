@@ -1182,55 +1182,57 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         </button>
       )}
 
-      <div className="signal-panel">
-        <button
-          className={`signal-panel-toggle ${isSignalModeExpanded ? "expanded" : ""}`}
-          type="button"
-          onClick={() => setIsSignalModeExpanded((prev) => !prev)}
-        >
-          <span className="signal-panel-toggle-copy">
-            <span className="signal-panel-label">{t.home.signalModeLabel || "Signal generation mode"}</span>
-            <span className="signal-panel-selected">
-              <span className="signal-panel-selected-icon" aria-hidden="true">
-                <SelectedModeIcon />
-              </span>
-              <span className="signal-panel-selected-text">
-                <strong>{selectedMode.label}</strong>
-                <small>{selectedMode.hint}</small>
+      {!analysisSummary && (
+        <div className="signal-panel">
+          <button
+            className={`signal-panel-toggle ${isSignalModeExpanded ? "expanded" : ""}`}
+            type="button"
+            onClick={() => setIsSignalModeExpanded((prev) => !prev)}
+          >
+            <span className="signal-panel-toggle-copy">
+              <span className="signal-panel-label">{t.home.signalModeLabel || "Signal generation mode"}</span>
+              <span className="signal-panel-selected">
+                <span className="signal-panel-selected-icon" aria-hidden="true">
+                  <SelectedModeIcon />
+                </span>
+                <span className="signal-panel-selected-text">
+                  <strong>{selectedMode.label}</strong>
+                  <small>{selectedMode.hint}</small>
+                </span>
               </span>
             </span>
-          </span>
-          <span className="signal-panel-toggle-meta">
-            <span className="signal-panel-state">{isSignalModeExpanded ? (t.home.signalModeCollapse || "Collapse") : (t.home.signalModeChoose || "Choose")}</span>
-            <span className={`signal-panel-chevron ${isSignalModeExpanded ? "expanded" : ""}`} aria-hidden="true" />
-          </span>
-        </button>
+            <span className="signal-panel-toggle-meta">
+              <span className="signal-panel-state">{isSignalModeExpanded ? (t.home.signalModeCollapse || "Collapse") : (t.home.signalModeChoose || "Choose")}</span>
+              <span className={`signal-panel-chevron ${isSignalModeExpanded ? "expanded" : ""}`} aria-hidden="true" />
+            </span>
+          </button>
 
-        {isSignalModeExpanded && (
-          <div className="signal-mode-grid">
-            {signalModes.filter((item) => item.id !== signalMode).map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  className="signal-mode-card"
-                  onClick={() => { setSignalMode(item.id); setIsSignalModeExpanded(false); }}
-                  type="button"
-                >
-                  <span className="signal-mode-icon" aria-hidden="true">
-                    <Icon />
-                  </span>
-                  <span className="signal-mode-text">
-                    <strong>{item.label}</strong>
-                    <small>{item.hint}</small>
-                  </span>
-                  <span className="signal-mode-cta">{t.home.signalModeChoose || "Choose"}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+          {isSignalModeExpanded && (
+            <div className="signal-mode-grid">
+              {signalModes.filter((item) => item.id !== signalMode).map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    className="signal-mode-card"
+                    onClick={() => { setSignalMode(item.id); setIsSignalModeExpanded(false); }}
+                    type="button"
+                  >
+                    <span className="signal-mode-icon" aria-hidden="true">
+                      <Icon />
+                    </span>
+                    <span className="signal-mode-text">
+                      <strong>{item.label}</strong>
+                      <small>{item.hint}</small>
+                    </span>
+                    <span className="signal-mode-cta">{t.home.signalModeChoose || "Choose"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={`analysis-action-row ${analysisSummary ? "is-result-state" : ""}`} aria-label={t.home.quickActionsLabel || "Quick actions"}>
         {!analysisSummary && (
@@ -1268,49 +1270,51 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         )}
       </div>
 
-      <div className="card form-card ref-form-card generator-panel">
-        <div className={`field-row ${signalMode === "indicators" ? "field-row-indicators" : ""} ${signalMode === "scanner" ? "field-row-scanner" : ""}`}>
-          {signalMode !== "scanner" && (
-            <div className="field-grow">
-              <label className="field-label">{t.home.asset || "Symbol"}</label>
+      {!analysisSummary && (
+        <div className="card form-card ref-form-card generator-panel">
+          <div className={`field-row ${signalMode === "indicators" ? "field-row-indicators" : ""} ${signalMode === "scanner" ? "field-row-scanner" : ""}`}>
+            {signalMode !== "scanner" && (
+              <div className="field-grow">
+                <label className="field-label">{t.home.asset || "Symbol"}</label>
+                <button
+                  type="button"
+                  className="field-input ref-input field-picker-trigger"
+                  onClick={() => openPickerSheet("asset")}
+                >
+                  <span className="field-picker-copy">
+                    <strong>
+                      {selectedPairMeta
+                        ? `${selectedPairMeta.pair}${typeof selectedPairMeta.payout === "number" ? ` (${selectedPairMeta.payout}%)` : ""}`
+                        : isLoading
+                          ? (t.home.loading || "Loading...")
+                          : (t.home.emptyPairs || "No pairs available")}
+                    </strong>
+                    <small>{t.home.assetPickerHint || "Tap to choose a currency pair"}</small>
+                  </span>
+                  <span className="field-picker-chevron" aria-hidden="true" />
+                </button>
+              </div>
+            )}
+
+            <div className="field-mini">
+              <label className="field-label">{t.home.expiration || "Expiration"}</label>
               <button
                 type="button"
-                className="field-input ref-input field-picker-trigger"
-                onClick={() => openPickerSheet("asset")}
+                className="field-input ref-input field-picker-trigger field-picker-trigger-mini"
+                onClick={() => openPickerSheet("expiration")}
               >
                 <span className="field-picker-copy">
-                  <strong>
-                    {selectedPairMeta
-                      ? `${selectedPairMeta.pair}${typeof selectedPairMeta.payout === "number" ? ` (${selectedPairMeta.payout}%)` : ""}`
-                      : isLoading
-                        ? (t.home.loading || "Loading...")
-                        : (t.home.emptyPairs || "No pairs available")}
-                  </strong>
-                  <small>{t.home.assetPickerHint || "Tap to choose a currency pair"}</small>
+                  <strong>{selectedExpirationMeta?.label || expiration || "5m"}</strong>
+                  <small>{t.home.expirationPickerHint || "Choose time"}</small>
                 </span>
                 <span className="field-picker-chevron" aria-hidden="true" />
               </button>
             </div>
-          )}
-
-          <div className="field-mini">
-            <label className="field-label">{t.home.expiration || "Expiration"}</label>
-            <button
-              type="button"
-              className="field-input ref-input field-picker-trigger field-picker-trigger-mini"
-              onClick={() => openPickerSheet("expiration")}
-            >
-              <span className="field-picker-copy">
-                <strong>{selectedExpirationMeta?.label || expiration || "5m"}</strong>
-                <small>{t.home.expirationPickerHint || "Choose time"}</small>
-              </span>
-              <span className="field-picker-chevron" aria-hidden="true" />
-            </button>
           </div>
-        </div>
 
-        {errorText && <div className="form-error">{errorText}</div>}
-      </div>
+          {errorText && <div className="form-error">{errorText}</div>}
+        </div>
+      )}
 
       {isInfoSheetOpen && (
         <div className="action-sheet-layer" role="presentation">

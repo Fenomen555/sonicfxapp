@@ -1248,29 +1248,7 @@ def _resolve_scanner_price_request(asset: Any, market_mode: Any) -> Optional[Dic
     return {"category": normalized_category, "symbol": normalized_symbol}
 
 
-async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
-    if not DEVSBITE_CLIENT_TOKEN:
-        return None
-
-    url = f"{DEVSBITE_API_BASE_URL}/quotes/price"
-    headers = {
-        "accept": "application/json",
-        "X-Client-Token": DEVSBITE_CLIENT_TOKEN,
-        "Cache-Control": "no-cache",
-    }
-    params = {
-        "category": normalize_quote_category(category),
-        "symbol": normalize_quote_symbol(symbol),
-    }
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=headers, params=params, timeout=10.0)
-            response.raise_for_status()
-            payload = response.json()
-    except Exception:
-        return None
-
+def _extract_quote_price(payload: Any) -> Optional[float]:
     if not isinstance(payload, dict):
         return None
 
@@ -1293,6 +1271,48 @@ async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
             if close_price > 0:
                 return close_price
     return None
+
+
+async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
+    if not DEVSBITE_CLIENT_TOKEN:
+        return None
+
+    normalized_category = normalize_quote_category(category)
+    normalized_symbol = normalize_quote_symbol(symbol)
+    url = f"{DEVSBITE_API_BASE_URL}/quotes/price"
+    headers = {
+        "accept": "application/json",
+        "X-Client-Token": DEVSBITE_CLIENT_TOKEN,
+        "Cache-Control": "no-cache",
+    }
+    params = {
+        "category": normalized_category,
+        "symbol": normalized_symbol,
+    }
+
+    payload: Optional[Dict[str, Any]] = None
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, params=params, timeout=10.0)
+            response.raise_for_status()
+            payload = response.json()
+    except Exception:
+        payload = None
+
+    resolved_price = _extract_quote_price(payload)
+    if resolved_price and resolved_price > 0:
+        return resolved_price
+
+    try:
+        history_payload = await _fetch_quote_history(
+            category=normalized_category,
+            symbol=normalized_symbol,
+            history_seconds=QUOTE_HISTORY_SECONDS,
+        )
+    except Exception:
+        return None
+
+    return _extract_quote_price(history_payload)
 
 
 async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:

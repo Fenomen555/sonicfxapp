@@ -995,111 +995,116 @@ export default function AdminApp({ authError }) {
         )}
 
         {!loading && tab === "flags" && (
-          <>
-            <section className="admin-card admin-scanner-settings-card">
-              <div className="admin-filter-head">
-                <div>
-                  <div className="admin-section-title">SonicFX Scanner</div>
-                  <div className="admin-muted-text">Управление GPT-ключом и текущим режимом анализа скриншотов.</div>
-                </div>
-                <div className="admin-scanner-badge-row">
-                  <span className={`admin-badge ${scannerSettings.api_key_configured ? "tone-success" : "tone-neutral"}`}>
-                    {scannerSettings.api_key_configured ? "GPT ключ подключён" : "GPT ключ не задан"}
-                  </span>
-                  <span className="admin-badge tone-accent">{scannerSettings.model || "gpt-4.1-mini"}</span>
-                </div>
-              </div>
-
-              <div className="admin-scanner-mode-grid">
-                {(scannerSettings.mode_options || EMPTY_SCANNER_SETTINGS.mode_options).map((item) => {
-                  const meta = SCANNER_MODE_META[item.key] || SCANNER_MODE_META.adaptive;
-                  const isActive = scannerEditor.analysis_mode === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={`admin-scanner-mode-card ${isActive ? "active" : ""}`}
-                      onClick={() => setScannerEditor((prev) => ({ ...prev, analysis_mode: item.key }))}
-                    >
-                      <span className="admin-scanner-mode-top">
-                        <span className="admin-mode-code">{meta.short}</span>
-                        <span className={`admin-badge ${isActive ? "tone-success" : "tone-neutral"}`}>
-                          {isActive ? "Выбран" : "Доступен"}
-                        </span>
-                      </span>
+          <section className="admin-control-grid admin-mode-control-grid">
+            {modeFlags.map((item) => {
+              const meta = getFlagMeta(item.key);
+              const enabled = item.is_enabled === 1;
+              const isScannerCard = item.key === "mode_scanner_enabled";
+              return (
+                <article
+                  className={`admin-card admin-control-card admin-mode-control-card ${enabled ? "is-enabled" : "is-disabled"} ${isScannerCard ? "has-scanner-settings" : ""}`}
+                  key={item.key}
+                >
+                  <div className="admin-control-head">
+                    <div className="admin-control-title-row">
+                      <span className="admin-mode-code">{meta.short}</span>
                       <strong>{meta.title}</strong>
-                      <p>{meta.description}</p>
+                    </div>
+                    <button
+                      className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
+                      disabled={flagSavingKey === item.key}
+                      onClick={() => toggleFlag(item)}
+                      type="button"
+                      aria-pressed={enabled}
+                    >
+                      <span>{flagSavingKey === item.key ? "..." : enabled ? "Включено" : "Выключено"}</span>
+                      <i aria-hidden="true" />
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                  <p>{meta.description}</p>
 
-              <div className="admin-scanner-settings-grid">
-                <label className="admin-field admin-field-wide">
-                  <span>OpenAI API key</span>
-                  <input
-                    className="admin-input"
-                    type="password"
-                    autoComplete="off"
-                    placeholder={scannerSettings.api_key_configured ? "Оставьте пустым, чтобы не менять текущий ключ" : "sk-..."}
-                    value={scannerEditor.api_key}
-                    onChange={(e) => setScannerEditor((prev) => ({ ...prev, api_key: e.target.value }))}
-                  />
-                </label>
-
-                <div className="admin-card admin-scanner-key-panel">
-                  <span className="admin-kpi-label">Текущий ключ</span>
-                  <strong>{scannerSettings.api_key_preview || "Не задан"}</strong>
-                  <span className="admin-kpi-note">
-                    Пустое поле при сохранении оставит текущий ключ без изменений.
-                  </span>
-                </div>
-              </div>
-
-              <div className="admin-scanner-save-row">
-                <span className="admin-muted-text">
-                  Режим будет использоваться для всех новых запросов сканера в mini app.
-                </span>
-                <button className="admin-primary-button" type="button" disabled={scannerSaving} onClick={saveScannerSettings}>
-                  {scannerSaving ? "Сохраняем..." : "Сохранить сканер"}
-                </button>
-              </div>
-            </section>
-
-            <section className="admin-control-grid admin-mode-control-grid">
-              {modeFlags.map((item) => {
-                const meta = getFlagMeta(item.key);
-                const enabled = item.is_enabled === 1;
-                return (
-                  <article className={`admin-card admin-control-card admin-mode-control-card ${enabled ? "is-enabled" : "is-disabled"}`} key={item.key}>
-                    <div className="admin-control-head">
-                      <div className="admin-control-title-row">
-                        <span className="admin-mode-code">{meta.short}</span>
-                        <strong>{meta.title}</strong>
+                  {isScannerCard && (
+                    <div className="admin-scanner-inline">
+                      <div className="admin-scanner-inline-head">
+                        <div className="admin-scanner-inline-copy">
+                          <strong>GPT анализ скриншота</strong>
+                          <span>Ключ и режим анализа для SonicFX Scanner. Авто режим с live-графиком управляется отдельной карточкой.</span>
+                        </div>
+                        <div className="admin-scanner-badge-row">
+                          <span className={`admin-badge ${scannerSettings.api_key_configured ? "tone-success" : "tone-neutral"}`}>
+                            {scannerSettings.api_key_configured ? "GPT ключ подключён" : "GPT ключ не задан"}
+                          </span>
+                          <span className="admin-badge tone-accent">{scannerSettings.model || "gpt-4.1-mini"}</span>
+                        </div>
                       </div>
-                      <button
-                        className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
-                        disabled={flagSavingKey === item.key}
-                        onClick={() => toggleFlag(item)}
-                        type="button"
-                        aria-pressed={enabled}
-                      >
-                        <span>{flagSavingKey === item.key ? "..." : enabled ? "Включено" : "Выключено"}</span>
-                        <i aria-hidden="true" />
-                      </button>
+
+                      <div className="admin-scanner-mode-grid">
+                        {(scannerSettings.mode_options || EMPTY_SCANNER_SETTINGS.mode_options).map((modeItem) => {
+                          const modeMeta = SCANNER_MODE_META[modeItem.key] || SCANNER_MODE_META.adaptive;
+                          const isActive = scannerEditor.analysis_mode === modeItem.key;
+                          return (
+                            <button
+                              key={modeItem.key}
+                              type="button"
+                              className={`admin-scanner-mode-card ${isActive ? "active" : ""}`}
+                              onClick={() => setScannerEditor((prev) => ({ ...prev, analysis_mode: modeItem.key }))}
+                            >
+                              <span className="admin-scanner-mode-top">
+                                <span className="admin-mode-code">{modeMeta.short}</span>
+                                <span className={`admin-badge ${isActive ? "tone-success" : "tone-neutral"}`}>
+                                  {isActive ? "Выбран" : "Доступен"}
+                                </span>
+                              </span>
+                              <strong>{modeMeta.title}</strong>
+                              <p>{modeMeta.description}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="admin-scanner-settings-grid">
+                        <label className="admin-field admin-field-wide">
+                          <span>OpenAI API key</span>
+                          <input
+                            className="admin-input"
+                            type="password"
+                            autoComplete="off"
+                            placeholder={scannerSettings.api_key_configured ? "Оставьте пустым, чтобы не менять текущий ключ" : "sk-..."}
+                            value={scannerEditor.api_key}
+                            onChange={(e) => setScannerEditor((prev) => ({ ...prev, api_key: e.target.value }))}
+                          />
+                        </label>
+
+                        <div className="admin-card admin-scanner-key-panel">
+                          <span className="admin-kpi-label">Текущий ключ</span>
+                          <strong>{scannerSettings.api_key_preview || "Не задан"}</strong>
+                          <span className="admin-kpi-note">
+                            Пустое поле при сохранении оставит текущий ключ без изменений.
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="admin-scanner-save-row">
+                        <span className="admin-muted-text">
+                          Режим будет использоваться для всех новых запросов сканера в mini app.
+                        </span>
+                        <button className="admin-primary-button" type="button" disabled={scannerSaving} onClick={saveScannerSettings}>
+                          {scannerSaving ? "Сохраняем..." : "Сохранить сканер"}
+                        </button>
+                      </div>
                     </div>
-                    <p>{meta.description}</p>
-                    <div className="admin-control-footer">
-                      <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
-                        {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
-                      </span>
-                      <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
-                    </div>
-                  </article>
-                );
-              })}
-            </section>
-          </>
+                  )}
+
+                  <div className="admin-control-footer">
+                    <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
+                      {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
+                    </span>
+                    <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
         )}
         {!loading && tab === "indicators" && (
           <>

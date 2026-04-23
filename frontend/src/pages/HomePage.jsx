@@ -1008,6 +1008,66 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
             label={t.home.scanAnalysisLabel || "Scanning chart"}
           />
         </div>
+      ) : analysisSummary ? (
+        <div className="upload-zone analysis-result-panel">
+          <div className="analysis-result-sheet analysis-result-sheet-inline" role="region" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
+            <div className="analysis-result-hero">
+              <div className="analysis-result-copy">
+                <span className="analysis-result-kicker">
+                  {analysisResult?.mode_label || "АДАПТИВНЫЙ"}
+                </span>
+                <strong>{analysisTitle}</strong>
+                <small>
+                  {analysisSummary.status === "graph_not_found"
+                    ? (t.home.analysisGraphNotFoundHint || "Загрузите более читаемый скриншот с ценой, свечами и шкалой.")
+                    : (analysisSummary.comment || t.home.analysisResultHint || "Сигнал подготовлен по текущей структуре цены.")}
+                </small>
+              </div>
+              <span className={`analysis-result-signal signal-${analysisSignalTone}`}>
+                {analysisSummary.status === "graph_not_found" ? "NO DATA" : (analysisSummary.signal || "NO TRADE")}
+              </span>
+            </div>
+
+            {analysisSummary.status !== "graph_not_found" ? (
+              <>
+                <div className="analysis-result-grid">
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisAssetLabel || "Актив"}</span>
+                    <strong>{analysisSummary.asset || "не определен"}</strong>
+                  </article>
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisMarketLabel || "Режим"}</span>
+                    <strong>{analysisSummary.market_mode || "UNKNOWN"}</strong>
+                  </article>
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>
+                    <strong>{Number(analysisSummary.confidence || 0)}%</strong>
+                  </article>
+                  <article className="analysis-result-card">
+                    <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
+                    <strong>{formatAnalysisExpiration(analysisSummary.expiration_minutes)}</strong>
+                  </article>
+                </div>
+
+                <div className="analysis-result-note">
+                  <span>{t.home.analysisCommentLabel || "Комментарий"}</span>
+                  <p>{analysisSummary.comment || "-"}</p>
+                </div>
+              </>
+            ) : (
+              <div className="analysis-result-empty">
+                <strong>{t.home.analysisGraphNotFoundTitle || "График не обнаружен"}</strong>
+                <p>{t.home.analysisGraphNotFoundHint || "Попробуйте загрузить более четкий скриншот, где видны свечи, движение цены и шкала."}</p>
+              </div>
+            )}
+
+            <div className="analysis-result-actions">
+              <button className="action-sheet-close" type="button" onClick={() => setAnalysisResult(null)}>
+                {t.home.close || "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : hasScanUploadPreview ? (
         <div className="upload-zone upload-zone-preview">
           <div className="upload-preview-media">
@@ -1202,75 +1262,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
 
         {errorText && <div className="form-error">{errorText}</div>}
       </div>
-
-      {analysisSummary && (
-        <div className="action-sheet-layer" role="presentation">
-          <button
-            className="action-sheet-backdrop"
-            type="button"
-            aria-label={t.home.close || "Close"}
-            onClick={() => setAnalysisResult(null)}
-          />
-          <div className="action-sheet analysis-result-sheet" role="dialog" aria-modal="true" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
-            <div className="action-sheet-handle" aria-hidden="true" />
-            <div className="analysis-result-hero">
-              <div className="analysis-result-copy">
-                <span className="analysis-result-kicker">
-                  {analysisResult?.mode_label || "АДАПТИВНЫЙ"}
-                </span>
-                <strong>{analysisTitle}</strong>
-                <small>
-                  {analysisSummary.status === "graph_not_found"
-                    ? (t.home.analysisGraphNotFoundHint || "Загрузите более читаемый скриншот с ценой, свечами и шкалой.")
-                    : (analysisSummary.comment || t.home.analysisResultHint || "Сигнал подготовлен по текущей структуре цены.")}
-                </small>
-              </div>
-              <span className={`analysis-result-signal signal-${analysisSignalTone}`}>
-                {analysisSummary.status === "graph_not_found" ? "NO DATA" : (analysisSummary.signal || "NO TRADE")}
-              </span>
-            </div>
-
-            {analysisSummary.status !== "graph_not_found" ? (
-              <>
-                <div className="analysis-result-grid">
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisAssetLabel || "Актив"}</span>
-                    <strong>{analysisSummary.asset || "не определен"}</strong>
-                  </article>
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisMarketLabel || "Режим"}</span>
-                    <strong>{analysisSummary.market_mode || "UNKNOWN"}</strong>
-                  </article>
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>
-                    <strong>{Number(analysisSummary.confidence || 0)}%</strong>
-                  </article>
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
-                    <strong>{formatAnalysisExpiration(analysisSummary.expiration_minutes)}</strong>
-                  </article>
-                </div>
-
-                <div className="analysis-result-note">
-                  <span>{t.home.analysisCommentLabel || "Комментарий"}</span>
-                  <p>{analysisSummary.comment || "-"}</p>
-                </div>
-              </>
-            ) : (
-              <div className="analysis-result-empty">
-                <strong>{t.home.analysisGraphNotFoundTitle || "График не обнаружен"}</strong>
-                <p>{t.home.analysisGraphNotFoundHint || "Попробуйте загрузить более четкий скриншот, где видны свечи, движение цены и шкала."}</p>
-              </div>
-            )}
-
-            <div className="analysis-result-actions">
-              <button className="action-sheet-close" type="button" onClick={() => setAnalysisResult(null)}>
-                {t.home.close || "Close"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {isInfoSheetOpen && (
         <div className="action-sheet-layer" role="presentation">

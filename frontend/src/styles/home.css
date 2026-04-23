@@ -1408,6 +1408,25 @@
   margin-inline: auto;
 }
 
+.analysis-result-sheet-inline {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+
+.analysis-result-panel {
+  padding: 14px;
+}
+
+.analysis-result-panel .analysis-result-actions {
+  margin-top: 16px;
+}
+
+.analysis-result-panel .action-sheet-close {
+  width: min(260px, 100%);
+  margin-inline: auto;
+}
+
 .analysis-result-hero {
   display: flex;
   align-items: flex-start;

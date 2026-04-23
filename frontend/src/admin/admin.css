@@ -1215,6 +1215,8 @@
   font-size: 18px;
   line-height: 1.05;
   letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-mode-control-card {
@@ -1225,6 +1227,10 @@
   background:
     radial-gradient(circle at 18% 0%, rgba(111, 164, 255, 0.16), transparent 34%),
     linear-gradient(145deg, rgba(18, 31, 51, 0.98), rgba(7, 13, 24, 0.98));
+}
+
+.admin-mode-control-card.has-scanner-settings {
+  min-height: auto;
 }
 
 .admin-mode-control-card::before {
@@ -1329,6 +1335,42 @@
   z-index: 1;
 }
 
+.admin-scanner-inline {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(92, 117, 158, 0.3);
+  background: linear-gradient(180deg, rgba(12, 20, 32, 0.76), rgba(8, 13, 22, 0.9));
+}
+
+.admin-scanner-inline-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.admin-scanner-inline-copy {
+  display: grid;
+  gap: 4px;
+  max-width: 560px;
+}
+
+.admin-scanner-inline-copy strong {
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.admin-scanner-inline-copy span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 @media (max-width: 720px) {
   .admin-scanner-mode-grid {
     grid-template-columns: 1fr;
@@ -1358,6 +1400,14 @@
   .admin-mode-control-card .admin-control-head {
     display: grid;
     gap: 12px;
+  }
+
+  .admin-scanner-inline {
+    padding: 12px;
+  }
+
+  .admin-scanner-inline-head {
+    display: grid;
   }
 
   .admin-mode-switch {

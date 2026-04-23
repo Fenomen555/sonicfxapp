@@ -1296,20 +1296,42 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               </div>
             )}
 
-            <div className="field-mini">
-              <label className="field-label">{t.home.expiration || "Expiration"}</label>
-              <button
-                type="button"
-                className="field-input ref-input field-picker-trigger field-picker-trigger-mini"
-                onClick={() => openPickerSheet("expiration")}
-              >
-                <span className="field-picker-copy">
-                  <strong>{selectedExpirationMeta?.label || expiration || "5m"}</strong>
-                  <small>{t.home.expirationPickerHint || "Choose time"}</small>
-                </span>
-                <span className="field-picker-chevron" aria-hidden="true" />
-              </button>
-            </div>
+            {signalMode === "scanner" ? (
+              <div className="field-grow expiration-inline-picker">
+                <label className="field-label">{t.home.expiration || "Expiration"}</label>
+                <div className="expiration-inline-grid" role="group" aria-label={t.home.expiration || "Expiration"}>
+                  {expirations.map((item) => {
+                    const isActive = expiration === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        className={`expiration-inline-btn ${isActive ? "active" : ""}`}
+                        onClick={() => setExpiration(item.value)}
+                        aria-pressed={isActive}
+                      >
+                        {item.label || item.value}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="field-mini">
+                <label className="field-label">{t.home.expiration || "Expiration"}</label>
+                <button
+                  type="button"
+                  className="field-input ref-input field-picker-trigger field-picker-trigger-mini"
+                  onClick={() => openPickerSheet("expiration")}
+                >
+                  <span className="field-picker-copy">
+                    <strong>{selectedExpirationMeta?.label || expiration || "5m"}</strong>
+                    <small>{t.home.expirationPickerHint || "Choose time"}</small>
+                  </span>
+                  <span className="field-picker-chevron" aria-hidden="true" />
+                </button>
+              </div>
+            )}
           </div>
 
           {errorText && <div className="form-error">{errorText}</div>}

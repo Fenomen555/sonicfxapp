@@ -171,7 +171,7 @@ function formatAnalysisAsset(asset, marketMode) {
 
 function formatAnalysisPrice(value) {
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return "—";
+  if (!Number.isFinite(numeric) || numeric <= 0) return "—";
   return numeric.toFixed(5).replace(/0+$/, "").replace(/\.$/, "");
 }
 

@@ -1275,9 +1275,24 @@ async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
         return None
 
     try:
-        return float(payload.get("price"))
+        price = float(payload.get("price"))
+        if price > 0:
+            return price
     except (TypeError, ValueError):
-        return None
+        price = None
+
+    candles = payload.get("candles")
+    if isinstance(candles, list):
+        for candle in reversed(candles):
+            if not isinstance(candle, dict):
+                continue
+            try:
+                close_price = float(candle.get("close"))
+            except (TypeError, ValueError):
+                continue
+            if close_price > 0:
+                return close_price
+    return None
 
 
 async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:

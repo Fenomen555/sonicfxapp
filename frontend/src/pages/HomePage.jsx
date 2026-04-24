@@ -29,6 +29,24 @@ const FALLBACK_EXPIRATIONS = [
   { value: "1h", label: "1h" }
 ];
 
+function mergeExpirationOptions(...groups) {
+  const merged = [];
+  const seen = new Set();
+
+  groups.forEach((group) => {
+    if (!Array.isArray(group)) return;
+    group.forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      const value = String(item.value || "").trim().toLowerCase();
+      if (!value || seen.has(value)) return;
+      seen.add(value);
+      merged.push({ value, label: item.label || value });
+    });
+  });
+
+  return merged.length ? merged : FALLBACK_EXPIRATIONS;
+}
+
 const BASIC_MARKETS = [
   { key: "otc", label: "OTC" },
   { key: "forex", label: "Forex" }
@@ -386,9 +404,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         if (!isActive) return;
 
         const nextPairs = Array.isArray(data?.pairs) ? data.pairs : [];
-        const nextExp = Array.isArray(data?.expirations) && data.expirations.length > 0
-          ? data.expirations
-          : FALLBACK_EXPIRATIONS;
+        const nextExp = mergeExpirationOptions(FALLBACK_EXPIRATIONS, data?.expirations);
         const nextMarkets = Array.isArray(data?.available_markets) ? data.available_markets : [];
 
         setPairs(nextPairs);

@@ -81,7 +81,8 @@ DEVSBITE_QUOTES_WS_URL = (
 QUOTE_HISTORY_SECONDS = int((os.getenv("QUOTE_HISTORY_SECONDS") or "300").strip() or "300")
 QUOTE_REPLACE_DEBOUNCE_MS = int((os.getenv("QUOTE_REPLACE_DEBOUNCE_MS") or "220").strip() or "220")
 MARKET_SYNC_INTERVAL_SEC = int((os.getenv("MARKET_SYNC_INTERVAL_SEC") or "300").strip() or "300")
-EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or "5s,15s,1m,3m,5m,15m,1h").strip()
+CORE_EXPIRATION_OPTIONS = "5s,15s,1m,3m,5m,15m,1h"
+EXPIRATION_OPTIONS = (os.getenv("EXPIRATION_OPTIONS") or CORE_EXPIRATION_OPTIONS).strip()
 DEVSBITE_EXPIRATIONS_URL = (os.getenv("DEVSBITE_EXPIRATIONS_URL") or "").strip()
 FINNHUB_TOKEN = (os.getenv("FINNHUB_TOKEN") or "").strip()
 SCAN_UPLOAD_MAX_BYTES = int((os.getenv("SCAN_UPLOAD_MAX_BYTES") or str(15 * 1024 * 1024)).strip() or str(15 * 1024 * 1024))
@@ -1990,7 +1991,10 @@ async def _fetch_devsbite_pairs(kind: str, min_payout: int) -> tuple[List[Dict[s
 
 
 async def _fetch_expiration_options() -> List[Dict[str, Any]]:
-    defaults = parse_expiration_options(EXPIRATION_OPTIONS)
+    defaults = _merge_expiration_options(
+        parse_expiration_options(CORE_EXPIRATION_OPTIONS),
+        parse_expiration_options(EXPIRATION_OPTIONS),
+    )
     if not DEVSBITE_TOKEN or not DEVSBITE_EXPIRATIONS_URL:
         return defaults
     headers = {

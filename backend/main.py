@@ -1824,7 +1824,7 @@ async def _record_analysis_history(
                 await cur.execute(
                     """
                     INSERT INTO analysis_history (
-                        user_id, source_type, upload_id, analysis_mode, signal, asset,
+                        user_id, source_type, upload_id, analysis_mode, `signal`, asset,
                         market_mode, entry_price, confidence, expiration_minutes,
                         selected_expiration, comment, result_json
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)

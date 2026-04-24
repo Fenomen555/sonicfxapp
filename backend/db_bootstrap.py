@@ -427,7 +427,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     source_type VARCHAR(16) NOT NULL DEFAULT 'scanner',
                     upload_id BIGINT NULL,
                     analysis_mode VARCHAR(16) NULL,
-                    signal VARCHAR(16) NULL,
+                    `signal` VARCHAR(16) NULL,
                     asset VARCHAR(128) NULL,
                     market_mode VARCHAR(16) NULL,
                     entry_price DECIMAL(20,8) NULL,
@@ -494,7 +494,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "analysis_history", "source_type", "ALTER TABLE analysis_history ADD COLUMN source_type VARCHAR(16) NOT NULL DEFAULT 'scanner'")
         await _ensure_column(conn, db_name, "analysis_history", "upload_id", "ALTER TABLE analysis_history ADD COLUMN upload_id BIGINT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "analysis_mode", "ALTER TABLE analysis_history ADD COLUMN analysis_mode VARCHAR(16) NULL")
-        await _ensure_column(conn, db_name, "analysis_history", "signal", "ALTER TABLE analysis_history ADD COLUMN signal VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "signal", "ALTER TABLE analysis_history ADD COLUMN `signal` VARCHAR(16) NULL")
         await _ensure_column(conn, db_name, "analysis_history", "asset", "ALTER TABLE analysis_history ADD COLUMN asset VARCHAR(128) NULL")
         await _ensure_column(conn, db_name, "analysis_history", "market_mode", "ALTER TABLE analysis_history ADD COLUMN market_mode VARCHAR(16) NULL")
         await _ensure_column(conn, db_name, "analysis_history", "entry_price", "ALTER TABLE analysis_history ADD COLUMN entry_price DECIMAL(20,8) NULL")

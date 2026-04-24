@@ -710,13 +710,15 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       }
 
       const currentItem = autoQuoteSubscription[0];
+      const requestKey = getQuoteSubscriptionKey(currentItem);
+      currentQuoteLoadKeyRef.current = requestKey;
       try {
         const data = await apiFetchJson(
           `/api/quotes/history?category=${encodeURIComponent(currentItem.category)}&symbol=${encodeURIComponent(currentItem.symbol)}&history_seconds=${encodeURIComponent(currentItem.history_seconds || quotesConfig.history_seconds || 300)}`
         );
         if (!isActive) return;
         if (data && typeof data === "object" && matchesQuotePayload(data, currentItem) && payloadHasRenderableCandles(data)) {
-          if (currentQuoteLoadKeyRef.current !== getQuoteSubscriptionKey(currentItem)) {
+          if (currentQuoteLoadKeyRef.current !== requestKey) {
             return;
           }
           if (quoteUnlockTimerRef.current) {

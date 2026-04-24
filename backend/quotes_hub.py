@@ -28,6 +28,11 @@ def normalize_quote_symbol(value: Any) -> str:
     return symbol
 
 
+def normalize_quote_key_symbol(value: Any) -> str:
+    symbol = normalize_quote_symbol(value).lower()
+    return "".join(char for char in symbol if char.isalnum())
+
+
 def normalize_subscription_item(item: Dict[str, Any]) -> Dict[str, Any]:
     normalized = {
         "category": normalize_quote_category(item.get("category")),
@@ -45,7 +50,7 @@ def normalize_subscription_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def subscription_key(item: Dict[str, Any]) -> str:
-    return f"{item['category']}::{item['symbol']}"
+    return f"{item['category']}::{normalize_quote_key_symbol(item['symbol'])}"
 
 
 def key_to_item(key: str) -> Dict[str, Any]:
@@ -55,11 +60,18 @@ def key_to_item(key: str) -> Dict[str, Any]:
 
 def _extract_event_keys(payload: Dict[str, Any]) -> Set[str]:
     keys: Set[str] = set()
-    if payload.get("category") and payload.get("symbol"):
-        try:
-            keys.add(subscription_key(normalize_subscription_item(payload)))
-        except ValueError:
-            pass
+    category = payload.get("category")
+    if category:
+        for symbol_field in ("symbol", "requested_symbol", "resolved_symbol"):
+            if not payload.get(symbol_field):
+                continue
+            try:
+                keys.add(subscription_key(normalize_subscription_item({
+                    "category": category,
+                    "symbol": payload.get(symbol_field),
+                })))
+            except ValueError:
+                pass
 
     for field_name in ("item", "subscription"):
         item = payload.get(field_name)
@@ -68,6 +80,10 @@ def _extract_event_keys(payload: Dict[str, Any]) -> Set[str]:
                 keys.add(subscription_key(normalize_subscription_item(item)))
             except ValueError:
                 pass
+
+    data = payload.get("data")
+    if isinstance(data, dict):
+        keys.update(_extract_event_keys(data))
 
     items = payload.get("items")
     if isinstance(items, list):

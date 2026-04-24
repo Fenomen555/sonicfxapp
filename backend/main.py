@@ -495,6 +495,12 @@ class ScannerAnalyzeRequest(BaseModel):
     upload_id: Optional[int] = Field(default=None, ge=1)
 
 
+class AutoAnalyzeRequest(BaseModel):
+    category: str = Field(min_length=2, max_length=32)
+    symbol: str = Field(min_length=3, max_length=64)
+    image_data_url: str = Field(min_length=32, max_length=8_000_000)
+
+
 class UserNewsNotificationSettingsUpdate(BaseModel):
     news_enabled: int = 0
     economic_enabled: int = 1
@@ -1560,40 +1566,89 @@ async def _fetch_quote_snapshot(category: str, symbol: str) -> Optional[Dict[str
     return None
 
 
-async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:
-    upload_row = await _load_scan_upload_for_analysis(user_id, upload_id)
+def _decode_scan_image_data_url(image_data_url: str) -> tuple[str, str]:
+    raw = str(image_data_url or "").strip()
+    header, separator, encoded = raw.partition(",")
+    if not separator or ";base64" not in header:
+        raise HTTPException(status_code=400, detail="Live chart image is invalid")
+    content_type = header.replace("data:", "", 1).split(";", 1)[0].strip().lower()
+    if content_type not in OPENAI_SCAN_CONTENT_TYPES:
+        raise HTTPException(status_code=415, detail="Live chart image must be PNG, JPG, WEBP or GIF")
+    try:
+        image_bytes = base64.b64decode(encoded, validate=True)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Live chart image is invalid") from exc
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Live chart image is empty")
+    if len(image_bytes) > SCAN_UPLOAD_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Live chart image is too large")
+    return content_type, raw
+
+
+def _display_quote_symbol(symbol: str, category: str) -> str:
+    clean_symbol = re.sub(r"\s+OTC$", "", str(symbol or "").strip(), flags=re.IGNORECASE)
+    return f"{clean_symbol} OTC" if category == "otc" and not re.search(r"\bOTC\b", clean_symbol, re.IGNORECASE) else clean_symbol
+
+
+async def _run_scanner_analysis_for_image(
+    *,
+    image_data_url: str,
+    known_category: Optional[str] = None,
+    known_symbol: Optional[str] = None,
+) -> Dict[str, Any]:
     settings = await get_scanner_settings_payload()
     api_key = await get_app_setting("scanner_openai_api_key", DEFAULT_SCANNER_OPENAI_API_KEY)
     api_key = str(api_key or "").strip()
     if not api_key:
         raise HTTPException(status_code=503, detail="Scanner AI key is not configured")
 
+    _decode_scan_image_data_url(image_data_url)
     analysis_mode = settings["analysis_mode"]
     analysis_mode_label = settings["analysis_mode_label"]
     model = settings["model"]
-    file_path = Path(str(upload_row["resolved_file_path"]))
-    content_type = str(upload_row.get("content_type") or "").strip() or (mimetypes.guess_type(file_path.name)[0] or "image/png")
-    if content_type not in OPENAI_SCAN_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=415,
-            detail="Unsupported image format for scanner AI. Use PNG, JPG, WEBP or GIF.",
+
+    known_price_request: Optional[Dict[str, str]] = None
+    context_lines = [f"Режим анализа: {analysis_mode_label}"]
+    if known_category and known_symbol:
+        try:
+            normalized_category = normalize_quote_category(known_category)
+            normalized_symbol = normalize_quote_symbol(
+                re.sub(r"\s+OTC$", "", known_symbol, flags=re.IGNORECASE).strip()
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Live chart market or symbol is invalid") from exc
+        known_price_request = {"category": normalized_category, "symbol": normalized_symbol}
+        known_market_mode = "OTC" if normalized_category == "otc" else "MARKET"
+        context_lines.extend(
+            [
+                "",
+                "Контекст live-графика уже известен:",
+                f"Актив: {_display_quote_symbol(normalized_symbol, normalized_category)}",
+                f"Режим: {known_market_mode}",
+                "Не угадывай другой актив, если на изображении нет явного противоречия.",
+            ]
         )
-    image_bytes = file_path.read_bytes()
-    image_base64 = base64.b64encode(image_bytes).decode("ascii")
-    image_data_url = f"data:{content_type};base64,{image_base64}"
 
     parsed_result = await _request_scanner_openai_json(
         api_key=api_key,
         model=model,
         system_prompt=SCANNER_ANALYSIS_PROMPT,
         user_content=[
-            {"type": "text", "text": f"Режим анализа: {analysis_mode_label}"},
+            {"type": "text", "text": "\n".join(context_lines)},
             {"type": "image_url", "image_url": {"url": image_data_url, "detail": "high"}},
         ],
         schema_name="scanner_signal_initial",
     )
     sanitized = _sanitize_scanner_analysis_result(parsed_result)
-    price_request = _resolve_scanner_price_request(sanitized.get("asset"), sanitized.get("market_mode"))
+
+    if known_price_request and sanitized.get("status") == "ok":
+        sanitized["asset"] = _display_quote_symbol(known_price_request["symbol"], known_price_request["category"])
+        sanitized["market_mode"] = "OTC" if known_price_request["category"] == "otc" else "MARKET"
+
+    price_request = known_price_request or _resolve_scanner_price_request(
+        sanitized.get("asset"),
+        sanitized.get("market_mode"),
+    )
     if sanitized.get("status") == "ok" and price_request:
         quote_snapshot = await _fetch_quote_snapshot(price_request["category"], price_request["symbol"])
         entry_price = _extract_quote_price(quote_snapshot)
@@ -1625,15 +1680,40 @@ async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int]
                         sanitized,
                         _sanitize_scanner_analysis_result(confirmation_result),
                     )
+                    if known_price_request:
+                        sanitized["asset"] = _display_quote_symbol(
+                            known_price_request["symbol"],
+                            known_price_request["category"],
+                        )
+                        sanitized["market_mode"] = "OTC" if known_price_request["category"] == "otc" else "MARKET"
                     if entry_price is not None:
                         sanitized["entry_price"] = entry_price
                 except HTTPException:
                     pass
         sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
+
     return {
         "result": sanitized,
         "mode": analysis_mode,
         "mode_label": analysis_mode_label,
+    }
+
+
+async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:
+    upload_row = await _load_scan_upload_for_analysis(user_id, upload_id)
+    file_path = Path(str(upload_row["resolved_file_path"]))
+    content_type = str(upload_row.get("content_type") or "").strip() or (mimetypes.guess_type(file_path.name)[0] or "image/png")
+    if content_type not in OPENAI_SCAN_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported image format for scanner AI. Use PNG, JPG, WEBP or GIF.",
+        )
+    image_bytes = file_path.read_bytes()
+    image_base64 = base64.b64encode(image_bytes).decode("ascii")
+    image_data_url = f"data:{content_type};base64,{image_base64}"
+    result = await _run_scanner_analysis_for_image(image_data_url=image_data_url)
+    return {
+        **result,
         "upload": _serialize_scan_upload(upload_row),
     }
 
@@ -2521,6 +2601,20 @@ async def analyze_scanner_chart(
     user_id = int(user["user_id"])
     result = await run_scanner_analysis_for_upload(user_id=user_id, upload_id=payload.upload_id)
     return {"status": "success", **result}
+
+
+@app.post("/api/analyze/auto")
+async def analyze_auto_chart(
+    payload: AutoAnalyzeRequest,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    result = await _run_scanner_analysis_for_image(
+        image_data_url=payload.image_data_url,
+        known_category=payload.category,
+        known_symbol=payload.symbol,
+    )
+    return {"status": "success", **result, "source": "auto"}
 
 
 @app.get("/api/upload/scan/{upload_id}/preview")

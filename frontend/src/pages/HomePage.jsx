@@ -166,6 +166,130 @@ function getRenderableCandleCount(payload) {
   return maxCount;
 }
 
+function getRenderableCandles(payload, limit = 64) {
+  const root = getQuotePayloadRoot(payload);
+  const candidates = [root?.candles, root?.history, payload?.candles, payload?.history];
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue;
+    const candles = candidate
+      .map((item, index) => ({
+        ts: Number(item?.ts ?? item?.time ?? item?.t ?? index) || index,
+        open: Number(item?.open),
+        high: Number(item?.high),
+        low: Number(item?.low),
+        close: Number(item?.close)
+      }))
+      .filter((item) => [item.open, item.high, item.low, item.close].every(Number.isFinite));
+    if (candles.length) {
+      return candles.slice(-Math.max(Number(limit) || 64, 8));
+    }
+  }
+
+  return [];
+}
+
+function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
+  const candles = getRenderableCandles(payload, 72);
+  if (!candles.length) return "";
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 960;
+  canvas.height = 540;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, "#17243a");
+  gradient.addColorStop(0.58, "#0d1422");
+  gradient.addColorStop(1, "#090e18");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "rgba(255,255,255,0.045)";
+  for (let x = 70; x < canvas.width; x += 96) {
+    ctx.fillRect(x, 96, 1, 360);
+  }
+  for (let y = 120; y <= 420; y += 60) {
+    ctx.fillRect(54, y, 852, 1);
+  }
+
+  const highs = candles.map((item) => item.high);
+  const lows = candles.map((item) => item.low);
+  const min = Math.min(...lows);
+  const max = Math.max(...highs);
+  const padding = Math.max((max - min) * 0.12, 0.000001);
+  const scaledMin = min - padding;
+  const scaledMax = max + padding;
+  const range = Math.max(scaledMax - scaledMin, 0.000001);
+  const plot = { left: 74, top: 104, width: 812, height: 328 };
+  const yOf = (value) => plot.top + (1 - ((value - scaledMin) / range)) * plot.height;
+  const step = plot.width / Math.max(candles.length, 1);
+  const bodyWidth = Math.min(Math.max(step * 0.56, 6), 18);
+
+  ctx.font = "700 24px Arial";
+  ctx.fillStyle = "#f4f7ff";
+  ctx.fillText(String(symbol || "Live chart"), 54, 56);
+  ctx.font = "700 16px Arial";
+  ctx.fillStyle = "#9ed7ff";
+  ctx.fillText(String(marketLabel || "LIVE").toUpperCase(), 54, 84);
+
+  const lastClose = candles[candles.length - 1]?.close;
+  if (Number.isFinite(lastClose)) {
+    const priceY = yOf(lastClose);
+    ctx.strokeStyle = "rgba(126, 170, 255, 0.42)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(plot.left, priceY);
+    ctx.lineTo(plot.left + plot.width, priceY);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(11,18,31,0.86)";
+    ctx.strokeStyle = "rgba(142,169,221,0.65)";
+    ctx.lineWidth = 1;
+    const label = formatAnalysisPrice(lastClose);
+    const metrics = ctx.measureText(label);
+    const tagW = metrics.width + 28;
+    const tagH = 34;
+    const tagX = plot.left + plot.width - tagW;
+    const tagY = Math.max(plot.top + 4, Math.min(priceY - tagH / 2, plot.top + plot.height - tagH - 4));
+    ctx.beginPath();
+    if (typeof ctx.roundRect === "function") {
+      ctx.roundRect(tagX, tagY, tagW, tagH, 17);
+    } else {
+      ctx.rect(tagX, tagY, tagW, tagH);
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#f7fbff";
+    ctx.font = "800 17px Arial";
+    ctx.fillText(label, tagX + 14, tagY + 23);
+  }
+
+  candles.forEach((item, index) => {
+    const x = plot.left + step * index + step / 2;
+    const openY = yOf(item.open);
+    const closeY = yOf(item.close);
+    const highY = yOf(item.high);
+    const lowY = yOf(item.low);
+    const bullish = item.close >= item.open;
+    ctx.strokeStyle = bullish ? "#62e56f" : "#ff6c5d";
+    ctx.fillStyle = bullish ? "#57d955" : "#ff543f";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x, highY);
+    ctx.lineTo(x, lowY);
+    ctx.stroke();
+    const bodyTop = Math.min(openY, closeY);
+    const bodyHeight = Math.max(Math.abs(closeY - openY), 5);
+    ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+  });
+
+  ctx.strokeStyle = "rgba(128, 159, 216, 0.42)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(plot.left, plot.top, plot.width, plot.height);
+  return canvas.toDataURL("image/png", 0.92);
+}
+
 function getAnalysisSignalTone(signal) {
   const normalized = String(signal || "").trim().toUpperCase();
   if (normalized === "BUY") return "buy";
@@ -951,6 +1075,15 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     setIsLinkSheetOpen(false);
   }
 
+  async function startNewAnalysis() {
+    if (signalMode === "automatic") {
+      setAnalysisResult(null);
+      setErrorText("");
+      return;
+    }
+    await startNewScannerAnalysis();
+  }
+
   async function handleAnalyzeClick() {
     if (signalMode === "scanner" && !hasScanUploadPreview) {
       notify?.({
@@ -961,11 +1094,11 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       return;
     }
 
-    if (signalMode !== "scanner") {
+    if (signalMode === "indicators") {
       notify?.({
         type: "info",
         title: t.home.analyzeSoonTitle || "Режим в работе",
-        message: t.home.analyzeSoonMessage || "GPT-анализ сейчас подключен для SonicFX Scanner. Для Auto и Indicators добавим отдельный поток."
+        message: t.home.analyzeSoonMessage || "GPT-анализ сейчас подключен для SonicFX Scanner и SonicFX Auto. Indicators добавим отдельным потоком."
       });
       return;
     }
@@ -977,10 +1110,37 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     setErrorText("");
 
     try {
-      const data = await apiFetchJson("/api/analyze/scanner", {
-        method: "POST",
-        body: JSON.stringify({ upload_id: scanUploadState.file?.id || null })
-      });
+      const data = signalMode === "automatic"
+        ? await (async () => {
+            if (!quoteRenderReady || !payloadHasRenderableCandles(quotePayload)) {
+              throw new Error(t.home.autoAnalyzeNoChartMessage || "Дождитесь загрузки live-графика перед анализом.");
+            }
+            const symbol = selectedPairMeta?.pair || asset;
+            if (!symbol) {
+              throw new Error(t.home.autoAnalyzeNoPairMessage || "Выберите валютную пару для Auto-анализа.");
+            }
+            const marketLabel = currentMarkets.find((item) => item.key === marketKind)?.label || marketKind.toUpperCase();
+            const imageDataUrl = buildLiveChartImageDataUrl({
+              payload: quotePayload,
+              symbol,
+              marketLabel
+            });
+            if (!imageDataUrl) {
+              throw new Error(t.home.autoAnalyzeNoChartMessage || "Дождитесь загрузки live-графика перед анализом.");
+            }
+            return apiFetchJson("/api/analyze/auto", {
+              method: "POST",
+              body: JSON.stringify({
+                category: marketKind,
+                symbol,
+                image_data_url: imageDataUrl
+              })
+            });
+          })()
+        : await apiFetchJson("/api/analyze/scanner", {
+            method: "POST",
+            body: JSON.stringify({ upload_id: scanUploadState.file?.id || null })
+          });
       setAnalysisResult(data || null);
     } catch (error) {
       notify?.({
@@ -1020,6 +1180,74 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const analysisPriceLabel = formatAnalysisPrice(analysisSummary?.entry_price);
   const selectedExpirationLabel = formatSelectedExpirationLabel(selectedExpirationMeta, expiration);
 
+  function renderAnalysisResultPanel({ showMedia = true } = {}) {
+    if (!analysisSummary) return null;
+    return (
+      <div className="upload-zone analysis-result-panel">
+        <div className="analysis-result-sheet analysis-result-sheet-inline" role="region" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
+          {showMedia && scanPreview.url ? (
+            <div className="upload-preview-media analysis-result-media">
+              <img
+                className="upload-preview-backdrop"
+                src={scanPreview.url}
+                alt=""
+                aria-hidden="true"
+              />
+              <img
+                className="upload-preview-image"
+                src={scanPreview.url}
+                alt={t.home.uploadPreviewAlt || "Uploaded chart"}
+                onError={() => setScanPreview((prev) => ({ ...prev, url: "", status: "error" }))}
+              />
+            </div>
+          ) : null}
+
+          <div className="analysis-result-hero">
+            <div className="analysis-result-copy">
+              <small>
+                {analysisSummary.status === "graph_not_found"
+                  ? (t.home.analysisGraphNotFoundHint || "Загрузите более читаемый скриншот с ценой, свечами и шкалой.")
+                  : (analysisSummary.comment || t.home.analysisResultHint || "Сигнал подготовлен по текущей структуре цены.")}
+              </small>
+            </div>
+            <span className={`analysis-result-signal signal-${analysisSignalTone}`}>
+              {analysisSummary.status === "graph_not_found" ? "NO DATA" : (analysisSummary.signal || "NO TRADE")}
+            </span>
+          </div>
+
+          {analysisSummary.status !== "graph_not_found" ? (
+            <div className="analysis-result-grid">
+              <article className="analysis-result-card">
+                <span>{t.home.analysisAssetLabel || "Актив"}</span>
+                <strong>{analysisAssetLabel}</strong>
+              </article>
+              <article className="analysis-result-card">
+                <span>{t.home.analysisPriceLabel || "Цена"}</span>
+                <strong>{analysisPriceLabel}</strong>
+              </article>
+              <article className="analysis-result-card">
+                <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>
+                <strong>{Number(analysisSummary.confidence || 0)}%</strong>
+              </article>
+              <article className="analysis-result-card">
+                <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
+                <strong>{selectedExpirationLabel}</strong>
+                <small className="analysis-result-subcopy">
+                  {(t.home.analysisExpirationRecommendationPrefix || "ИИ рекомендует")}: {formatAnalysisExpiration(analysisSummary.expiration_minutes)}
+                </small>
+              </article>
+            </div>
+          ) : (
+            <div className="analysis-result-empty">
+              <strong>{t.home.analysisGraphNotFoundTitle || "График не обнаружен"}</strong>
+              <p>{t.home.analysisGraphNotFoundHint || "Попробуйте загрузить более четкий скриншот, где видны свечи, движение цены и шкала."}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className="page page-home-ref">
       <input
@@ -1049,90 +1277,29 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       </div>
 
       {isAutomaticMode ? (
-        <div
-          className="live-quote-stage"
-          role="button"
-          tabIndex={0}
-          onClick={() => openPickerSheet("asset")}
-          onKeyDown={handleAutomaticZoneKeyDown}
-        >
-          <LiveQuoteChart
-            symbol={selectedPairMeta?.pair || asset || (t.home.quoteAwaitPair || "Choose a pair")}
-            marketLabel={currentMarkets.find((item) => item.key === marketKind)?.label || marketKind.toUpperCase()}
-            payload={quoteRenderReady ? quotePayload : null}
-            state={quoteState}
-          />
-          <ScanAnalysisOverlay
-            isActive={isAnalysisScanning}
-            label={t.home.scanAnalysisLabel || "Scanning chart"}
-          />
-        </div>
-      ) : analysisSummary ? (
-        <div className="upload-zone analysis-result-panel">
-          <div className="analysis-result-sheet analysis-result-sheet-inline" role="region" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
-            {scanPreview.url ? (
-              <div className="upload-preview-media analysis-result-media">
-                <img
-                  className="upload-preview-backdrop"
-                  src={scanPreview.url}
-                  alt=""
-                  aria-hidden="true"
-                />
-                <img
-                  className="upload-preview-image"
-                  src={scanPreview.url}
-                  alt={t.home.uploadPreviewAlt || "Uploaded chart"}
-                  onError={() => setScanPreview((prev) => ({ ...prev, url: "", status: "error" }))}
-                />
-              </div>
-            ) : null}
-
-            <div className="analysis-result-hero">
-              <div className="analysis-result-copy">
-                <small>
-                  {analysisSummary.status === "graph_not_found"
-                    ? (t.home.analysisGraphNotFoundHint || "Загрузите более читаемый скриншот с ценой, свечами и шкалой.")
-                    : (analysisSummary.comment || t.home.analysisResultHint || "Сигнал подготовлен по текущей структуре цены.")}
-                </small>
-              </div>
-              <span className={`analysis-result-signal signal-${analysisSignalTone}`}>
-                {analysisSummary.status === "graph_not_found" ? "NO DATA" : (analysisSummary.signal || "NO TRADE")}
-              </span>
-            </div>
-
-            {analysisSummary.status !== "graph_not_found" ? (
-              <>
-                <div className="analysis-result-grid">
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisAssetLabel || "Актив"}</span>
-                    <strong>{analysisAssetLabel}</strong>
-                  </article>
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisPriceLabel || "Цена"}</span>
-                    <strong>{analysisPriceLabel}</strong>
-                  </article>
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>
-                    <strong>{Number(analysisSummary.confidence || 0)}%</strong>
-                  </article>
-                  <article className="analysis-result-card">
-                    <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
-                    <strong>{selectedExpirationLabel}</strong>
-                    <small className="analysis-result-subcopy">
-                      {(t.home.analysisExpirationRecommendationPrefix || "ИИ рекомендует")}: {formatAnalysisExpiration(analysisSummary.expiration_minutes)}
-                    </small>
-                  </article>
-                </div>
-              </>
-            ) : (
-              <div className="analysis-result-empty">
-                <strong>{t.home.analysisGraphNotFoundTitle || "График не обнаружен"}</strong>
-                <p>{t.home.analysisGraphNotFoundHint || "Попробуйте загрузить более четкий скриншот, где видны свечи, движение цены и шкала."}</p>
-              </div>
-            )}
-
+        <>
+          <div
+            className="live-quote-stage"
+            role="button"
+            tabIndex={0}
+            onClick={() => openPickerSheet("asset")}
+            onKeyDown={handleAutomaticZoneKeyDown}
+          >
+            <LiveQuoteChart
+              symbol={selectedPairMeta?.pair || asset || (t.home.quoteAwaitPair || "Choose a pair")}
+              marketLabel={currentMarkets.find((item) => item.key === marketKind)?.label || marketKind.toUpperCase()}
+              payload={quoteRenderReady ? quotePayload : null}
+              state={quoteState}
+            />
+            <ScanAnalysisOverlay
+              isActive={isAnalysisScanning}
+              label={t.home.scanAnalysisLabel || "Scanning chart"}
+            />
           </div>
-        </div>
+          {analysisSummary ? renderAnalysisResultPanel({ showMedia: false }) : null}
+        </>
+      ) : analysisSummary ? (
+        renderAnalysisResultPanel({ showMedia: true })
       ) : hasScanUploadPreview ? (
         <div className="upload-zone upload-zone-preview">
           <div className="upload-preview-media">
@@ -1279,7 +1446,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         <button
           className={`primary-btn ref-primary primary-btn-top primary-btn-scanner ${analysisSummary ? "is-reset-mode" : ""}`}
           type="button"
-          onClick={analysisSummary ? startNewScannerAnalysis : handleAnalyzeClick}
+          onClick={analysisSummary ? startNewAnalysis : handleAnalyzeClick}
           disabled={isAnalysisScanning}
         >
           <span>{analysisSummary ? (t.home.newAnalysis || "Новый анализ") : actionLabel}</span>

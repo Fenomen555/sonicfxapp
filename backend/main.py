@@ -1833,6 +1833,24 @@ def parse_expiration_options(raw: str) -> List[Dict[str, Any]]:
     return items
 
 
+def _merge_expiration_options(*groups: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    merged: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for group in groups:
+        if not isinstance(group, list):
+            continue
+        for item in group:
+            if not isinstance(item, dict):
+                continue
+            value = str(item.get("value") or "").strip().lower()
+            label = str(item.get("label") or value).strip()
+            if not value or value in seen:
+                continue
+            seen.add(value)
+            merged.append({"value": value, "label": label or value})
+    return merged or [{"value": "5m", "label": "5m"}]
+
+
 def _pair_kind_normalized(kind: str) -> str:
     raw = str(kind or "").strip().lower()
     if raw in MARKET_KIND_CONFIG:
@@ -1995,7 +2013,7 @@ async def _fetch_expiration_options() -> List[Dict[str, Any]]:
         values = []
     parsed_raw = ",".join(str(item) for item in values)
     parsed = parse_expiration_options(parsed_raw)
-    return parsed if parsed else defaults
+    return _merge_expiration_options(parsed, defaults)
 
 
 async def _fetch_quote_history(category: str, symbol: str, history_seconds: int) -> Dict[str, Any]:

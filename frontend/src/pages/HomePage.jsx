@@ -23,6 +23,7 @@ const FALLBACK_EXPIRATIONS = [
   { value: "5s", label: "5s" },
   { value: "15s", label: "15s" },
   { value: "1m", label: "1m" },
+  { value: "3m", label: "3m" },
   { value: "5m", label: "5m" },
   { value: "15m", label: "15m" },
   { value: "1h", label: "1h" }

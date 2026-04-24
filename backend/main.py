@@ -396,7 +396,7 @@ scan_archive_dir.mkdir(parents=True, exist_ok=True)
 admin_token_file_path = media_dir / "admin.token"
 admin_panel_token = (os.getenv("ADMIN_PANEL_TOKEN") or "").strip()
 
-SCAN_UPLOAD_SOURCE_TYPES = {"gallery", "camera", "link"}
+SCAN_UPLOAD_SOURCE_TYPES = {"gallery", "camera", "link", "auto"}
 SCAN_UPLOAD_ALLOWED_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 SCAN_UPLOAD_ALLOWED_CONTENT_TYPES = {
     "image/jpeg",
@@ -493,12 +493,14 @@ class AdminScannerSettingsUpdateRequest(BaseModel):
 
 class ScannerAnalyzeRequest(BaseModel):
     upload_id: Optional[int] = Field(default=None, ge=1)
+    selected_expiration: Optional[str] = Field(default=None, max_length=16)
 
 
 class AutoAnalyzeRequest(BaseModel):
     category: str = Field(min_length=2, max_length=32)
     symbol: str = Field(min_length=3, max_length=64)
     image_data_url: str = Field(min_length=32, max_length=8_000_000)
+    selected_expiration: Optional[str] = Field(default=None, max_length=16)
 
 
 class UserNewsNotificationSettingsUpdate(BaseModel):
@@ -655,6 +657,7 @@ async def _record_scan_upload(
     upload_date: datetime,
     sequence_number: int,
     source_url: str = "",
+    is_current: bool = True,
 ) -> Dict[str, Any]:
     public_path = f"/api/uploads/scan/{user_id}/{file_path.name}"
     pool = await require_db_pool()
@@ -665,7 +668,7 @@ async def _record_scan_upload(
                 INSERT INTO scan_uploads (
                     user_id, source_type, original_name, content_type, file_size,
                     file_path, public_path, source_url, is_current, upload_date, sequence_number
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     int(user_id),
@@ -676,15 +679,17 @@ async def _record_scan_upload(
                     str(file_path),
                     public_path,
                     source_url or None,
+                    1 if is_current else 0,
                     upload_date.date(),
                     int(sequence_number),
                 ),
             )
             upload_id = int(cur.lastrowid or 0)
-            await cur.execute(
-                "UPDATE scan_uploads SET is_current = 0 WHERE user_id = %s AND is_current = 1 AND id <> %s",
-                (int(user_id), upload_id),
-            )
+            if is_current:
+                await cur.execute(
+                    "UPDATE scan_uploads SET is_current = 0 WHERE user_id = %s AND is_current = 1 AND id <> %s",
+                    (int(user_id), upload_id),
+                )
             await cur.execute("SELECT * FROM scan_uploads WHERE id = %s LIMIT 1", (upload_id,))
             row = await cur.fetchone()
     serialized = _serialize_scan_upload(row)
@@ -701,6 +706,7 @@ async def _save_scan_upload_file(
     content_type: str,
     chunks,
     source_url: str = "",
+    is_current: bool = True,
 ) -> Dict[str, Any]:
     suffix = _resolve_scan_upload_suffix(original_name, content_type)
     if not suffix:
@@ -753,6 +759,32 @@ async def _save_scan_upload_file(
         upload_date=upload_date,
         sequence_number=sequence_number,
         source_url=source_url,
+        is_current=is_current,
+    )
+
+
+async def _single_bytes_chunk(payload: bytes):
+    yield payload
+
+
+async def _save_scan_upload_bytes(
+    *,
+    user_id: int,
+    source_type: str,
+    original_name: str,
+    content_type: str,
+    payload: bytes,
+    source_url: str = "",
+    is_current: bool = True,
+) -> Dict[str, Any]:
+    return await _save_scan_upload_file(
+        user_id=user_id,
+        source_type=source_type,
+        original_name=original_name,
+        content_type=content_type,
+        chunks=_single_bytes_chunk(payload),
+        source_url=source_url,
+        is_current=is_current,
     )
 
 
@@ -1566,7 +1598,7 @@ async def _fetch_quote_snapshot(category: str, symbol: str) -> Optional[Dict[str
     return None
 
 
-def _decode_scan_image_data_url(image_data_url: str) -> tuple[str, str]:
+def _decode_scan_image_data_url(image_data_url: str) -> tuple[str, str, bytes]:
     raw = str(image_data_url or "").strip()
     header, separator, encoded = raw.partition(",")
     if not separator or ";base64" not in header:
@@ -1582,7 +1614,7 @@ def _decode_scan_image_data_url(image_data_url: str) -> tuple[str, str]:
         raise HTTPException(status_code=400, detail="Live chart image is empty")
     if len(image_bytes) > SCAN_UPLOAD_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Live chart image is too large")
-    return content_type, raw
+    return content_type, raw, image_bytes
 
 
 def _display_quote_symbol(symbol: str, category: str) -> str:
@@ -1716,6 +1748,110 @@ async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int]
         **result,
         "upload": _serialize_scan_upload(upload_row),
     }
+
+
+def _normalize_selected_expiration(value: Optional[str]) -> str:
+    return str(value or "").strip()[:16]
+
+
+def _serialize_analysis_history(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not row:
+        return None
+    created_at = row.get("created_at")
+    archived_at = row.get("upload_archived_at")
+    upload_id = int(row.get("upload_id") or 0)
+    try:
+        result_payload = json.loads(row.get("result_json") or "{}")
+    except Exception:
+        result_payload = {}
+    return {
+        "id": int(row.get("id") or 0),
+        "source_type": row.get("source_type") or "scanner",
+        "upload_id": upload_id or None,
+        "preview_path": f"/api/upload/scan/{upload_id}/preview" if upload_id and not archived_at else "",
+        "is_archived": bool(archived_at),
+        "analysis_mode": row.get("analysis_mode") or "",
+        "signal": row.get("signal") or "NO TRADE",
+        "asset": row.get("asset") or "не определен",
+        "market_mode": row.get("market_mode") or "MARKET",
+        "entry_price": float(row.get("entry_price") or 0),
+        "confidence": int(row.get("confidence") or 0),
+        "expiration_minutes": int(row.get("expiration_minutes") or 0),
+        "selected_expiration": row.get("selected_expiration") or "",
+        "comment": row.get("comment") or "",
+        "result": result_payload,
+        "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
+    }
+
+
+async def _record_analysis_history(
+    *,
+    user_id: int,
+    source_type: str,
+    result_payload: Dict[str, Any],
+    upload_id: Optional[int] = None,
+    analysis_mode: str = "",
+    selected_expiration: str = "",
+) -> Optional[Dict[str, Any]]:
+    result = result_payload.get("result") if isinstance(result_payload.get("result"), dict) else result_payload
+    if not isinstance(result, dict):
+        return None
+
+    entry_price = result.get("entry_price")
+    try:
+        entry_price = float(entry_price) if entry_price is not None else None
+    except (TypeError, ValueError):
+        entry_price = None
+
+    try:
+        confidence = int(result.get("confidence") or 0)
+    except (TypeError, ValueError):
+        confidence = 0
+    try:
+        expiration_minutes = int(result.get("expiration_minutes") or 0)
+    except (TypeError, ValueError):
+        expiration_minutes = 0
+
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                INSERT INTO analysis_history (
+                    user_id, source_type, upload_id, analysis_mode, signal, asset,
+                    market_mode, entry_price, confidence, expiration_minutes,
+                    selected_expiration, comment, result_json
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    int(user_id),
+                    (source_type or "scanner")[:16],
+                    int(upload_id) if upload_id else None,
+                    (analysis_mode or "")[:16],
+                    str(result.get("signal") or "NO TRADE")[:16],
+                    str(result.get("asset") or "не определен")[:128],
+                    str(result.get("market_mode") or "MARKET")[:16],
+                    entry_price,
+                    confidence,
+                    expiration_minutes,
+                    _normalize_selected_expiration(selected_expiration),
+                    str(result.get("comment") or "")[:2000],
+                    json.dumps(result, ensure_ascii=False),
+                ),
+            )
+            history_id = int(cur.lastrowid or 0)
+            await cur.execute(
+                """
+                SELECT ah.*, su.archived_at AS upload_archived_at
+                FROM analysis_history ah
+                LEFT JOIN scan_uploads su ON su.id = ah.upload_id
+                WHERE ah.id = %s
+                LIMIT 1
+                """,
+                (history_id,),
+            )
+            row = await cur.fetchone()
+    return _serialize_analysis_history(row)
 
 
 def _normalize_telegram_support_url(value: Any, fallback: str) -> str:
@@ -2600,7 +2736,21 @@ async def analyze_scanner_chart(
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
     result = await run_scanner_analysis_for_upload(user_id=user_id, upload_id=payload.upload_id)
-    return {"status": "success", **result}
+    response = {"status": "success", **result}
+    try:
+        history_item = await _record_analysis_history(
+            user_id=user_id,
+            source_type="scanner",
+            upload_id=int(result.get("upload", {}).get("id") or payload.upload_id or 0) or None,
+            result_payload=result,
+            analysis_mode=str(result.get("mode") or ""),
+            selected_expiration=payload.selected_expiration or "",
+        )
+        if history_item:
+            response["history_item"] = history_item
+    except Exception as exc:
+        print(f"[AnalysisHistory] failed to save scanner analysis: {exc}")
+    return response
 
 
 @app.post("/api/analyze/auto")
@@ -2609,12 +2759,68 @@ async def analyze_auto_chart(
     user: Dict[str, Any] = Depends(get_telegram_user),
 ):
     await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    content_type, _raw_data_url, image_bytes = _decode_scan_image_data_url(payload.image_data_url)
+    upload_row: Optional[Dict[str, Any]] = None
+    try:
+        safe_symbol = re.sub(r"[^A-Za-z0-9]+", "", payload.symbol or "")[:24] or "chart"
+        upload_row = await _save_scan_upload_bytes(
+            user_id=user_id,
+            source_type="auto",
+            original_name=f"live-{safe_symbol}.png",
+            content_type=content_type,
+            payload=image_bytes,
+            is_current=False,
+        )
+    except Exception as exc:
+        print(f"[AnalysisHistory] failed to save live chart snapshot: {exc}")
     result = await _run_scanner_analysis_for_image(
         image_data_url=payload.image_data_url,
         known_category=payload.category,
         known_symbol=payload.symbol,
     )
-    return {"status": "success", **result, "source": "auto"}
+    response = {"status": "success", **result, "source": "auto"}
+    if upload_row:
+        response["upload"] = upload_row
+    try:
+        history_item = await _record_analysis_history(
+            user_id=user_id,
+            source_type="auto",
+            upload_id=int(upload_row.get("id") or 0) if upload_row else None,
+            result_payload=result,
+            analysis_mode=str(result.get("mode") or ""),
+            selected_expiration=payload.selected_expiration or "",
+        )
+        if history_item:
+            response["history_item"] = history_item
+    except Exception as exc:
+        print(f"[AnalysisHistory] failed to save auto analysis: {exc}")
+    return response
+
+
+@app.get("/api/analysis/history")
+async def get_analysis_history(
+    limit: int = Query(default=20, ge=1, le=20),
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT ah.*, su.archived_at AS upload_archived_at
+                FROM analysis_history ah
+                LEFT JOIN scan_uploads su ON su.id = ah.upload_id
+                WHERE ah.user_id = %s
+                ORDER BY ah.created_at DESC, ah.id DESC
+                LIMIT %s
+                """,
+                (user_id, int(limit)),
+            )
+            rows = await cur.fetchall()
+    return {"items": [_serialize_analysis_history(row) for row in rows if row]}
 
 
 @app.get("/api/upload/scan/{upload_id}/preview")
@@ -3806,6 +4012,7 @@ async def admin_delete_user(
             if not await cur.fetchone():
                 raise HTTPException(status_code=404, detail="User not found")
 
+            await cur.execute("DELETE FROM analysis_history WHERE user_id = %s", (target_user_id,))
             await cur.execute("DELETE FROM scan_uploads WHERE user_id = %s", (target_user_id,))
             await cur.execute("DELETE FROM signals WHERE user_id = %s", (target_user_id,))
             await cur.execute("DELETE FROM admin_users WHERE user_id = %s", (target_user_id,))

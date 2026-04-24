@@ -409,6 +409,28 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                 """
             )
 
+            await cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS analysis_history (
+                    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    source_type VARCHAR(16) NOT NULL DEFAULT 'scanner',
+                    upload_id BIGINT NULL,
+                    analysis_mode VARCHAR(16) NULL,
+                    signal VARCHAR(16) NULL,
+                    asset VARCHAR(128) NULL,
+                    market_mode VARCHAR(16) NULL,
+                    entry_price DECIMAL(20,8) NULL,
+                    confidence INT NULL,
+                    expiration_minutes INT NULL,
+                    selected_expiration VARCHAR(16) NULL,
+                    comment TEXT NULL,
+                    result_json MEDIUMTEXT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
         await _ensure_column(conn, db_name, "users", "theme", "ALTER TABLE users ADD COLUMN theme VARCHAR(16) NOT NULL DEFAULT 'dark'")
         await _ensure_column(conn, db_name, "users", "lang", "ALTER TABLE users ADD COLUMN lang VARCHAR(8) NOT NULL DEFAULT 'ru'")
         await _ensure_column(conn, db_name, "users", "timezone", "ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev'")
@@ -459,6 +481,19 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "scan_uploads", "archive_path", "ALTER TABLE scan_uploads ADD COLUMN archive_path VARCHAR(700) NULL")
         await _ensure_column(conn, db_name, "scan_uploads", "archived_at", "ALTER TABLE scan_uploads ADD COLUMN archived_at TIMESTAMP NULL DEFAULT NULL")
         await _ensure_column(conn, db_name, "scan_uploads", "updated_at", "ALTER TABLE scan_uploads ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+        await _ensure_column(conn, db_name, "analysis_history", "source_type", "ALTER TABLE analysis_history ADD COLUMN source_type VARCHAR(16) NOT NULL DEFAULT 'scanner'")
+        await _ensure_column(conn, db_name, "analysis_history", "upload_id", "ALTER TABLE analysis_history ADD COLUMN upload_id BIGINT NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "analysis_mode", "ALTER TABLE analysis_history ADD COLUMN analysis_mode VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "signal", "ALTER TABLE analysis_history ADD COLUMN signal VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "asset", "ALTER TABLE analysis_history ADD COLUMN asset VARCHAR(128) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "market_mode", "ALTER TABLE analysis_history ADD COLUMN market_mode VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "entry_price", "ALTER TABLE analysis_history ADD COLUMN entry_price DECIMAL(20,8) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "confidence", "ALTER TABLE analysis_history ADD COLUMN confidence INT NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "expiration_minutes", "ALTER TABLE analysis_history ADD COLUMN expiration_minutes INT NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "selected_expiration", "ALTER TABLE analysis_history ADD COLUMN selected_expiration VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "comment", "ALTER TABLE analysis_history ADD COLUMN comment TEXT NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "result_json", "ALTER TABLE analysis_history ADD COLUMN result_json MEDIUMTEXT NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "created_at", "ALTER TABLE analysis_history ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
 
         await _ensure_index(conn, db_name, "signals", "idx_signals_user_created", "CREATE INDEX idx_signals_user_created ON signals (user_id, created_at)")
         await _ensure_index(conn, db_name, "signals", "idx_signals_status", "CREATE INDEX idx_signals_status ON signals (status)")
@@ -478,6 +513,8 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_user_current", "CREATE INDEX idx_scan_uploads_user_current ON scan_uploads (user_id, is_current, created_at)")
         await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_archive_due", "CREATE INDEX idx_scan_uploads_archive_due ON scan_uploads (archived_at, created_at)")
         await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_user_date_sequence", "CREATE INDEX idx_scan_uploads_user_date_sequence ON scan_uploads (user_id, upload_date, sequence_number)")
+        await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_user_created", "CREATE INDEX idx_analysis_history_user_created ON analysis_history (user_id, created_at)")
+        await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_upload", "CREATE INDEX idx_analysis_history_upload ON analysis_history (upload_id)")
 
         await _seed_feature_flags(conn)
         await _seed_signal_indicators(conn)

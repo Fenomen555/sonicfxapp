@@ -1133,13 +1133,17 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               body: JSON.stringify({
                 category: marketKind,
                 symbol,
-                image_data_url: imageDataUrl
+                image_data_url: imageDataUrl,
+                selected_expiration: expiration
               })
             });
           })()
         : await apiFetchJson("/api/analyze/scanner", {
             method: "POST",
-            body: JSON.stringify({ upload_id: scanUploadState.file?.id || null })
+            body: JSON.stringify({
+              upload_id: scanUploadState.file?.id || null,
+              selected_expiration: expiration
+            })
           });
       setAnalysisResult(data || null);
     } catch (error) {

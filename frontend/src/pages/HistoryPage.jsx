@@ -56,6 +56,8 @@ function getHistoryCopy(lang) {
     scanner: "Scanner",
     auto: "Live",
     total: "Всего",
+    close: "Закрыть",
+    openMedia: "Открыть изображение",
     price: "Цена",
     confidence: "Уверенность",
     expiration: "Экспирация",
@@ -75,6 +77,8 @@ function getHistoryCopy(lang) {
       archived: "File archived",
       noPreview: "Preview unavailable",
       total: "Total",
+      close: "Close",
+      openMedia: "Open image",
       price: "Price",
       confidence: "Confidence",
       expiration: "Expiration",
@@ -95,6 +99,8 @@ function getHistoryCopy(lang) {
       archived: "Файл уже в архіві",
       noPreview: "Прев'ю недоступне",
       total: "Усього",
+      close: "Закрити",
+      openMedia: "Відкрити зображення",
       price: "Ціна",
       confidence: "Впевненість",
       expiration: "Експірація",
@@ -109,6 +115,7 @@ export default function HistoryPage({ lang = "ru" }) {
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading");
   const [previewUrls, setPreviewUrls] = useState({});
+  const [openPreview, setOpenPreview] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const summary = useMemo(() => {
     const scanner = items.filter((item) => item?.source_type !== "auto").length;
@@ -202,13 +209,19 @@ export default function HistoryPage({ lang = "ru" }) {
             const previewUrl = previewUrls[item.id];
             return (
               <article className={`history-card tone-${tone}`} key={item.id}>
-                <div className="history-card-media">
+                <button
+                  className="history-card-media"
+                  type="button"
+                  onClick={() => previewUrl && setOpenPreview({ url: previewUrl, title: formatHistoryAsset(item.asset, item.market_mode) })}
+                  disabled={!previewUrl}
+                  aria-label={copy.openMedia}
+                >
                   {previewUrl ? (
                     <img src={previewUrl} alt="" />
                   ) : (
                     <span>{item.is_archived ? copy.archived : copy.noPreview}</span>
                   )}
-                </div>
+                </button>
 
                 <div className="history-card-body">
                   <div className="history-card-topline">
@@ -242,6 +255,18 @@ export default function HistoryPage({ lang = "ru" }) {
           })}
         </div>
       )}
+
+      {openPreview?.url ? (
+        <div className="history-preview-viewer" role="dialog" aria-modal="true" onClick={() => setOpenPreview(null)}>
+          <div className="history-preview-panel" onClick={(event) => event.stopPropagation()}>
+            <div className="history-preview-head">
+              <strong>{openPreview.title}</strong>
+              <button type="button" onClick={() => setOpenPreview(null)}>{copy.close}</button>
+            </div>
+            <img src={openPreview.url} alt="" />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

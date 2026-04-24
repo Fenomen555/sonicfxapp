@@ -287,6 +287,45 @@ MACD:
   "expiration_minutes": 0,
   "comment": "string до 20 слов"
 }"""
+SCANNER_CONFIRMATION_PROMPT = """Ты выполняешь второй этап валидации торгового сигнала.
+
+На входе:
+1. Исходный анализ скриншота графика.
+2. Свежие рыночные данные по уже определенным активу и рынку.
+
+Задача:
+- подтвердить сигнал,
+- ослабить его,
+- либо отменить и поставить NO TRADE.
+
+Правила:
+- не выдумывай новые данные,
+- не меняй актив без явной причины,
+- если актив уже определен, используй его как основной,
+- если рыночные данные противоречат сигналу или цена уже ушла слишком далеко, ставь NO TRADE,
+- если последние свечи подтверждают направление, можно сохранить сигнал,
+- если последние свечи ослабляют сценарий, снижай уверенность,
+- экспирацию подбирай по актуальному состоянию рынка,
+- комментарий короткий, до 20 слов,
+- если данных недостаточно для подтверждения, лучше NO TRADE.
+
+Учитывай:
+- текущую цену,
+- изменение,
+- свежие свечи,
+- рыночный шум, особенно в OTC,
+- исходный режим анализа: АГРЕССИВНЫЙ / АДАПТИВНЫЙ / МИНИМАЛЬНЫЙ.
+
+Верни только строгий JSON без markdown и без пояснений по схеме:
+{
+  "status": "ok" | "graph_not_found",
+  "asset": "string",
+  "market_mode": "OTC" | "MARKET" | "UNKNOWN",
+  "signal": "BUY" | "SELL" | "NO TRADE",
+  "confidence": 0,
+  "expiration_minutes": 0,
+  "comment": "string до 20 слов"
+}"""
 VALID_NEWS_FEEDS = {"economic", "market"}
 NEWS_GENERAL_CATEGORY = "general"
 NEWS_NOTIFICATION_LEAD_OPTIONS = (5, 15, 30, 60)
@@ -1166,6 +1205,153 @@ def _sanitize_scanner_analysis_result(payload: Dict[str, Any]) -> Dict[str, Any]
     return sanitized
 
 
+def _build_scanner_response_schema(name: str = "scanner_signal") -> Dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": name,
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "status": {"type": "string", "enum": ["ok", "graph_not_found"]},
+                    "asset": {"type": "string"},
+                    "market_mode": {"type": "string", "enum": ["OTC", "MARKET", "UNKNOWN"]},
+                    "signal": {"type": "string", "enum": ["BUY", "SELL", "NO TRADE"]},
+                    "confidence": {"type": "integer", "minimum": 0, "maximum": 85},
+                    "expiration_minutes": {"type": "integer", "minimum": 0, "maximum": 5},
+                    "comment": {"type": "string"},
+                },
+                "required": ["status", "asset", "market_mode", "signal", "confidence", "expiration_minutes", "comment"],
+            },
+        },
+    }
+
+
+async def _request_scanner_openai_json(
+    *,
+    api_key: str,
+    model: str,
+    system_prompt: str,
+    user_content: List[Dict[str, Any]],
+    schema_name: str,
+) -> Dict[str, Any]:
+    request_payload = {
+        "model": model,
+        "temperature": 0.2,
+        "response_format": _build_scanner_response_schema(schema_name),
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    url = f"{OPENAI_API_BASE_URL}/chat/completions"
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(45.0, connect=10.0)) as client:
+            response = await client.post(url, headers=headers, json=request_payload)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = ""
+        try:
+            detail = exc.response.json().get("error", {}).get("message", "")
+        except Exception:
+            detail = exc.response.text.strip() if exc.response is not None else ""
+        raise HTTPException(status_code=502, detail=detail or "OpenAI request failed") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="OpenAI request failed") from exc
+
+    raw_content = ""
+    try:
+        content = payload["choices"][0]["message"]["content"]
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="OpenAI response is invalid") from exc
+    if isinstance(content, list):
+        parts: List[str] = []
+        for item in content:
+            if isinstance(item, dict) and item.get("type") == "text":
+                parts.append(str(item.get("text") or ""))
+        raw_content = "".join(parts).strip()
+    else:
+        raw_content = str(content or "").strip()
+    if not raw_content:
+        raise HTTPException(status_code=502, detail="OpenAI response is empty")
+
+    try:
+        parsed_result = json.loads(raw_content)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=502, detail="OpenAI response is not JSON") from exc
+    if not isinstance(parsed_result, dict):
+        raise HTTPException(status_code=502, detail="OpenAI response is invalid")
+    return parsed_result
+
+
+def _compact_quote_snapshot_for_prompt(payload: Any, candle_limit: int = 36) -> Optional[Dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return None
+
+    compact: Dict[str, Any] = {
+        "category": payload.get("category"),
+        "requested_symbol": payload.get("requested_symbol"),
+        "resolved_symbol": payload.get("resolved_symbol"),
+        "price": payload.get("price"),
+        "change": payload.get("change"),
+        "last_updated": payload.get("last_updated"),
+        "seconds_since_change": payload.get("seconds_since_change"),
+        "market_status": payload.get("market_status"),
+        "source": payload.get("source"),
+    }
+
+    candles = payload.get("candles")
+    compact_candles: List[Dict[str, Any]] = []
+    if isinstance(candles, list):
+        for candle in candles[-max(int(candle_limit), 1):]:
+            if not isinstance(candle, dict):
+                continue
+            compact_candles.append(
+                {
+                    "ts": candle.get("ts"),
+                    "open": candle.get("open"),
+                    "high": candle.get("high"),
+                    "low": candle.get("low"),
+                    "close": candle.get("close"),
+                }
+            )
+    compact["candles"] = compact_candles
+    return compact
+
+
+def _merge_scanner_confirmation_result(
+    initial_result: Dict[str, Any],
+    confirmed_result: Dict[str, Any],
+) -> Dict[str, Any]:
+    if (confirmed_result.get("status") or "") != "ok":
+        return initial_result
+
+    merged = dict(initial_result)
+    confirmed_asset = str(confirmed_result.get("asset") or "").strip()
+    confirmed_market_mode = str(confirmed_result.get("market_mode") or "").strip().upper()
+
+    if confirmed_asset and confirmed_asset != "не определен":
+        merged["asset"] = confirmed_asset
+    if confirmed_market_mode in {"OTC", "MARKET"}:
+        merged["market_mode"] = confirmed_market_mode
+
+    merged["signal"] = confirmed_result.get("signal") or initial_result.get("signal") or "NO TRADE"
+    merged["confidence"] = int(confirmed_result.get("confidence") or initial_result.get("confidence") or 0)
+    merged["expiration_minutes"] = int(
+        confirmed_result.get("expiration_minutes") or initial_result.get("expiration_minutes") or 0
+    )
+    merged["comment"] = str(confirmed_result.get("comment") or initial_result.get("comment") or "").strip()
+    merged["status"] = "ok"
+    return _sanitize_scanner_analysis_result(merged)
+
+
 async def get_scanner_settings_payload() -> Dict[str, Any]:
     analysis_mode = _normalize_scanner_analysis_mode(
         await get_app_setting("scanner_analysis_mode", DEFAULT_SCANNER_ANALYSIS_MODE)
@@ -1315,6 +1501,39 @@ async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
     return _extract_quote_price(history_payload)
 
 
+async def _fetch_quote_snapshot(category: str, symbol: str) -> Optional[Dict[str, Any]]:
+    if not DEVSBITE_CLIENT_TOKEN:
+        return None
+
+    normalized_category = normalize_quote_category(category)
+    normalized_symbol = normalize_quote_symbol(symbol)
+    url = f"{DEVSBITE_API_BASE_URL}/quotes/price"
+    headers = {
+        "accept": "application/json",
+        "X-Client-Token": DEVSBITE_CLIENT_TOKEN,
+        "Cache-Control": "no-cache",
+    }
+    params = {
+        "category": normalized_category,
+        "symbol": normalized_symbol,
+    }
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, params=params, timeout=10.0)
+            response.raise_for_status()
+            payload = response.json()
+    except Exception:
+        payload = None
+
+    if isinstance(payload, dict):
+        payload.setdefault("category", normalized_category)
+        payload.setdefault("requested_symbol", normalized_symbol)
+        return payload
+
+    return None
+
+
 async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int] = None) -> Dict[str, Any]:
     upload_row = await _load_scan_upload_for_analysis(user_id, upload_id)
     settings = await get_scanner_settings_payload()
@@ -1337,89 +1556,54 @@ async def run_scanner_analysis_for_upload(user_id: int, upload_id: Optional[int]
     image_base64 = base64.b64encode(image_bytes).decode("ascii")
     image_data_url = f"data:{content_type};base64,{image_base64}"
 
-    request_payload = {
-        "model": model,
-        "temperature": 0.2,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "scanner_signal",
-                "strict": True,
-                "schema": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "status": {"type": "string", "enum": ["ok", "graph_not_found"]},
-                        "asset": {"type": "string"},
-                        "market_mode": {"type": "string", "enum": ["OTC", "MARKET", "UNKNOWN"]},
-                        "signal": {"type": "string", "enum": ["BUY", "SELL", "NO TRADE"]},
-                        "confidence": {"type": "integer", "minimum": 0, "maximum": 85},
-                        "expiration_minutes": {"type": "integer", "minimum": 0, "maximum": 5},
-                        "comment": {"type": "string"},
-                    },
-                    "required": ["status", "asset", "market_mode", "signal", "confidence", "expiration_minutes", "comment"],
-                },
-            },
-        },
-        "messages": [
-            {"role": "system", "content": SCANNER_ANALYSIS_PROMPT},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": f"Режим анализа: {analysis_mode_label}"},
-                    {"type": "image_url", "image_url": {"url": image_data_url, "detail": "high"}},
-                ],
-            },
+    parsed_result = await _request_scanner_openai_json(
+        api_key=api_key,
+        model=model,
+        system_prompt=SCANNER_ANALYSIS_PROMPT,
+        user_content=[
+            {"type": "text", "text": f"Режим анализа: {analysis_mode_label}"},
+            {"type": "image_url", "image_url": {"url": image_data_url, "detail": "high"}},
         ],
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
-    url = f"{OPENAI_API_BASE_URL}/chat/completions"
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(45.0, connect=10.0)) as client:
-            response = await client.post(url, headers=headers, json=request_payload)
-            response.raise_for_status()
-            payload = response.json()
-    except httpx.HTTPStatusError as exc:
-        detail = ""
-        try:
-            detail = exc.response.json().get("error", {}).get("message", "")
-        except Exception:
-            detail = exc.response.text.strip() if exc.response is not None else ""
-        raise HTTPException(status_code=502, detail=detail or "OpenAI request failed") from exc
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="OpenAI request failed") from exc
-
-    raw_content = ""
-    try:
-        content = payload["choices"][0]["message"]["content"]
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="OpenAI response is invalid") from exc
-    if isinstance(content, list):
-        parts: List[str] = []
-        for item in content:
-            if isinstance(item, dict) and item.get("type") == "text":
-                parts.append(str(item.get("text") or ""))
-        raw_content = "".join(parts).strip()
-    else:
-        raw_content = str(content or "").strip()
-    if not raw_content:
-        raise HTTPException(status_code=502, detail="OpenAI response is empty")
-
-    try:
-        parsed_result = json.loads(raw_content)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=502, detail="OpenAI response is not JSON") from exc
-
-    sanitized = _sanitize_scanner_analysis_result(parsed_result if isinstance(parsed_result, dict) else {})
+        schema_name="scanner_signal_initial",
+    )
+    sanitized = _sanitize_scanner_analysis_result(parsed_result)
     price_request = _resolve_scanner_price_request(sanitized.get("asset"), sanitized.get("market_mode"))
     if sanitized.get("status") == "ok" and price_request:
-        entry_price = await _fetch_quote_price(price_request["category"], price_request["symbol"])
+        quote_snapshot = await _fetch_quote_snapshot(price_request["category"], price_request["symbol"])
+        entry_price = _extract_quote_price(quote_snapshot)
+        if entry_price is None:
+            entry_price = await _fetch_quote_price(price_request["category"], price_request["symbol"])
         if entry_price is not None:
             sanitized["entry_price"] = entry_price
-            sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
+        if quote_snapshot:
+            compact_snapshot = _compact_quote_snapshot_for_prompt(quote_snapshot)
+            if compact_snapshot:
+                try:
+                    confirmation_result = await _request_scanner_openai_json(
+                        api_key=api_key,
+                        model=model,
+                        system_prompt=SCANNER_CONFIRMATION_PROMPT,
+                        user_content=[
+                            {
+                                "type": "text",
+                                "text": (
+                                    f"Режим анализа: {analysis_mode_label}\n\n"
+                                    f"Исходный анализ:\n{_build_scanner_analysis_text(sanitized)}\n\n"
+                                    f"Свежие рыночные данные:\n{json.dumps(compact_snapshot, ensure_ascii=False)}"
+                                ),
+                            }
+                        ],
+                        schema_name="scanner_signal_confirmation",
+                    )
+                    sanitized = _merge_scanner_confirmation_result(
+                        sanitized,
+                        _sanitize_scanner_analysis_result(confirmation_result),
+                    )
+                    if entry_price is not None:
+                        sanitized["entry_price"] = entry_price
+                except HTTPException:
+                    pass
+        sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
     return {
         "result": sanitized,
         "mode": analysis_mode,

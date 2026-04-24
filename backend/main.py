@@ -4326,22 +4326,33 @@ async def shutdown_database() -> None:
         db_pool = None
 
 
+async def run_api_warmup_once() -> None:
+    warmup_jobs = (
+        ("market pairs", sync_market_pairs_once),
+        ("news", sync_news_once),
+        ("scan archive", archive_expired_scan_uploads_once),
+    )
+    for label, job in warmup_jobs:
+        try:
+            await job()
+        except Exception as exc:
+            print(f"[Warmup] {label} failed: {exc}")
+
+
 async def main(mode: str = "all"):
     await bootstrap_database()
-    try:
-        if mode in {"all", "api"}:
+    if mode in {"all", "api"}:
+        try:
             await quotes_hub.start()
-            await sync_market_pairs_once()
-            await sync_news_once()
-            await archive_expired_scan_uploads_once()
-    except Exception:
-        pass
+        except Exception as exc:
+            print(f"[QuotesHub] start failed: {exc}")
     try:
         tasks = []
         if mode in {"all", "bot"}:
             tasks.append(start_bot())
         if mode in {"all", "api"}:
             tasks.append(start_api())
+            tasks.append(run_api_warmup_once())
             tasks.append(market_pairs_sync_loop())
             tasks.append(news_sync_loop())
             tasks.append(scan_upload_archive_loop())

@@ -2013,7 +2013,7 @@ async def _fetch_expiration_options() -> List[Dict[str, Any]]:
         values = []
     parsed_raw = ",".join(str(item) for item in values)
     parsed = parse_expiration_options(parsed_raw)
-    return _merge_expiration_options(parsed, defaults)
+    return _merge_expiration_options(defaults, parsed)
 
 
 async def _fetch_quote_history(category: str, symbol: str, history_seconds: int) -> Dict[str, Any]:

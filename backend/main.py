@@ -1334,6 +1334,16 @@ def _merge_scanner_confirmation_result(
         return initial_result
 
     merged = dict(initial_result)
+    initial_signal = str(initial_result.get("signal") or "NO TRADE").strip().upper()
+    confirmed_signal = str(confirmed_result.get("signal") or initial_signal or "NO TRADE").strip().upper()
+    try:
+        initial_confidence = int(initial_result.get("confidence") or 0)
+    except (TypeError, ValueError):
+        initial_confidence = 0
+    try:
+        confirmed_confidence = int(confirmed_result.get("confidence") or initial_confidence or 0)
+    except (TypeError, ValueError):
+        confirmed_confidence = initial_confidence
     confirmed_asset = str(confirmed_result.get("asset") or "").strip()
     confirmed_market_mode = str(confirmed_result.get("market_mode") or "").strip().upper()
 
@@ -1342,8 +1352,23 @@ def _merge_scanner_confirmation_result(
     if confirmed_market_mode in {"OTC", "MARKET"}:
         merged["market_mode"] = confirmed_market_mode
 
-    merged["signal"] = confirmed_result.get("signal") or initial_result.get("signal") or "NO TRADE"
-    merged["confidence"] = int(confirmed_result.get("confidence") or initial_result.get("confidence") or 0)
+    merged["signal"] = confirmed_signal
+    if initial_signal == confirmed_signal and confirmed_signal in {"BUY", "SELL"}:
+        confidence_delta = confirmed_confidence - initial_confidence
+        if confidence_delta < 0:
+            merged_confidence = initial_confidence + max(int(round(confidence_delta * 0.35)), -8)
+        elif confidence_delta > 0:
+            merged_confidence = initial_confidence + min(int(round(confidence_delta * 0.25)), 5)
+        else:
+            merged_confidence = initial_confidence
+        merged["confidence"] = min(max(merged_confidence, 50), 85)
+    elif confirmed_signal == "NO TRADE":
+        merged["confidence"] = confirmed_confidence
+    elif initial_signal == "NO TRADE" and confirmed_signal in {"BUY", "SELL"}:
+        merged["confidence"] = confirmed_confidence
+    else:
+        merged["signal"] = "NO TRADE"
+        merged["confidence"] = min(max(min(initial_confidence, confirmed_confidence), 45), 55)
     merged["expiration_minutes"] = int(
         confirmed_result.get("expiration_minutes") or initial_result.get("expiration_minutes") or 0
     )

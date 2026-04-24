@@ -47,14 +47,24 @@ async def _ensure_column(conn, db_name: str, table_name: str, column_name: str, 
     if await _column_exists(conn, db_name, table_name, column_name):
         return
     async with conn.cursor() as cur:
-        await cur.execute(alter_sql)
+        try:
+            await cur.execute(alter_sql)
+        except Exception as exc:
+            if getattr(exc, "args", [None])[0] == 1060:
+                return
+            raise
 
 
 async def _ensure_index(conn, db_name: str, table_name: str, index_name: str, create_sql: str) -> None:
     if await _index_exists(conn, db_name, table_name, index_name):
         return
     async with conn.cursor() as cur:
-        await cur.execute(create_sql)
+        try:
+            await cur.execute(create_sql)
+        except Exception as exc:
+            if getattr(exc, "args", [None])[0] == 1061:
+                return
+            raise
 
 
 def _normalize_lang(value: str) -> str:

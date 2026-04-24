@@ -4312,10 +4312,11 @@ async def start_api():
     await server.serve()
 
 
-async def bootstrap_database() -> None:
+async def bootstrap_database(*, ensure_schema: bool = True) -> None:
     global db_pool
     db_pool = await aiomysql.create_pool(**DB_CONFIG)
-    await ensure_database_schema(db_pool)
+    if ensure_schema:
+        await ensure_database_schema(db_pool)
 
 
 async def shutdown_database() -> None:
@@ -4327,6 +4328,11 @@ async def shutdown_database() -> None:
 
 
 async def run_api_warmup_once() -> None:
+    if db_pool is not None:
+        try:
+            await ensure_database_schema(db_pool)
+        except Exception as exc:
+            print(f"[Warmup] schema failed: {exc}")
     warmup_jobs = (
         ("market pairs", sync_market_pairs_once),
         ("news", sync_news_once),
@@ -4340,7 +4346,7 @@ async def run_api_warmup_once() -> None:
 
 
 async def main(mode: str = "all"):
-    await bootstrap_database()
+    await bootstrap_database(ensure_schema=mode not in {"api", "all"})
     if mode in {"all", "api"}:
         try:
             await quotes_hub.start()

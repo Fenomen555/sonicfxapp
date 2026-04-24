@@ -7,6 +7,7 @@ import { apiAdminFetchJson, apiFetchJson, isAdminRoute, isTelegramWebAppAvailabl
 import { getDeviceProfile } from "./lib/device";
 import { initTelegramApp } from "./lib/tgSetup";
 import { texts } from "./locales/texts";
+import HistoryPage from "./pages/HistoryPage";
 import HomePage from "./pages/HomePage";
 import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
@@ -319,6 +320,7 @@ export default function App() {
           <>
             {tab === "news" && <NewsPage t={t} lang={lang} timezone={user.timezone || FALLBACK_USER.timezone} />}
             {tab === "home" && <HomePage t={t} notify={notify} featureFlags={user.feature_flags || FALLBACK_USER.feature_flags} />}
+            {tab === "history" && <HistoryPage lang={lang} onBack={() => setTab("profile")} />}
             {tab === "profile" && (
               <ProfilePage
                 t={t}
@@ -328,6 +330,7 @@ export default function App() {
                 onThemePreview={(theme) => setUser((prev) => ({ ...prev, theme: normalizeTheme(theme) }))}
                 onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: normalizeLang(nextLang) }))}
                 onOpenOnboarding={openOnboardingFromProfile}
+                onOpenHistory={() => setTab("history")}
               />
             )}
           </>

@@ -7,6 +7,7 @@ import "./styles/onboarding.css";
 import "./styles/home.css";
 import "./styles/profile.css";
 import "./styles/news.css";
+import "./styles/history.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>

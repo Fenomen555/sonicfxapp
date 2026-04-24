@@ -1754,6 +1754,11 @@ def _normalize_selected_expiration(value: Optional[str]) -> str:
     return str(value or "").strip()[:16]
 
 
+def _is_analysis_history_schema_error(exc: Exception) -> bool:
+    error_code = getattr(exc, "args", [None])[0]
+    return error_code in {1054, 1146}
+
+
 def _serialize_analysis_history(row: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not row:
         return None
@@ -1812,45 +1817,55 @@ async def _record_analysis_history(
     except (TypeError, ValueError):
         expiration_minutes = 0
 
-    pool = await require_db_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(
-                """
-                INSERT INTO analysis_history (
-                    user_id, source_type, upload_id, analysis_mode, signal, asset,
-                    market_mode, entry_price, confidence, expiration_minutes,
-                    selected_expiration, comment, result_json
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    int(user_id),
-                    (source_type or "scanner")[:16],
-                    int(upload_id) if upload_id else None,
-                    (analysis_mode or "")[:16],
-                    str(result.get("signal") or "NO TRADE")[:16],
-                    str(result.get("asset") or "не определен")[:128],
-                    str(result.get("market_mode") or "MARKET")[:16],
-                    entry_price,
-                    confidence,
-                    expiration_minutes,
-                    _normalize_selected_expiration(selected_expiration),
-                    str(result.get("comment") or "")[:2000],
-                    json.dumps(result, ensure_ascii=False),
-                ),
-            )
-            history_id = int(cur.lastrowid or 0)
-            await cur.execute(
-                """
-                SELECT ah.*, su.archived_at AS upload_archived_at
-                FROM analysis_history ah
-                LEFT JOIN scan_uploads su ON su.id = ah.upload_id
-                WHERE ah.id = %s
-                LIMIT 1
-                """,
-                (history_id,),
-            )
-            row = await cur.fetchone()
+    async def insert_history() -> Optional[Dict[str, Any]]:
+        pool = await require_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO analysis_history (
+                        user_id, source_type, upload_id, analysis_mode, signal, asset,
+                        market_mode, entry_price, confidence, expiration_minutes,
+                        selected_expiration, comment, result_json
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        int(user_id),
+                        (source_type or "scanner")[:16],
+                        int(upload_id) if upload_id else None,
+                        (analysis_mode or "")[:16],
+                        str(result.get("signal") or "NO TRADE")[:16],
+                        str(result.get("asset") or "не определен")[:128],
+                        str(result.get("market_mode") or "MARKET")[:16],
+                        entry_price,
+                        confidence,
+                        expiration_minutes,
+                        _normalize_selected_expiration(selected_expiration),
+                        str(result.get("comment") or "")[:2000],
+                        json.dumps(result, ensure_ascii=False),
+                    ),
+                )
+                history_id = int(cur.lastrowid or 0)
+                await cur.execute(
+                    """
+                    SELECT ah.*, su.archived_at AS upload_archived_at
+                    FROM analysis_history ah
+                    LEFT JOIN scan_uploads su ON su.id = ah.upload_id
+                    WHERE ah.id = %s
+                    LIMIT 1
+                    """,
+                    (history_id,),
+                )
+                return await cur.fetchone()
+
+    try:
+        row = await insert_history()
+    except Exception as exc:
+        if not _is_analysis_history_schema_error(exc):
+            raise
+        pool = await require_db_pool()
+        await ensure_database_schema(pool)
+        row = await insert_history()
     return _serialize_analysis_history(row)
 
 
@@ -2805,21 +2820,32 @@ async def get_analysis_history(
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
-    pool = await require_db_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor(aiomysql.DictCursor) as cur:
-            await cur.execute(
-                """
-                SELECT ah.*, su.archived_at AS upload_archived_at
-                FROM analysis_history ah
-                LEFT JOIN scan_uploads su ON su.id = ah.upload_id
-                WHERE ah.user_id = %s
-                ORDER BY ah.created_at DESC, ah.id DESC
-                LIMIT %s
-                """,
-                (user_id, int(limit)),
-            )
-            rows = await cur.fetchall()
+
+    async def fetch_rows() -> List[Dict[str, Any]]:
+        pool = await require_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor(aiomysql.DictCursor) as cur:
+                await cur.execute(
+                    """
+                    SELECT ah.*, su.archived_at AS upload_archived_at
+                    FROM analysis_history ah
+                    LEFT JOIN scan_uploads su ON su.id = ah.upload_id
+                    WHERE ah.user_id = %s
+                    ORDER BY ah.created_at DESC, ah.id DESC
+                    LIMIT %s
+                    """,
+                    (user_id, int(limit)),
+                )
+                return await cur.fetchall()
+
+    try:
+        rows = await fetch_rows()
+    except Exception as exc:
+        if not _is_analysis_history_schema_error(exc):
+            raise
+        pool = await require_db_pool()
+        await ensure_database_schema(pool)
+        rows = await fetch_rows()
     return {"items": [_serialize_analysis_history(row) for row in rows if row]}
 
 

@@ -195,7 +195,7 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
 
   const canvas = document.createElement("canvas");
   canvas.width = 960;
-  canvas.height = 540;
+  canvas.height = 320;
   const ctx = canvas.getContext("2d");
   if (!ctx) return "";
 
@@ -207,11 +207,11 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.fillStyle = "rgba(255,255,255,0.045)";
-  for (let x = 70; x < canvas.width; x += 96) {
-    ctx.fillRect(x, 96, 1, 360);
+  for (let x = 56; x < canvas.width - 34; x += 92) {
+    ctx.fillRect(x, 74, 1, 216);
   }
-  for (let y = 120; y <= 420; y += 60) {
-    ctx.fillRect(54, y, 852, 1);
+  for (let y = 86; y <= 270; y += 46) {
+    ctx.fillRect(40, y, 880, 1);
   }
 
   const highs = candles.map((item) => item.high);
@@ -222,17 +222,17 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
   const scaledMin = min - padding;
   const scaledMax = max + padding;
   const range = Math.max(scaledMax - scaledMin, 0.000001);
-  const plot = { left: 74, top: 104, width: 812, height: 328 };
+  const plot = { left: 48, top: 72, width: 872, height: 218 };
   const yOf = (value) => plot.top + (1 - ((value - scaledMin) / range)) * plot.height;
   const step = plot.width / Math.max(candles.length, 1);
-  const bodyWidth = Math.min(Math.max(step * 0.56, 6), 18);
+  const bodyWidth = Math.min(Math.max(step * 0.58, 6), 20);
 
-  ctx.font = "700 24px Arial";
+  ctx.font = "800 22px Arial";
   ctx.fillStyle = "#f4f7ff";
-  ctx.fillText(String(symbol || "Live chart"), 54, 56);
-  ctx.font = "700 16px Arial";
+  ctx.fillText(String(symbol || "Live chart"), 44, 36);
+  ctx.font = "800 14px Arial";
   ctx.fillStyle = "#9ed7ff";
-  ctx.fillText(String(marketLabel || "LIVE").toUpperCase(), 54, 84);
+  ctx.fillText(String(marketLabel || "LIVE").toUpperCase(), 44, 57);
 
   const lastClose = candles[candles.length - 1]?.close;
   if (Number.isFinite(lastClose)) {
@@ -249,7 +249,7 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
     const label = formatAnalysisPrice(lastClose);
     const metrics = ctx.measureText(label);
     const tagW = metrics.width + 28;
-    const tagH = 34;
+    const tagH = 32;
     const tagX = plot.left + plot.width - tagW;
     const tagY = Math.max(plot.top + 4, Math.min(priceY - tagH / 2, plot.top + plot.height - tagH - 4));
     ctx.beginPath();
@@ -261,8 +261,8 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = "#f7fbff";
-    ctx.font = "800 17px Arial";
-    ctx.fillText(label, tagX + 14, tagY + 23);
+    ctx.font = "800 16px Arial";
+    ctx.fillText(label, tagX + 14, tagY + 22);
   }
 
   candles.forEach((item, index) => {
@@ -274,7 +274,7 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
     const bullish = item.close >= item.open;
     ctx.strokeStyle = bullish ? "#62e56f" : "#ff6c5d";
     ctx.fillStyle = bullish ? "#57d955" : "#ff543f";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.6;
     ctx.beginPath();
     ctx.moveTo(x, highY);
     ctx.lineTo(x, lowY);

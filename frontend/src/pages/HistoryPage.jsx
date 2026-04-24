@@ -44,8 +44,8 @@ function getSignalTone(signal) {
 function getHistoryCopy(lang) {
   const ru = {
     title: "История анализов",
-    subtitle: "Последние 20 сделок по Scanner и Live",
-    back: "Назад",
+    subtitle: "Последние 20 анализов",
+    lead: "Scanner и Live сохраняются здесь после каждого анализа.",
     loading: "Загружаем историю...",
     error: "Не удалось загрузить историю",
     retry: "Повторить",
@@ -55,6 +55,7 @@ function getHistoryCopy(lang) {
     noPreview: "Превью недоступно",
     scanner: "Scanner",
     auto: "Live",
+    total: "Всего",
     price: "Цена",
     confidence: "Уверенность",
     expiration: "Экспирация",
@@ -64,8 +65,8 @@ function getHistoryCopy(lang) {
     return {
       ...ru,
       title: "Analysis History",
-      subtitle: "Last 20 Scanner and Live trades",
-      back: "Back",
+      subtitle: "Last 20 analyses",
+      lead: "Scanner and Live results are saved here after every analysis.",
       loading: "Loading history...",
       error: "Could not load history",
       retry: "Retry",
@@ -73,6 +74,7 @@ function getHistoryCopy(lang) {
       emptyHint: "Run screenshot or live chart analysis and it will appear here.",
       archived: "File archived",
       noPreview: "Preview unavailable",
+      total: "Total",
       price: "Price",
       confidence: "Confidence",
       expiration: "Expiration",
@@ -83,8 +85,8 @@ function getHistoryCopy(lang) {
     return {
       ...ru,
       title: "Історія аналізів",
-      subtitle: "Останні 20 угод Scanner і Live",
-      back: "Назад",
+      subtitle: "Останні 20 аналізів",
+      lead: "Scanner і Live зберігаються тут після кожного аналізу.",
       loading: "Завантажуємо історію...",
       error: "Не вдалося завантажити історію",
       retry: "Повторити",
@@ -92,6 +94,7 @@ function getHistoryCopy(lang) {
       emptyHint: "Запустіть аналіз скрина або live-графіка, і запис з'явиться тут.",
       archived: "Файл уже в архіві",
       noPreview: "Прев'ю недоступне",
+      total: "Усього",
       price: "Ціна",
       confidence: "Впевненість",
       expiration: "Експірація",
@@ -101,12 +104,17 @@ function getHistoryCopy(lang) {
   return ru;
 }
 
-export default function HistoryPage({ lang = "ru", onBack }) {
+export default function HistoryPage({ lang = "ru" }) {
   const copy = useMemo(() => getHistoryCopy(lang), [lang]);
   const [items, setItems] = useState([]);
   const [status, setStatus] = useState("loading");
   const [previewUrls, setPreviewUrls] = useState({});
   const [reloadKey, setReloadKey] = useState(0);
+  const summary = useMemo(() => {
+    const scanner = items.filter((item) => item?.source_type !== "auto").length;
+    const live = items.filter((item) => item?.source_type === "auto").length;
+    return { total: items.length, scanner, live };
+  }, [items]);
 
   useEffect(() => {
     let isActive = true;
@@ -159,11 +167,14 @@ export default function HistoryPage({ lang = "ru", onBack }) {
   return (
     <section className="page page-history page-history-ref">
       <div className="history-page-head">
-        <button type="button" className="history-back-btn" onClick={onBack}>
-          {copy.back}
-        </button>
         <span className="history-kicker">{copy.title}</span>
         <h1>{copy.subtitle}</h1>
+        <p>{copy.lead}</p>
+        <div className="history-summary-strip" aria-label={copy.title}>
+          <span><b>{summary.total}</b>{copy.total}</span>
+          <span><b>{summary.scanner}</b>{copy.scanner}</span>
+          <span><b>{summary.live}</b>{copy.auto}</span>
+        </div>
       </div>
 
       {status === "loading" && (

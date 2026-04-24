@@ -320,7 +320,7 @@ export default function App() {
           <>
             {tab === "news" && <NewsPage t={t} lang={lang} timezone={user.timezone || FALLBACK_USER.timezone} />}
             {tab === "home" && <HomePage t={t} notify={notify} featureFlags={user.feature_flags || FALLBACK_USER.feature_flags} />}
-            {tab === "history" && <HistoryPage lang={lang} onBack={() => setTab("profile")} />}
+            {tab === "history" && <HistoryPage lang={lang} />}
             {tab === "profile" && (
               <ProfilePage
                 t={t}

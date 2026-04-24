@@ -1,28 +1,15 @@
 .page-history-ref {
   display: grid;
-  gap: 14px;
+  gap: 16px;
   padding-bottom: calc(110px + var(--tg-content-safe-area-inset-bottom, env(safe-area-inset-bottom)));
 }
 
 .history-page-head {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 9px;
   text-align: center;
-  padding-top: 2px;
-}
-
-.history-back-btn {
-  justify-self: start;
-  min-height: 34px;
-  padding: 0 14px;
-  border: 1px solid rgba(86, 105, 137, 0.5);
-  border-radius: 999px;
-  background: rgba(9, 15, 24, 0.54);
-  color: #dce8ff;
-  font-size: 12px;
-  font-weight: 900;
-  cursor: pointer;
+  padding: 4px 4px 0;
 }
 
 .history-kicker {
@@ -43,13 +30,52 @@
 .history-page-head h1 {
   margin: 0;
   color: var(--text-main);
-  font-size: clamp(22px, 6vw, 30px);
+  max-width: 360px;
+  font-size: clamp(24px, 6vw, 32px);
   line-height: 1.05;
   letter-spacing: -0.05em;
 }
 
+.history-page-head p {
+  margin: 0;
+  max-width: 330px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.38;
+}
+
+.history-summary-strip {
+  width: min(100%, 430px);
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 3px;
+}
+
+.history-summary-strip span {
+  border: 1px solid rgba(83, 103, 136, 0.3);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top, rgba(143, 184, 255, 0.14), transparent 55%),
+    rgba(10, 16, 26, 0.72);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.history-summary-strip b {
+  color: var(--text-main);
+  font-size: 18px;
+  line-height: 1;
+}
+
 .history-state-card {
-  min-height: 170px;
+  min-height: 188px;
   border: 1px dashed rgba(143, 184, 255, 0.24);
   border-radius: 26px;
   background:
@@ -113,7 +139,7 @@
 }
 
 .history-card-media {
-  height: 168px;
+  height: 148px;
   margin: 12px 12px 0;
   border: 1px solid rgba(83, 103, 136, 0.3);
   border-radius: 20px;
@@ -229,7 +255,6 @@
   font-style: normal;
 }
 
-:root[data-theme="light"] .history-back-btn,
 :root[data-theme="light"] .history-state-card button {
   border-color: rgba(101, 125, 165, 0.22);
   background: rgba(236, 242, 252, 0.82);
@@ -246,6 +271,7 @@
 
 :root[data-theme="light"] .history-state-card,
 :root[data-theme="light"] .history-card,
+:root[data-theme="light"] .history-summary-strip span,
 :root[data-theme="light"] .history-card-stats span {
   border-color: rgba(119, 102, 78, 0.15);
   background:
@@ -283,6 +309,23 @@
 }
 
 @media (max-width: 640px) {
+  .page-history-ref {
+    gap: 14px;
+  }
+
+  .history-page-head {
+    gap: 8px;
+  }
+
+  .history-page-head h1 {
+    max-width: 330px;
+  }
+
+  .history-summary-strip {
+    min-height: 54px;
+    gap: 7px;
+  }
+
   .history-card-media {
     height: 132px;
     margin: 10px 10px 0;

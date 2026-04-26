@@ -190,27 +190,27 @@ function getRenderableCandles(payload, limit = 64) {
 }
 
 function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
-  const candles = getRenderableCandles(payload, 72);
+  const candles = getRenderableCandles(payload, 48);
   if (!candles.length) return "";
 
   const canvas = document.createElement("canvas");
   canvas.width = 960;
-  canvas.height = 320;
+  canvas.height = 540;
   const ctx = canvas.getContext("2d");
   if (!ctx) return "";
 
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, "#17243a");
-  gradient.addColorStop(0.58, "#0d1422");
-  gradient.addColorStop(1, "#090e18");
+  gradient.addColorStop(0, "#162238");
+  gradient.addColorStop(0.56, "#0c1422");
+  gradient.addColorStop(1, "#070d16");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = "rgba(255,255,255,0.045)";
+  ctx.fillStyle = "rgba(255,255,255,0.035)";
   for (let x = 56; x < canvas.width - 34; x += 92) {
-    ctx.fillRect(x, 74, 1, 216);
+    ctx.fillRect(x, 96, 1, 390);
   }
-  for (let y = 86; y <= 270; y += 46) {
+  for (let y = 112; y <= 466; y += 72) {
     ctx.fillRect(40, y, 880, 1);
   }
 
@@ -218,21 +218,21 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
   const lows = candles.map((item) => item.low);
   const min = Math.min(...lows);
   const max = Math.max(...highs);
-  const padding = Math.max((max - min) * 0.12, 0.000001);
+  const padding = Math.max((max - min) * 0.035, 0.000001);
   const scaledMin = min - padding;
   const scaledMax = max + padding;
   const range = Math.max(scaledMax - scaledMin, 0.000001);
-  const plot = { left: 48, top: 72, width: 872, height: 218 };
+  const plot = { left: 44, top: 94, width: 872, height: 392 };
   const yOf = (value) => plot.top + (1 - ((value - scaledMin) / range)) * plot.height;
   const step = plot.width / Math.max(candles.length, 1);
-  const bodyWidth = Math.min(Math.max(step * 0.58, 6), 20);
+  const bodyWidth = Math.min(Math.max(step * 0.58, 8), 34);
 
   ctx.font = "800 22px Arial";
   ctx.fillStyle = "#f4f7ff";
-  ctx.fillText(String(symbol || "Live chart"), 44, 36);
+  ctx.fillText(String(symbol || "Live chart"), 44, 42);
   ctx.font = "800 14px Arial";
   ctx.fillStyle = "#9ed7ff";
-  ctx.fillText(String(marketLabel || "LIVE").toUpperCase(), 44, 57);
+  ctx.fillText(String(marketLabel || "LIVE").toUpperCase(), 44, 64);
 
   candles.forEach((item, index) => {
     const x = plot.left + step * index + step / 2;
@@ -243,18 +243,18 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
     const bullish = item.close >= item.open;
     ctx.strokeStyle = bullish ? "#62e56f" : "#ff6c5d";
     ctx.fillStyle = bullish ? "#57d955" : "#ff543f";
-    ctx.lineWidth = 2.6;
+    ctx.lineWidth = 3.2;
     ctx.beginPath();
     ctx.moveTo(x, highY);
     ctx.lineTo(x, lowY);
     ctx.stroke();
     const bodyTop = Math.min(openY, closeY);
-    const bodyHeight = Math.max(Math.abs(closeY - openY), 5);
+    const bodyHeight = Math.max(Math.abs(closeY - openY), 6);
     ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
   });
 
-  ctx.strokeStyle = "rgba(128, 159, 216, 0.42)";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = "rgba(128, 159, 216, 0.28)";
+  ctx.lineWidth = 1.5;
   ctx.strokeRect(plot.left, plot.top, plot.width, plot.height);
   return canvas.toDataURL("image/png", 0.92);
 }

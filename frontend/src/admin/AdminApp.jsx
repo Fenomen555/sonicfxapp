@@ -270,6 +270,7 @@ export default function AdminApp({ authError }) {
   const [supportEditor, setSupportEditor] = useState(EMPTY_SUPPORT_SETTINGS);
   const [scannerSettings, setScannerSettings] = useState(EMPTY_SCANNER_SETTINGS);
   const [scannerEditor, setScannerEditor] = useState({ analysis_mode: "adaptive", api_key: "" });
+  const [scannerSettingsOpen, setScannerSettingsOpen] = useState(false);
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
   const [marketSavingKey, setMarketSavingKey] = useState("");
@@ -1015,111 +1016,131 @@ export default function AdminApp({ authError }) {
         )}
 
         {!loading && tab === "flags" && (
-          <section className="admin-control-grid admin-mode-control-grid">
-            {modeFlags.map((item) => {
-              const meta = getFlagMeta(item.key);
-              const enabled = item.is_enabled === 1;
-              const isScannerCard = item.key === "mode_scanner_enabled";
-              return (
-                <article
-                  className={`admin-card admin-control-card admin-mode-control-card ${enabled ? "is-enabled" : "is-disabled"} ${isScannerCard ? "has-scanner-settings" : ""}`}
-                  key={item.key}
-                >
-                  <div className="admin-control-head">
-                    <div className="admin-control-title-row">
-                      <strong>{meta.title}</strong>
+          <>
+            <section className="admin-control-grid admin-mode-control-grid">
+              {modeFlags.map((item) => {
+                const meta = getFlagMeta(item.key);
+                const enabled = item.is_enabled === 1;
+                const isScannerCard = item.key === "mode_scanner_enabled";
+                const scannerModeTitle = SCANNER_MODE_META[scannerEditor.analysis_mode]?.title || "Адаптивный";
+                return (
+                  <article
+                    className={`admin-card admin-control-card admin-mode-control-card ${enabled ? "is-enabled" : "is-disabled"}`}
+                    key={item.key}
+                  >
+                    <div className="admin-control-head">
+                      <div className="admin-control-title-row">
+                        <strong>{meta.title}</strong>
+                      </div>
+                      <button
+                        className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
+                        disabled={flagSavingKey === item.key}
+                        onClick={() => toggleFlag(item)}
+                        type="button"
+                        aria-pressed={enabled}
+                      >
+                        <span>{flagSavingKey === item.key ? "..." : enabled ? "Включено" : "Выключено"}</span>
+                        <i aria-hidden="true" />
+                      </button>
                     </div>
-                    <button
-                      className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
-                      disabled={flagSavingKey === item.key}
-                      onClick={() => toggleFlag(item)}
-                      type="button"
-                      aria-pressed={enabled}
-                    >
-                      <span>{flagSavingKey === item.key ? "..." : enabled ? "Включено" : "Выключено"}</span>
-                      <i aria-hidden="true" />
-                    </button>
+
+                    <p>{meta.description}</p>
+
+                    {isScannerCard && (
+                      <div className="admin-feature-summary">
+                        <span>GPT режим</span>
+                        <strong>{scannerModeTitle}</strong>
+                        <small>{scannerSettings.model || "gpt-4.1-mini"} · {compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}</small>
+                      </div>
+                    )}
+
+                    <div className="admin-control-footer">
+                      <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
+                        {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
+                      </span>
+                      <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
+                    </div>
+
+                    {isScannerCard && (
+                      <button
+                        className="admin-card-ghost-button"
+                        type="button"
+                        onClick={() => setScannerSettingsOpen((prev) => !prev)}
+                      >
+                        {scannerSettingsOpen ? "Скрыть настройки" : "Настроить GPT"}
+                      </button>
+                    )}
+                  </article>
+                );
+              })}
+            </section>
+
+            {scannerSettingsOpen && (
+              <section className="admin-card admin-scanner-settings-panel">
+                <div className="admin-scanner-panel-head">
+                  <div className="admin-scanner-panel-title">
+                    <span>GPT анализ скриншота</span>
+                    <strong>Настройки SonicFX Scanner</strong>
+                    <p>Выбери стиль анализа и обнови OpenAI ключ без перегруза карточек функций.</p>
                   </div>
-                  <p>{meta.description}</p>
-
-                  {isScannerCard && (
-                    <details className="admin-scanner-inline">
-                      <summary className="admin-scanner-inline-summary">
-                        <div className="admin-scanner-inline-copy">
-                          <strong>GPT анализ</strong>
-                          <span>{SCANNER_MODE_META[scannerEditor.analysis_mode]?.title || "Адаптивный"} · {scannerSettings.model || "gpt-4.1-mini"}</span>
-                        </div>
-                        <div className="admin-scanner-badge-row">
-                          <span className={`admin-badge ${scannerSettings.api_key_configured ? "tone-success" : "tone-neutral"}`}>
-                            {compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}
-                          </span>
-                        </div>
-                      </summary>
-
-                      <div className="admin-scanner-mode-grid">
-                        {(scannerSettings.mode_options || EMPTY_SCANNER_SETTINGS.mode_options).map((modeItem) => {
-                          const modeMeta = SCANNER_MODE_META[modeItem.key] || SCANNER_MODE_META.adaptive;
-                          const isActive = scannerEditor.analysis_mode === modeItem.key;
-                          return (
-                            <button
-                              key={modeItem.key}
-                              type="button"
-                              className={`admin-scanner-mode-card ${isActive ? "active" : ""}`}
-                              onClick={() => setScannerEditor((prev) => ({ ...prev, analysis_mode: modeItem.key }))}
-                            >
-                              <span className="admin-scanner-mode-top">
-                                {isActive ? <span className="admin-badge tone-success">Выбран</span> : null}
-                              </span>
-                              <strong>{modeMeta.title}</strong>
-                              <p>{modeMeta.description}</p>
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      <div className="admin-scanner-settings-grid">
-                        <label className="admin-field admin-field-wide">
-                          <span>OpenAI API key</span>
-                          <input
-                            className="admin-input"
-                            type="password"
-                            autoComplete="off"
-                            placeholder={scannerSettings.api_key_configured ? "Новый ключ или оставить пустым" : "sk-..."}
-                            value={scannerEditor.api_key}
-                            onChange={(e) => setScannerEditor((prev) => ({ ...prev, api_key: e.target.value }))}
-                          />
-                        </label>
-
-                        <div className="admin-card admin-scanner-key-panel">
-                          <span className="admin-kpi-label">Текущий ключ</span>
-                          <strong>{compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}</strong>
-                          <span className="admin-kpi-note">
-                            Пустое поле при сохранении оставит текущий ключ без изменений.
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="admin-scanner-save-row">
-                        <span className="admin-muted-text">
-                          Режим будет использоваться для всех новых запросов сканера в mini app.
-                        </span>
-                        <button className="admin-primary-button" type="button" disabled={scannerSaving} onClick={saveScannerSettings}>
-                          {scannerSaving ? "Сохраняем..." : "Сохранить сканер"}
-                        </button>
-                      </div>
-                    </details>
-                  )}
-
-                  <div className="admin-control-footer">
-                    <span className={`admin-badge ${enabled ? "tone-success" : "tone-neutral"}`}>
-                      {enabled ? "Отображается в mini app" : "Скрыт из mini app"}
+                  <div className="admin-scanner-panel-badges">
+                    <span className="admin-badge tone-accent">{scannerSettings.model || "gpt-4.1-mini"}</span>
+                    <span className={`admin-badge ${scannerSettings.api_key_configured ? "tone-success" : "tone-neutral"}`}>
+                      {compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}
                     </span>
-                    <span className="admin-muted-text">Изменено: {formatDateTime(item.updated_at)}</span>
                   </div>
-                </article>
-              );
-            })}
-          </section>
+                </div>
+
+                <div className="admin-scanner-mode-grid">
+                  {(scannerSettings.mode_options || EMPTY_SCANNER_SETTINGS.mode_options).map((modeItem) => {
+                    const modeMeta = SCANNER_MODE_META[modeItem.key] || SCANNER_MODE_META.adaptive;
+                    const isActive = scannerEditor.analysis_mode === modeItem.key;
+                    return (
+                      <button
+                        key={modeItem.key}
+                        type="button"
+                        className={`admin-scanner-mode-card ${isActive ? "active" : ""}`}
+                        onClick={() => setScannerEditor((prev) => ({ ...prev, analysis_mode: modeItem.key }))}
+                      >
+                        <span className="admin-scanner-mode-top">
+                          {isActive ? <span className="admin-badge tone-success">Выбран</span> : <span />}
+                        </span>
+                        <strong>{modeMeta.title}</strong>
+                        <p>{modeMeta.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="admin-scanner-settings-grid">
+                  <label className="admin-field admin-field-wide">
+                    <span>OpenAI API key</span>
+                    <input
+                      className="admin-input"
+                      type="password"
+                      autoComplete="off"
+                      placeholder={scannerSettings.api_key_configured ? "Новый ключ или оставить пустым" : "sk-..."}
+                      value={scannerEditor.api_key}
+                      onChange={(e) => setScannerEditor((prev) => ({ ...prev, api_key: e.target.value }))}
+                    />
+                  </label>
+
+                  <div className="admin-card admin-scanner-key-panel">
+                    <span className="admin-kpi-label">Текущий ключ</span>
+                    <strong>{compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}</strong>
+                    <span className="admin-kpi-note">Пустое поле при сохранении оставит текущий ключ без изменений.</span>
+                  </div>
+                </div>
+
+                <div className="admin-scanner-save-row">
+                  <span className="admin-muted-text">Эти параметры применятся ко всем новым анализам скриншотов.</span>
+                  <button className="admin-primary-button" type="button" disabled={scannerSaving} onClick={saveScannerSettings}>
+                    {scannerSaving ? "Сохраняем..." : "Сохранить настройки"}
+                  </button>
+                </div>
+              </section>
+            )}
+          </>
         )}
         {!loading && tab === "indicators" && (
           <>

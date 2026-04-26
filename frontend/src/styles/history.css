@@ -257,6 +257,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .history-card-topline span,
@@ -283,6 +284,28 @@
   border-color: rgba(255, 104, 92, 0.36);
   background: rgba(255, 104, 92, 0.12);
   color: #ffc2bd;
+}
+
+.history-card-topline b.history-outcome-chip {
+  margin-left: auto;
+}
+
+.history-card-topline b.history-outcome-chip.outcome-win {
+  border-color: rgba(82, 222, 125, 0.36);
+  background: rgba(82, 222, 125, 0.12);
+  color: #a8f5c0;
+}
+
+.history-card-topline b.history-outcome-chip.outcome-loss {
+  border-color: rgba(255, 104, 92, 0.36);
+  background: rgba(255, 104, 92, 0.12);
+  color: #ffc2bd;
+}
+
+.history-card-topline b.history-outcome-chip.outcome-refund {
+  border-color: rgba(245, 206, 116, 0.34);
+  background: rgba(245, 206, 116, 0.12);
+  color: #f7dfa0;
 }
 
 .history-card-body > strong {
@@ -391,6 +414,24 @@
   border-color: rgba(214, 99, 99, 0.24);
   background: rgba(255, 224, 224, 0.9);
   color: #9f2f2f;
+}
+
+:root[data-theme="light"] .history-card-topline b.history-outcome-chip.outcome-win {
+  border-color: rgba(59, 166, 112, 0.24);
+  background: rgba(225, 246, 235, 0.92);
+  color: #23744a;
+}
+
+:root[data-theme="light"] .history-card-topline b.history-outcome-chip.outcome-loss {
+  border-color: rgba(214, 99, 99, 0.24);
+  background: rgba(255, 224, 224, 0.9);
+  color: #9f2f2f;
+}
+
+:root[data-theme="light"] .history-card-topline b.history-outcome-chip.outcome-refund {
+  border-color: rgba(176, 136, 54, 0.24);
+  background: rgba(255, 241, 205, 0.92);
+  color: #7e5b18;
 }
 
 :root[data-theme="light"] .history-card-body > p,

@@ -322,6 +322,33 @@ function formatSelectedExpirationLabel(selectedExpirationMeta, expirationValue) 
   return selectedExpirationMeta?.label || String(expirationValue || "").trim() || "—";
 }
 
+function getExpirationSeconds(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  const match = raw.match(/^(\d+)\s*([smh])$/);
+  if (!match) return 0;
+  const amount = Number(match[1]);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  if (match[2] === "s") return amount;
+  if (match[2] === "m") return amount * 60;
+  if (match[2] === "h") return amount * 60 * 60;
+  return 0;
+}
+
+function formatCountdown(seconds) {
+  const total = Math.max(0, Number(seconds || 0));
+  const minutes = Math.floor(total / 60);
+  const rest = Math.floor(total % 60);
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
+}
+
+function getSettlementTone(outcome) {
+  const value = String(outcome || "").trim().toLowerCase();
+  if (value === "win") return "win";
+  if (value === "loss") return "loss";
+  if (value === "refund") return "refund";
+  return "pending";
+}
+
 
 export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -356,9 +383,12 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const [scanPreview, setScanPreview] = useState({ url: "", status: "idle" });
   const [isAnalysisScanning, setIsAnalysisScanning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
+  const [analysisSettlement, setAnalysisSettlement] = useState({ status: "idle" });
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const analysisScanTimerRef = useRef(0);
+  const settlementTimerRef = useRef(null);
+  const settlementTokenRef = useRef("");
   const quoteClientRef = useRef(null);
   const currentQuoteSubscriptionRef = useRef(null);
   const quoteRenderReadyRef = useRef(false);
@@ -454,6 +484,11 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       window.clearTimeout(analysisScanTimerRef.current);
       analysisScanTimerRef.current = 0;
     }
+    if (settlementTimerRef.current) {
+      window.clearInterval(settlementTimerRef.current);
+      settlementTimerRef.current = null;
+    }
+    settlementTokenRef.current = "";
   }, []);
 
   useEffect(() => {
@@ -950,7 +985,9 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         body: formData
       });
       setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+      clearSettlementTimer();
       setAnalysisResult(null);
+      setAnalysisSettlement({ status: "idle" });
       notify?.({
         type: "success",
         title: t.home.uploadToastTitle || "Chart uploaded",
@@ -987,7 +1024,9 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         body: JSON.stringify({ url: trimmedUrl })
       });
       setScanUploadState({ status: "success", file: data?.file || null, detail: "" });
+      clearSettlementTimer();
       setAnalysisResult(null);
+      setAnalysisSettlement({ status: "idle" });
       setIsLinkSheetOpen(false);
       setLinkInputValue("");
       notify?.({
@@ -1041,15 +1080,112 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     setIsActionSheetOpen(true);
   }
 
+  function clearSettlementTimer() {
+    if (settlementTimerRef.current) {
+      window.clearInterval(settlementTimerRef.current);
+      settlementTimerRef.current = null;
+    }
+    settlementTokenRef.current = "";
+  }
+
+  async function settleAnalysisResult(historyId, selectedExpiration, token) {
+    if (!historyId || settlementTokenRef.current !== token) return;
+    setAnalysisSettlement((prev) => ({
+      ...prev,
+      status: "settling",
+      remainingSeconds: 0
+    }));
+    try {
+      const data = await apiFetchJson(`/api/analysis/history/${historyId}/settle`, {
+        method: "POST",
+        body: JSON.stringify({ selected_expiration: selectedExpiration })
+      });
+      if (settlementTokenRef.current !== token) return;
+      const settlement = data?.settlement || data?.item?.settlement || null;
+      setAnalysisSettlement({
+        status: "settled",
+        historyId,
+        settlement,
+        selectedExpiration
+      });
+      setAnalysisResult((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          history_item: data?.item || prev.history_item,
+          result: {
+            ...(prev.result || {}),
+            settlement
+          }
+        };
+      });
+      notify?.({
+        type: "success",
+        title: settlement?.outcome_label || "Результат сделки готов",
+        message: `Финальная цена: ${formatAnalysisPrice(settlement?.exit_price)}`
+      });
+    } catch (error) {
+      if (settlementTokenRef.current !== token) return;
+      setAnalysisSettlement((prev) => ({
+        ...prev,
+        status: "error",
+        error: error.message || "Не удалось проверить результат сделки"
+      }));
+      notify?.({
+        type: "error",
+        title: "Не удалось проверить сделку",
+        message: error.message || "Попробуйте открыть историю позже."
+      });
+    }
+  }
+
+  function startSettlementCountdown(data, selectedExpiration) {
+    clearSettlementTimer();
+    const result = data?.result || null;
+    const signal = String(result?.signal || "").trim().toUpperCase();
+    const historyId = Number(data?.history_item?.id || 0);
+    const totalSeconds = getExpirationSeconds(selectedExpiration);
+
+    if (!historyId || !["BUY", "SELL"].includes(signal) || totalSeconds <= 0) {
+      setAnalysisSettlement({ status: "idle" });
+      return;
+    }
+
+    const token = `${historyId}:${Date.now()}`;
+    const endsAt = Date.now() + totalSeconds * 1000;
+    settlementTokenRef.current = token;
+    setAnalysisSettlement({
+      status: "countdown",
+      historyId,
+      totalSeconds,
+      remainingSeconds: totalSeconds,
+      selectedExpiration
+    });
+
+    settlementTimerRef.current = window.setInterval(() => {
+      const remainingSeconds = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+      setAnalysisSettlement((prev) => ({ ...prev, remainingSeconds }));
+      if (remainingSeconds <= 0) {
+        if (settlementTimerRef.current) {
+          window.clearInterval(settlementTimerRef.current);
+          settlementTimerRef.current = null;
+        }
+        settleAnalysisResult(historyId, selectedExpiration, token);
+      }
+    }, 1000);
+  }
+
   async function resetScanUpload() {
     if (scanUploadState.status === "uploading") return;
     setErrorText("");
+    clearSettlementTimer();
     try {
       await apiFetchJson("/api/upload/scan/latest", { method: "DELETE" });
     } catch (_error) {
       // The local reset still keeps the interface usable if the server is temporarily unavailable.
     }
     setAnalysisResult(null);
+    setAnalysisSettlement({ status: "idle" });
     setScanUploadState({ status: "idle", file: null, detail: "" });
     notify?.({
       type: "info",
@@ -1061,12 +1197,14 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   async function startNewScannerAnalysis() {
     if (scanUploadState.status === "uploading") return;
     setErrorText("");
+    clearSettlementTimer();
     try {
       await apiFetchJson("/api/upload/scan/latest", { method: "DELETE" });
     } catch (_error) {
       // Local reset is enough to return the user to the initial scanner state.
     }
     setAnalysisResult(null);
+    setAnalysisSettlement({ status: "idle" });
     setScanPreview({ url: "", status: "idle" });
     setScanUploadState({ status: "idle", file: null, detail: "" });
     setSignalMode("scanner");
@@ -1076,6 +1214,8 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   }
 
   async function startNewAnalysis() {
+    clearSettlementTimer();
+    setAnalysisSettlement({ status: "idle" });
     if (signalMode === "automatic") {
       setAnalysisResult(null);
       setErrorText("");
@@ -1105,8 +1245,10 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
 
     if (isAnalysisScanning) return;
 
+    clearSettlementTimer();
     setIsAnalysisScanning(true);
     setAnalysisResult(null);
+    setAnalysisSettlement({ status: "idle" });
     setErrorText("");
 
     try {
@@ -1146,6 +1288,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
             })
           });
       setAnalysisResult(data || null);
+      startSettlementCountdown(data || null, expiration);
     } catch (error) {
       notify?.({
         type: "error",
@@ -1183,6 +1326,11 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const analysisAssetLabel = formatAnalysisAsset(analysisSummary?.asset, analysisSummary?.market_mode);
   const analysisPriceLabel = formatAnalysisPrice(analysisSummary?.entry_price);
   const selectedExpirationLabel = formatSelectedExpirationLabel(selectedExpirationMeta, expiration);
+  const displayedSettlement = analysisSettlement.status !== "idle"
+    ? analysisSettlement
+    : analysisSummary?.settlement
+      ? { status: "settled", settlement: analysisSummary.settlement }
+      : { status: "idle" };
 
   function renderAnalysisResultPanel({ showMedia = true } = {}) {
     if (!analysisSummary) return null;
@@ -1240,6 +1388,37 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
                   {(t.home.analysisExpirationRecommendationPrefix || "ИИ рекомендует")}: {formatAnalysisExpiration(analysisSummary.expiration_minutes)}
                 </small>
               </article>
+              {displayedSettlement.status !== "idle" && (
+                <article className={`analysis-result-card analysis-settlement-card settlement-${getSettlementTone(displayedSettlement.settlement?.outcome)}`}>
+                  <span>
+                    {displayedSettlement.status === "countdown"
+                      ? "Таймер сделки"
+                      : displayedSettlement.status === "settling"
+                        ? "Проверка сделки"
+                        : displayedSettlement.status === "error"
+                          ? "Проверка сделки"
+                          : "Результат сделки"}
+                  </span>
+                  <strong>
+                    {displayedSettlement.status === "countdown"
+                      ? formatCountdown(displayedSettlement.remainingSeconds)
+                      : displayedSettlement.status === "settling"
+                        ? "Проверяем..."
+                        : displayedSettlement.status === "error"
+                          ? "Ошибка"
+                          : displayedSettlement.settlement?.outcome_label || "Готово"}
+                  </strong>
+                  <small className="analysis-result-subcopy">
+                    {displayedSettlement.status === "countdown"
+                      ? "Финальную цену проверим после экспирации"
+                      : displayedSettlement.status === "settling"
+                        ? "Запрашиваем свежую цену актива"
+                        : displayedSettlement.status === "error"
+                          ? (displayedSettlement.error || "Не удалось получить финальную цену")
+                          : `Финал: ${formatAnalysisPrice(displayedSettlement.settlement?.exit_price)}`}
+                  </small>
+                </article>
+              )}
             </div>
           ) : (
             <div className="analysis-result-empty">

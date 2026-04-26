@@ -503,6 +503,10 @@ class AutoAnalyzeRequest(BaseModel):
     selected_expiration: Optional[str] = Field(default=None, max_length=16)
 
 
+class AnalysisSettlementRequest(BaseModel):
+    selected_expiration: Optional[str] = Field(default=None, max_length=16)
+
+
 class UserNewsNotificationSettingsUpdate(BaseModel):
     news_enabled: int = 0
     economic_enabled: int = 1
@@ -1784,6 +1788,7 @@ def _serialize_analysis_history(row: Optional[Dict[str, Any]]) -> Optional[Dict[
         "expiration_minutes": int(row.get("expiration_minutes") or 0),
         "selected_expiration": row.get("selected_expiration") or "",
         "comment": row.get("comment") or "",
+        "settlement": result_payload.get("settlement") if isinstance(result_payload.get("settlement"), dict) else None,
         "result": result_payload,
         "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
     }
@@ -1867,6 +1872,43 @@ async def _record_analysis_history(
         await ensure_database_schema(pool)
         row = await insert_history()
     return _serialize_analysis_history(row)
+
+
+def _build_analysis_settlement_payload(
+    *,
+    signal: str,
+    entry_price: float,
+    exit_price: float,
+    selected_expiration: str,
+) -> Dict[str, Any]:
+    normalized_signal = str(signal or "").strip().upper()
+    delta = float(exit_price) - float(entry_price)
+    tolerance = 1e-10
+
+    if abs(delta) <= tolerance:
+        outcome = "refund"
+        outcome_label = "Возврат"
+    elif normalized_signal == "BUY":
+        outcome = "win" if delta > 0 else "loss"
+        outcome_label = "Победа" if outcome == "win" else "Проигрыш"
+    elif normalized_signal == "SELL":
+        outcome = "win" if delta < 0 else "loss"
+        outcome_label = "Победа" if outcome == "win" else "Проигрыш"
+    else:
+        outcome = "unknown"
+        outcome_label = "Не определено"
+
+    return {
+        "status": "settled",
+        "outcome": outcome,
+        "outcome_label": outcome_label,
+        "direction": normalized_signal,
+        "entry_price": float(entry_price),
+        "exit_price": float(exit_price),
+        "price_delta": delta,
+        "selected_expiration": _normalize_selected_expiration(selected_expiration),
+        "settled_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 def _normalize_telegram_support_url(value: Any, fallback: str) -> str:
@@ -2849,6 +2891,93 @@ async def get_analysis_history(
         await ensure_database_schema(pool)
         rows = await fetch_rows()
     return {"items": [_serialize_analysis_history(row) for row in rows if row]}
+
+
+@app.post("/api/analysis/history/{history_id}/settle")
+async def settle_analysis_history_item(
+    history_id: int,
+    payload: AnalysisSettlementRequest,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    pool = await require_db_pool()
+
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT ah.*, su.archived_at AS upload_archived_at
+                FROM analysis_history ah
+                LEFT JOIN scan_uploads su ON su.id = ah.upload_id
+                WHERE ah.id = %s AND ah.user_id = %s
+                LIMIT 1
+                """,
+                (int(history_id), user_id),
+            )
+            row = await cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Analysis history item not found")
+
+    signal = str(row.get("signal") or "").strip().upper()
+    if signal not in {"BUY", "SELL"}:
+        raise HTTPException(status_code=400, detail="Only BUY or SELL analyses can be settled")
+
+    try:
+        entry_price = float(row.get("entry_price") or 0)
+    except (TypeError, ValueError):
+        entry_price = 0.0
+    if entry_price <= 0:
+        raise HTTPException(status_code=400, detail="Entry price is missing")
+
+    price_request = _resolve_scanner_price_request(row.get("asset"), row.get("market_mode"))
+    if not price_request:
+        raise HTTPException(status_code=400, detail="Unable to resolve market pair for settlement")
+
+    exit_price = await _fetch_quote_price(price_request["category"], price_request["symbol"])
+    if not exit_price or exit_price <= 0:
+        raise HTTPException(status_code=502, detail="Unable to fetch final quote price")
+
+    selected_expiration = payload.selected_expiration or row.get("selected_expiration") or ""
+    settlement = _build_analysis_settlement_payload(
+        signal=signal,
+        entry_price=entry_price,
+        exit_price=float(exit_price),
+        selected_expiration=selected_expiration,
+    )
+
+    try:
+        result_payload = json.loads(row.get("result_json") or "{}")
+    except Exception:
+        result_payload = {}
+    if not isinstance(result_payload, dict):
+        result_payload = {}
+    result_payload["settlement"] = settlement
+
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                UPDATE analysis_history
+                SET result_json = %s
+                WHERE id = %s AND user_id = %s
+                """,
+                (json.dumps(result_payload, ensure_ascii=False), int(history_id), user_id),
+            )
+            await cur.execute(
+                """
+                SELECT ah.*, su.archived_at AS upload_archived_at
+                FROM analysis_history ah
+                LEFT JOIN scan_uploads su ON su.id = ah.upload_id
+                WHERE ah.id = %s AND ah.user_id = %s
+                LIMIT 1
+                """,
+                (int(history_id), user_id),
+            )
+            updated_row = await cur.fetchone()
+
+    return {"status": "success", "item": _serialize_analysis_history(updated_row), "settlement": settlement}
 
 
 @app.get("/api/upload/scan/{upload_id}/preview")

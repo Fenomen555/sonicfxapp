@@ -41,6 +41,14 @@ function getSignalTone(signal) {
   return "neutral";
 }
 
+function getSettlementTone(outcome) {
+  const value = String(outcome || "").trim().toLowerCase();
+  if (value === "win") return "win";
+  if (value === "loss") return "loss";
+  if (value === "refund") return "refund";
+  return "pending";
+}
+
 function isTradableSignal(signal) {
   const value = String(signal || "").trim().toUpperCase();
   return Boolean(value) && value !== "NO TRADE";
@@ -74,7 +82,9 @@ function getHistoryCopy(lang) {
     price: "Цена",
     confidence: "Уверенность",
     expiration: "Экспирация",
-    aiExpiration: "ИИ"
+    aiExpiration: "ИИ",
+    finalPrice: "Финал",
+    result: "Итог"
   };
   if (lang === "en") {
     return {
@@ -96,7 +106,9 @@ function getHistoryCopy(lang) {
       price: "Price",
       confidence: "Confidence",
       expiration: "Expiration",
-      aiExpiration: "AI"
+      aiExpiration: "AI",
+      finalPrice: "Final",
+      result: "Result"
     };
   }
   if (lang === "uk") {
@@ -119,7 +131,9 @@ function getHistoryCopy(lang) {
       price: "Ціна",
       confidence: "Впевненість",
       expiration: "Експірація",
-      aiExpiration: "ШІ"
+      aiExpiration: "ШІ",
+      finalPrice: "Фінал",
+      result: "Підсумок"
     };
   }
   return ru;
@@ -227,6 +241,8 @@ export default function HistoryPage({ lang = "ru" }) {
             const tone = getSignalTone(item.signal);
             const previewUrl = previewUrls[item.id];
             const sourceType = getHistorySourceType(item);
+            const settlement = item.settlement || item.result?.settlement || null;
+            const settlementTone = getSettlementTone(settlement?.outcome);
             return (
               <article className={`history-card tone-${tone}`} key={item.id}>
                 <button
@@ -247,6 +263,9 @@ export default function HistoryPage({ lang = "ru" }) {
                   <div className="history-card-topline">
                     <span>{sourceType === "auto" ? copy.auto : sourceType === "indicators" ? copy.indicators : copy.scanner}</span>
                     <b className={`signal-${tone}`}>{item.signal || "NO TRADE"}</b>
+                    {settlement ? (
+                      <b className={`history-outcome-chip outcome-${settlementTone}`}>{settlement.outcome_label || copy.result}</b>
+                    ) : null}
                   </div>
 
                   <strong>{formatHistoryAsset(item.asset, item.market_mode)}</strong>
@@ -256,6 +275,7 @@ export default function HistoryPage({ lang = "ru" }) {
                     <span>
                       <small>{copy.price}</small>
                       <b>{formatHistoryPrice(item.entry_price)}</b>
+                      {settlement?.exit_price ? <em>{copy.finalPrice}: {formatHistoryPrice(settlement.exit_price)}</em> : null}
                     </span>
                     <span>
                       <small>{copy.confidence}</small>

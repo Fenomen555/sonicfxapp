@@ -1688,6 +1688,22 @@
     linear-gradient(180deg, rgba(45, 35, 18, 0.92), rgba(18, 17, 14, 0.96));
 }
 
+.analysis-settlement-card.settlement-advice {
+  min-height: 74px;
+  place-items: center;
+  text-align: center;
+  border-color: rgba(142, 169, 221, 0.28);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(142, 169, 221, 0.12), transparent 48%),
+    linear-gradient(180deg, rgba(17, 26, 40, 0.94), rgba(10, 17, 27, 0.96));
+}
+
+.analysis-settlement-card.settlement-advice strong {
+  max-width: 330px;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
 .deal-timer-head {
   position: relative;
   z-index: 1;

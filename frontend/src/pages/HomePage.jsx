@@ -1442,6 +1442,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       ? { status: "settled", settlement: analysisSummary.settlement }
       : { status: "idle" };
   const settlementCountdownProgress = getCountdownProgress(displayedSettlement);
+  const isNoTradeResult = String(analysisSummary?.signal || "").trim().toUpperCase() === "NO TRADE";
   const activeAnalysisSignalTone = getAnalysisSignalTone(activeAnalysis?.signal);
   const activeAnalysisAssetLabel = activeAnalysis
     ? formatAnalysisAsset(activeAnalysis.asset, activeAnalysis.market_mode)
@@ -1449,6 +1450,14 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const shouldShowActiveAnalysisCard = Boolean(activeAnalysis?.id && !analysisSummary);
 
   function renderSettlementCard() {
+    if (isNoTradeResult) {
+      return (
+        <article className="analysis-result-card analysis-settlement-card settlement-advice">
+          <span>Рекомендация</span>
+          <strong>Советуем вам выбрать другую валютную пару.</strong>
+        </article>
+      );
+    }
     if (displayedSettlement.status === "idle") return null;
     return (
       <article className={`analysis-result-card analysis-settlement-card settlement-${getSettlementTone(displayedSettlement.settlement?.outcome)}`}>

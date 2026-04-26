@@ -59,7 +59,13 @@ export async function apiFetchJson(url, options = {}) {
 
   if (!response.ok) {
     const message = data?.detail || data?.error || text || "Request failed";
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = data;
+    if (response.status === 401) {
+      window.dispatchEvent(new CustomEvent("sonicfx:telegram-auth-error", { detail: { message } }));
+    }
+    throw error;
   }
   return data;
 }
@@ -90,7 +96,10 @@ export async function apiAdminFetchJson(url, options = {}) {
 
   if (!response.ok) {
     const message = data?.detail || data?.error || text || "Request failed";
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = data;
+    throw error;
   }
   return data;
 }

@@ -1,8 +1,11 @@
 export const texts = {
   ru: {
     appName: "SonicFX",
-    openViaBotTitle: "Откройте приложение через Telegram-бота",
-    openViaBotHint: "Перейдите в бота и нажмите кнопку запуска Mini App.",
+    openViaBotKicker: "Доступ через Telegram",
+    openViaBotTitle: "Откройте SonicFX в Telegram",
+    openViaBotHint: "Mini App работает только внутри Telegram: так мы безопасно определяем профиль, язык и настройки пользователя.",
+    openViaBotSessionHint: "Если сессия устарела, просто откройте приложение заново из бота.",
+    openViaBotButton: "Открыть бота",
     nav: {
       news: "Новости",
       home: "Главная",
@@ -264,8 +267,11 @@ export const texts = {
   },
   en: {
     appName: "SonicFX",
-    openViaBotTitle: "Open app via Telegram bot",
-    openViaBotHint: "Open the bot and tap the Mini App button.",
+    openViaBotKicker: "Telegram access",
+    openViaBotTitle: "Open SonicFX in Telegram",
+    openViaBotHint: "The Mini App works only inside Telegram so we can securely read your profile, language, and settings.",
+    openViaBotSessionHint: "If the session expired, open the app again from the bot.",
+    openViaBotButton: "Open bot",
     nav: {
       news: "News",
       home: "Home",
@@ -527,8 +533,11 @@ export const texts = {
   },
   uk: {
     appName: "SonicFX",
-    openViaBotTitle: "Відкрийте застосунок через Telegram-бота",
-    openViaBotHint: "Перейдіть у бота та натисніть кнопку запуску Mini App.",
+    openViaBotKicker: "Доступ через Telegram",
+    openViaBotTitle: "Відкрийте SonicFX у Telegram",
+    openViaBotHint: "Mini App працює лише всередині Telegram: так ми безпечно визначаємо профіль, мову та налаштування користувача.",
+    openViaBotSessionHint: "Якщо сесія застаріла, просто відкрийте застосунок заново з бота.",
+    openViaBotButton: "Відкрити бота",
     nav: {
       news: "Новини",
       home: "Головна",

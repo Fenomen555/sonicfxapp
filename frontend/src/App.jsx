@@ -12,6 +12,8 @@ import HomePage from "./pages/HomePage";
 import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
 
+const TELEGRAM_BOT_USERNAME = "SonicTradeaibot";
+
 function normalizeTheme(value) {
   return value === "light" ? "light" : "dark";
 }
@@ -47,7 +49,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [manualOnboarding, setManualOnboarding] = useState(false);
   const [isTgWebApp, setIsTgWebApp] = useState(true);
-  const [botUsername, setBotUsername] = useState("");
+  const [telegramAccessError, setTelegramAccessError] = useState("");
   const [safeAreaTop, setSafeAreaTop] = useState(0);
   const [contentAreaTop, setContentAreaTop] = useState(56);
   const [device, setDevice] = useState(() => getDeviceProfile());
@@ -88,6 +90,17 @@ export default function App() {
     toastTimersRef.current.clear();
   }, []);
 
+  useEffect(() => {
+    if (adminMode) return undefined;
+    const handleTelegramAuthError = (event) => {
+      setTelegramAccessError(event?.detail?.message || "unauthorized");
+      setIsTgWebApp(false);
+      setIsLoading(false);
+    };
+    window.addEventListener("sonicfx:telegram-auth-error", handleTelegramAuthError);
+    return () => window.removeEventListener("sonicfx:telegram-auth-error", handleTelegramAuthError);
+  }, [adminMode]);
+
   const dismissToast = useCallback((id) => {
     const timerId = toastTimersRef.current.get(id);
     if (timerId) {
@@ -115,18 +128,13 @@ export default function App() {
       const hasTg = isTelegramWebAppAvailable();
       if (!hasTg) {
         setIsTgWebApp(false);
-        try {
-          const info = await apiFetchJson("/api/webapp/bot-info");
-          if (isActive) setBotUsername(info?.bot_username || "");
-        } catch {
-          if (isActive) setBotUsername("");
-        } finally {
-          if (isActive) setIsLoading(false);
-        }
+        setTelegramAccessError("missing");
+        if (isActive) setIsLoading(false);
         return;
       }
 
       setIsTgWebApp(true);
+      setTelegramAccessError("");
 
       try {
         await initTelegramApp();
@@ -162,8 +170,14 @@ export default function App() {
         });
         setManualOnboarding(false);
         setShowOnboarding(!Number(profile?.onboarding_seen || 0));
-      } catch {
+      } catch (error) {
         if (!isActive) return;
+        if (error?.status === 401 || /telegram init data/i.test(error?.message || "")) {
+          setIsTgWebApp(false);
+          setTelegramAccessError(error?.message || "unauthorized");
+          setIsLoading(false);
+          return;
+        }
         setUser(FALLBACK_USER);
         setShowOnboarding(true);
       } finally {
@@ -268,15 +282,28 @@ export default function App() {
     : Math.max(device.stableHeight || 0, window.innerHeight || 0, 640);
 
   if (!isTgWebApp) {
+    const botUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}`;
     return (
       <div className="open-via-bot">
-        <h1>{t.openViaBotTitle}</h1>
-        <p>{t.openViaBotHint}</p>
-        {botUsername && (
-          <a href={`https://t.me/${botUsername}`} target="_blank" rel="noreferrer">
-            @{botUsername}
+        <div className="open-via-bot-card">
+          <div className="open-via-bot-brand" aria-label="SonicFX">
+            <span className="brand-main">Sonic</span>
+            <span className="brand-fx">fx</span>
+          </div>
+          <div className="open-via-bot-icon" aria-hidden="true">
+            <span>TG</span>
+          </div>
+          <span className="open-via-bot-kicker">{t.openViaBotKicker || "Telegram only"}</span>
+          <h1>{t.openViaBotTitle}</h1>
+          <p>{t.openViaBotHint}</p>
+          {telegramAccessError ? (
+            <small>{t.openViaBotSessionHint || "Если страница была открыта давно, запустите Mini App заново из бота."}</small>
+          ) : null}
+          <a className="open-via-bot-cta" href={botUrl} target="_blank" rel="noreferrer">
+            {t.openViaBotButton || `@${TELEGRAM_BOT_USERNAME}`}
           </a>
-        )}
+          <div className="open-via-bot-footer">@{TELEGRAM_BOT_USERNAME}</div>
+        </div>
       </div>
     );
   }

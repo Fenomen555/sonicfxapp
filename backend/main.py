@@ -2831,6 +2831,8 @@ async def get_analysis_history(
                     FROM analysis_history ah
                     LEFT JOIN scan_uploads su ON su.id = ah.upload_id
                     WHERE ah.user_id = %s
+                      AND UPPER(TRIM(COALESCE(ah.`signal`, 'NO TRADE'))) <> 'NO TRADE'
+                      AND TRIM(COALESCE(ah.`signal`, '')) <> ''
                     ORDER BY ah.created_at DESC, ah.id DESC
                     LIMIT %s
                     """,

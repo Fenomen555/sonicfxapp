@@ -41,11 +41,23 @@ function getSignalTone(signal) {
   return "neutral";
 }
 
+function isTradableSignal(signal) {
+  const value = String(signal || "").trim().toUpperCase();
+  return Boolean(value) && value !== "NO TRADE";
+}
+
+function getHistorySourceType(item) {
+  const source = String(item?.source_type || "").trim().toLowerCase();
+  if (source === "auto" || source === "live") return "auto";
+  if (source === "indicator" || source === "indicators") return "indicators";
+  return "scanner";
+}
+
 function getHistoryCopy(lang) {
   const ru = {
     title: "История анализов",
     subtitle: "Последние 20 анализов",
-    lead: "Scanner и Live сохраняются здесь после каждого анализа.",
+    lead: "Scanner, Live и Indicators сохраняются здесь после каждого торгового сигнала.",
     loading: "Загружаем историю...",
     error: "Не удалось загрузить историю",
     retry: "Повторить",
@@ -55,6 +67,7 @@ function getHistoryCopy(lang) {
     noPreview: "Превью недоступно",
     scanner: "Scanner",
     auto: "Live",
+    indicators: "Indicators",
     total: "Всего",
     close: "Закрыть",
     openMedia: "Открыть изображение",
@@ -68,7 +81,7 @@ function getHistoryCopy(lang) {
       ...ru,
       title: "Analysis History",
       subtitle: "Last 20 analyses",
-      lead: "Scanner and Live results are saved here after every analysis.",
+      lead: "Scanner, Live and Indicators are saved here after every trade signal.",
       loading: "Loading history...",
       error: "Could not load history",
       retry: "Retry",
@@ -77,6 +90,7 @@ function getHistoryCopy(lang) {
       archived: "File archived",
       noPreview: "Preview unavailable",
       total: "Total",
+      indicators: "Indicators",
       close: "Close",
       openMedia: "Open image",
       price: "Price",
@@ -90,7 +104,7 @@ function getHistoryCopy(lang) {
       ...ru,
       title: "Історія аналізів",
       subtitle: "Останні 20 аналізів",
-      lead: "Scanner і Live зберігаються тут після кожного аналізу.",
+      lead: "Scanner, Live і Indicators зберігаються тут після кожного торгового сигналу.",
       loading: "Завантажуємо історію...",
       error: "Не вдалося завантажити історію",
       retry: "Повторити",
@@ -99,6 +113,7 @@ function getHistoryCopy(lang) {
       archived: "Файл уже в архіві",
       noPreview: "Прев'ю недоступне",
       total: "Усього",
+      indicators: "Indicators",
       close: "Закрити",
       openMedia: "Відкрити зображення",
       price: "Ціна",
@@ -118,9 +133,10 @@ export default function HistoryPage({ lang = "ru" }) {
   const [openPreview, setOpenPreview] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
   const summary = useMemo(() => {
-    const scanner = items.filter((item) => item?.source_type !== "auto").length;
-    const live = items.filter((item) => item?.source_type === "auto").length;
-    return { total: items.length, scanner, live };
+    const scanner = items.filter((item) => getHistorySourceType(item) === "scanner").length;
+    const live = items.filter((item) => getHistorySourceType(item) === "auto").length;
+    const indicators = items.filter((item) => getHistorySourceType(item) === "indicators").length;
+    return { total: items.length, scanner, live, indicators };
   }, [items]);
 
   useEffect(() => {
@@ -136,7 +152,9 @@ export default function HistoryPage({ lang = "ru" }) {
       try {
         const data = await apiFetchJson("/api/analysis/history?limit=20");
         if (!isActive) return;
-        const nextItems = Array.isArray(data?.items) ? data.items.filter(Boolean) : [];
+        const nextItems = Array.isArray(data?.items)
+          ? data.items.filter((item) => item && isTradableSignal(item.signal))
+          : [];
         setItems(nextItems);
         setStatus("ready");
 
@@ -181,6 +199,7 @@ export default function HistoryPage({ lang = "ru" }) {
           <span><b>{summary.total}</b>{copy.total}</span>
           <span><b>{summary.scanner}</b>{copy.scanner}</span>
           <span><b>{summary.live}</b>{copy.auto}</span>
+          <span><b>{summary.indicators}</b>{copy.indicators}</span>
         </div>
       </div>
 
@@ -207,6 +226,7 @@ export default function HistoryPage({ lang = "ru" }) {
           {items.map((item) => {
             const tone = getSignalTone(item.signal);
             const previewUrl = previewUrls[item.id];
+            const sourceType = getHistorySourceType(item);
             return (
               <article className={`history-card tone-${tone}`} key={item.id}>
                 <button
@@ -225,7 +245,7 @@ export default function HistoryPage({ lang = "ru" }) {
 
                 <div className="history-card-body">
                   <div className="history-card-topline">
-                    <span>{item.source_type === "auto" ? copy.auto : copy.scanner}</span>
+                    <span>{sourceType === "auto" ? copy.auto : sourceType === "indicators" ? copy.indicators : copy.scanner}</span>
                     <b className={`signal-${tone}`}>{item.signal || "NO TRADE"}</b>
                   </div>
 

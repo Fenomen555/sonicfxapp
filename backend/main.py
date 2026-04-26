@@ -4159,29 +4159,27 @@ async def _generate_signal_result_quote(row: Dict[str, Any], settlement: Dict[st
 
 def _format_signal_result_notification_message(row: Dict[str, Any], settlement: Dict[str, Any], quote: str) -> str:
     outcome_label = settlement.get("outcome_label") or _get_settlement_outcome_label(settlement.get("outcome"))
+    outcome = str(settlement.get("outcome") or "").strip().lower()
+    outcome_icon = {"win": "✅", "loss": "⚠️", "refund": "↔️"}.get(outcome, "📌")
     asset = html.escape(str(row.get("asset") or "не определен"))
     direction = html.escape(str(settlement.get("direction") or row.get("signal") or "-"))
+    direction_icon = "🟢" if direction.upper() == "BUY" else "🔴" if direction.upper() == "SELL" else "⚪"
     expiration = html.escape(_format_signal_notification_expiration(settlement.get("selected_expiration") or row.get("selected_expiration")))
     entry_price = html.escape(_format_signal_notification_price(settlement.get("entry_price") or row.get("entry_price")))
     exit_price = html.escape(_format_signal_notification_price(settlement.get("exit_price") or row.get("exit_price")))
-    delta = html.escape(_format_signal_notification_price(settlement.get("price_delta")))
-    comment = html.escape(str(row.get("comment") or "").strip())
     quote_text = html.escape(quote or _fallback_signal_result_quote(settlement.get("outcome")))
 
     lines = [
-        "<b>SonicFX Signal</b>",
-        f"<b>{html.escape(str(outcome_label or 'Не определено'))}</b>",
+        "📊 <b>SonicFX Signal</b>",
+        f"{outcome_icon} <b>{html.escape(str(outcome_label or 'Не определено'))}</b>",
         "",
-        f"Актив: <b>{asset}</b>",
-        f"Направление: <b>{direction}</b>",
-        f"Экспирация: <b>{expiration}</b>",
-        f"Цена входа: <code>{entry_price}</code>",
-        f"Цена выхода: <code>{exit_price}</code>",
-        f"Дельта: <code>{delta}</code>",
+        f"💱 Актив: <b>{asset}</b>",
+        f"{direction_icon} Направление: <b>{direction}</b>",
+        f"⏱ Экспирация: <b>{expiration}</b>",
+        f"🎯 Цена входа: <code>{entry_price}</code>",
+        f"🏁 Цена выхода: <code>{exit_price}</code>",
     ]
-    if comment:
-        lines.extend(["", f"<i>{comment}</i>"])
-    lines.extend(["", f"<blockquote>{quote_text}</blockquote>"])
+    lines.extend(["", f"<blockquote>💬 {quote_text}</blockquote>"])
     return "\n".join(lines)
 
 

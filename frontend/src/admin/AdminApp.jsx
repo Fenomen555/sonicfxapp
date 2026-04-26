@@ -1067,7 +1067,7 @@ export default function AdminApp({ authError }) {
                         type="button"
                         onClick={() => setScannerSettingsOpen((prev) => !prev)}
                       >
-                        {scannerSettingsOpen ? "Скрыть настройки" : "Настроить GPT"}
+                        {scannerSettingsOpen ? "Скрыть настройки" : "Настройки"}
                       </button>
                     )}
                   </article>

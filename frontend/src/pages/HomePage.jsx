@@ -349,6 +349,19 @@ function getSettlementTone(outcome) {
   return "pending";
 }
 
+function getCountdownProgress(settlement) {
+  if (!settlement || settlement.status !== "countdown") {
+    return { elapsedPercent: 100, remainingPercent: 0 };
+  }
+  const total = Math.max(1, Number(settlement.totalSeconds || 0));
+  const remaining = Math.max(0, Math.min(total, Number(settlement.remainingSeconds || 0)));
+  const remainingPercent = Math.round((remaining / total) * 100);
+  return {
+    elapsedPercent: 100 - remainingPercent,
+    remainingPercent
+  };
+}
+
 
 export default function HomePage({ t, notify, featureFlags = {} }) {
   const [signalMode, setSignalMode] = useState("scanner");
@@ -1408,6 +1421,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     : analysisSummary?.settlement
       ? { status: "settled", settlement: analysisSummary.settlement }
       : { status: "idle" };
+  const settlementCountdownProgress = getCountdownProgress(displayedSettlement);
   const activeAnalysisSignalTone = getAnalysisSignalTone(activeAnalysis?.signal);
   const activeAnalysisAssetLabel = activeAnalysis
     ? formatAnalysisAsset(activeAnalysis.asset, activeAnalysis.market_mode)
@@ -1472,33 +1486,51 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               </article>
               {displayedSettlement.status !== "idle" && (
                 <article className={`analysis-result-card analysis-settlement-card settlement-${getSettlementTone(displayedSettlement.settlement?.outcome)}`}>
-                  <span>
-                    {displayedSettlement.status === "countdown"
-                      ? "Таймер сделки"
-                      : displayedSettlement.status === "settling"
-                        ? "Проверка сделки"
-                        : displayedSettlement.status === "error"
+                  {displayedSettlement.status === "countdown" ? (
+                    <>
+                      <div className="deal-timer-head">
+                        <span>Таймер сделки</span>
+                        <strong>{formatCountdown(displayedSettlement.remainingSeconds)}</strong>
+                      </div>
+                      <div
+                        className="deal-timer-flow"
+                        style={{ "--deal-progress": `${settlementCountdownProgress.elapsedPercent}%` }}
+                      >
+                        <span className="deal-timer-percent left">{settlementCountdownProgress.remainingPercent}%</span>
+                        <div className="deal-timer-track" aria-hidden="true">
+                          <span className="deal-timer-line green" />
+                          <span className="deal-timer-pin" />
+                          <span className="deal-timer-line red" />
+                        </div>
+                        <span className="deal-timer-percent right">{settlementCountdownProgress.elapsedPercent}%</span>
+                      </div>
+                      <small className="analysis-result-subcopy">Финальную цену проверим после экспирации</small>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        {displayedSettlement.status === "settling"
                           ? "Проверка сделки"
-                          : "Результат сделки"}
-                  </span>
-                  <strong>
-                    {displayedSettlement.status === "countdown"
-                      ? formatCountdown(displayedSettlement.remainingSeconds)
-                      : displayedSettlement.status === "settling"
-                        ? "Проверяем..."
-                        : displayedSettlement.status === "error"
-                          ? "Ошибка"
-                          : displayedSettlement.settlement?.outcome_label || "Готово"}
-                  </strong>
-                  <small className="analysis-result-subcopy">
-                    {displayedSettlement.status === "countdown"
-                      ? "Финальную цену проверим после экспирации"
-                      : displayedSettlement.status === "settling"
-                        ? "Запрашиваем свежую цену актива"
-                        : displayedSettlement.status === "error"
-                          ? (displayedSettlement.error || "Не удалось получить финальную цену")
-                          : `Финал: ${formatAnalysisPrice(displayedSettlement.settlement?.exit_price)}`}
-                  </small>
+                          : displayedSettlement.status === "error"
+                            ? "Проверка сделки"
+                            : "Результат сделки"}
+                      </span>
+                      <strong>
+                        {displayedSettlement.status === "settling"
+                          ? "Проверяем..."
+                          : displayedSettlement.status === "error"
+                            ? "Ошибка"
+                            : displayedSettlement.settlement?.outcome_label || "Готово"}
+                      </strong>
+                      <small className="analysis-result-subcopy">
+                        {displayedSettlement.status === "settling"
+                          ? "Запрашиваем свежую цену актива"
+                          : displayedSettlement.status === "error"
+                            ? (displayedSettlement.error || "Не удалось получить финальную цену")
+                            : `Финал: ${formatAnalysisPrice(displayedSettlement.settlement?.exit_price)}`}
+                      </small>
+                    </>
+                  )}
                 </article>
               )}
             </div>

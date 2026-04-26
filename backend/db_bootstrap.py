@@ -207,6 +207,12 @@ async def _seed_app_settings(conn) -> None:
                 """,
                 (key, value),
             )
+        await cur.execute(
+            """
+            INSERT IGNORE INTO app_settings (`key`, value_text)
+            VALUES ('signal_notifications_started_at', DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'))
+            """
+        )
 
 
 async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
@@ -296,6 +302,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     user_id BIGINT NOT NULL PRIMARY KEY,
                     news_enabled TINYINT(1) NOT NULL DEFAULT 0,
                     signals_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    signals_enabled_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
                     economic_enabled TINYINT(1) NOT NULL DEFAULT 1,
                     market_enabled TINYINT(1) NOT NULL DEFAULT 1,
                     impact_high_enabled TINYINT(1) NOT NULL DEFAULT 1,
@@ -478,6 +485,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "news_items", "updated_at", "ALTER TABLE news_items ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
         await _ensure_column(conn, db_name, "user_notification_settings", "news_enabled", "ALTER TABLE user_notification_settings ADD COLUMN news_enabled TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "user_notification_settings", "signals_enabled", "ALTER TABLE user_notification_settings ADD COLUMN signals_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "user_notification_settings", "signals_enabled_at", "ALTER TABLE user_notification_settings ADD COLUMN signals_enabled_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP")
         await _ensure_column(conn, db_name, "user_notification_settings", "economic_enabled", "ALTER TABLE user_notification_settings ADD COLUMN economic_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "user_notification_settings", "market_enabled", "ALTER TABLE user_notification_settings ADD COLUMN market_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "user_notification_settings", "impact_high_enabled", "ALTER TABLE user_notification_settings ADD COLUMN impact_high_enabled TINYINT(1) NOT NULL DEFAULT 1")

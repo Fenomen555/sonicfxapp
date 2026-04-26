@@ -2200,6 +2200,7 @@ async def get_user_news_notification_settings(user_id: int) -> Dict[str, Any]:
                 SELECT
                     news_enabled,
                     signals_enabled,
+                    signals_enabled_at,
                     economic_enabled,
                     market_enabled,
                     impact_high_enabled,
@@ -2234,11 +2235,18 @@ async def update_user_news_notification_settings(user_id: int, payload: UserNews
                 INSERT INTO user_notification_settings
                     (
                         user_id, news_enabled, signals_enabled, economic_enabled, market_enabled,
-                        impact_high_enabled, impact_medium_enabled, impact_low_enabled, lead_minutes
+                        impact_high_enabled, impact_medium_enabled, impact_low_enabled, lead_minutes,
+                        signals_enabled_at
                     )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CASE WHEN %s = 1 THEN CURRENT_TIMESTAMP() ELSE NULL END)
                 ON DUPLICATE KEY UPDATE
                     news_enabled = VALUES(news_enabled),
+                    signals_enabled_at = CASE
+                        WHEN VALUES(signals_enabled) = 1
+                         AND (COALESCE(signals_enabled, 0) = 0 OR signals_enabled_at IS NULL)
+                        THEN CURRENT_TIMESTAMP()
+                        ELSE signals_enabled_at
+                    END,
                     signals_enabled = VALUES(signals_enabled),
                     economic_enabled = VALUES(economic_enabled),
                     market_enabled = VALUES(market_enabled),
@@ -2257,6 +2265,7 @@ async def update_user_news_notification_settings(user_id: int, payload: UserNews
                     impact_medium_enabled,
                     impact_low_enabled,
                     lead_minutes,
+                    signals_enabled,
                 ),
             )
             await cur.execute("UPDATE users SET last_active_at = NOW() WHERE user_id = %s", (int(user_id),))
@@ -4213,6 +4222,16 @@ async def send_due_signal_result_notifications_once(limit: int = 50) -> int:
                   AND ah.settled_at IS NOT NULL
                   AND ah.signal_notification_sent_at IS NULL
                   AND COALESCE(s.signals_enabled, 1) = 1
+                  AND ah.settled_at >= COALESCE(
+                        s.signals_enabled_at,
+                        (
+                            SELECT STR_TO_DATE(value_text, '%%Y-%%m-%%d %%H:%%i:%%s')
+                            FROM app_settings
+                            WHERE `key` = 'signal_notifications_started_at'
+                            LIMIT 1
+                        ),
+                        CURRENT_TIMESTAMP()
+                  )
                   AND UPPER(TRIM(COALESCE(ah.`signal`, ''))) IN ('BUY', 'SELL')
                 ORDER BY ah.settled_at ASC, ah.id ASC
                 LIMIT %s

@@ -33,6 +33,7 @@ const SUPPORT_LINK_DEFAULTS = {
 
 const NEWS_NOTIFICATION_DEFAULTS = {
   news_enabled: 0,
+  signals_enabled: 1,
   economic_enabled: 1,
   market_enabled: 1,
   impact_high_enabled: 1,
@@ -265,10 +266,18 @@ function normalizeSupportLinks(data) {
 function getNotificationsCopy(lang) {
   const ru = {
     title: "Уведомления",
-    subtitle: "Новости в Telegram-боте",
-    intro: "Включите напоминания, чтобы бот заранее присылал важные события экономического календаря и свежие рыночные новости.",
+    subtitle: "Telegram-бот",
+    intro: "Настройте, что бот будет присылать: новости рынка и результаты ваших сигналов.",
+    newsCard: "Новости",
+    newsCardHint: "Календарь и рынок",
+    signalsCard: "Сигналы",
+    signalsCardHint: "Итоги сделок",
     masterOn: "Уведомления включены",
     masterOff: "Уведомления выключены",
+    signalsOn: "Сигналы включены",
+    signalsOff: "Сигналы выключены",
+    signalsIntro: "Когда таймер сделки завершится, бот пришлет медиа, цену входа, цену выхода и итог.",
+    signalsBotHint: "По умолчанию включено. Если бот еще не писал вам, откройте его и нажмите /start.",
     economic: "Экономический календарь",
     economicHint: "Ставки, инфляция, занятость и выступления регуляторов.",
     market: "Общерыночные новости",
@@ -293,10 +302,18 @@ function getNotificationsCopy(lang) {
     return {
       ...ru,
       title: "Notifications",
-      subtitle: "News in the Telegram bot",
-      intro: "Enable reminders so the bot can send economic events in advance and fresh market headlines as they appear.",
+      subtitle: "Telegram bot",
+      intro: "Choose what the bot should send: market news and your signal results.",
+      newsCard: "News",
+      newsCardHint: "Calendar and market",
+      signalsCard: "Signals",
+      signalsCardHint: "Trade outcomes",
       masterOn: "Notifications enabled",
       masterOff: "Notifications disabled",
+      signalsOn: "Signals enabled",
+      signalsOff: "Signals disabled",
+      signalsIntro: "When a trade timer finishes, the bot sends media, entry price, exit price and the result.",
+      signalsBotHint: "Enabled by default. If the bot has not messaged you yet, open it and tap /start.",
       economic: "Economic calendar",
       economicHint: "Rates, inflation, employment and regulator speeches.",
       market: "Market news",
@@ -322,10 +339,18 @@ function getNotificationsCopy(lang) {
     return {
       ...ru,
       title: "Сповіщення",
-      subtitle: "Новини в Telegram-боті",
-      intro: "Увімкніть нагадування, щоб бот завчасно надсилав важливі події економічного календаря та свіжі ринкові новини.",
+      subtitle: "Telegram-бот",
+      intro: "Налаштуйте, що бот надсилатиме: ринкові новини та результати ваших сигналів.",
+      newsCard: "Новини",
+      newsCardHint: "Календар і ринок",
+      signalsCard: "Сигнали",
+      signalsCardHint: "Підсумки угод",
       masterOn: "Сповіщення увімкнені",
       masterOff: "Сповіщення вимкнені",
+      signalsOn: "Сигнали увімкнені",
+      signalsOff: "Сигнали вимкнені",
+      signalsIntro: "Коли таймер угоди завершиться, бот надішле медіа, ціну входу, ціну виходу та підсумок.",
+      signalsBotHint: "За замовчуванням увімкнено. Якщо бот ще не писав вам, відкрийте його та натисніть /start.",
       economic: "Економічний календар",
       economicHint: "Ставки, інфляція, зайнятість і виступи регуляторів.",
       market: "Загальноринкові новини",
@@ -359,6 +384,7 @@ function normalizeNewsNotificationSettings(data) {
     : NEWS_NOTIFICATION_DEFAULTS.lead_minutes;
   return {
     news_enabled: Number(data?.news_enabled) === 1 ? 1 : 0,
+    signals_enabled: data?.signals_enabled === undefined || Number(data.signals_enabled) === 1 ? 1 : 0,
     economic_enabled: data?.economic_enabled === undefined || Number(data.economic_enabled) === 1 ? 1 : 0,
     market_enabled: data?.market_enabled === undefined || Number(data.market_enabled) === 1 ? 1 : 0,
     impact_high_enabled: data?.impact_high_enabled === undefined || Number(data.impact_high_enabled) === 1 ? 1 : 0,
@@ -460,6 +486,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [supportLinks, setSupportLinks] = useState(SUPPORT_LINK_DEFAULTS);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notificationSection, setNotificationSection] = useState("news");
   const [notificationSettings, setNotificationSettings] = useState(NEWS_NOTIFICATION_DEFAULTS);
   const [notificationDraft, setNotificationDraft] = useState(NEWS_NOTIFICATION_DEFAULTS);
   const [notificationsSaving, setNotificationsSaving] = useState(false);
@@ -575,6 +602,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     }
     if (key === "notifications") {
       setNotificationDraft(notificationSettings);
+      setNotificationSection("news");
       setIsNotificationsOpen(true);
       return;
     }
@@ -712,6 +740,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
         method: "POST",
         body: JSON.stringify({
           news_enabled: notificationDraft.news_enabled,
+          signals_enabled: notificationDraft.signals_enabled,
           economic_enabled: notificationDraft.economic_enabled,
           market_enabled: notificationDraft.market_enabled,
           impact_high_enabled: notificationDraft.impact_high_enabled,
@@ -1062,38 +1091,26 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
             <div className="profile-notifications-body profile-faq-modal-scroll">
               <p>{notificationsCopy.intro}</p>
 
-              <button
-                type="button"
-                className={`profile-notification-master ${notificationDraft.news_enabled ? "active" : ""}`}
-                onClick={() => handleNotificationDraftChange("news_enabled", notificationDraft.news_enabled ? 0 : 1)}
-                role="switch"
-                aria-checked={notificationDraft.news_enabled === 1}
-              >
-                <span>
-                  <strong>{notificationDraft.news_enabled ? notificationsCopy.masterOn : notificationsCopy.masterOff}</strong>
-                  <small>{notificationsCopy.botHint}</small>
-                </span>
-                <i aria-hidden="true" />
-              </button>
-
-              <div className="profile-notification-feed-grid">
+              <div className="profile-notification-kind-grid">
                 {[
                   {
-                    key: "economic_enabled",
-                    title: notificationsCopy.economic,
-                    hint: notificationsCopy.economicHint
+                    id: "news",
+                    title: notificationsCopy.newsCard,
+                    hint: notificationsCopy.newsCardHint,
+                    active: notificationDraft.news_enabled === 1
                   },
                   {
-                    key: "market_enabled",
-                    title: notificationsCopy.market,
-                    hint: notificationsCopy.marketHint
+                    id: "signals",
+                    title: notificationsCopy.signalsCard,
+                    hint: notificationsCopy.signalsCardHint,
+                    active: notificationDraft.signals_enabled === 1
                   }
                 ].map((item) => (
                   <button
                     type="button"
-                    key={item.key}
-                    className={`profile-notification-feed ${notificationDraft[item.key] ? "active" : ""}`}
-                    onClick={() => handleNotificationDraftChange(item.key, notificationDraft[item.key] ? 0 : 1)}
+                    key={item.id}
+                    className={`profile-notification-kind ${notificationSection === item.id ? "selected" : ""} ${item.active ? "active" : ""}`}
+                    onClick={() => setNotificationSection(item.id)}
                   >
                     <strong>{item.title}</strong>
                     <span>{item.hint}</span>
@@ -1101,44 +1118,104 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
                 ))}
               </div>
 
-              {notificationDraft.economic_enabled === 1 && (
-                <div className="profile-notification-impact">
-                  <span>{notificationsCopy.impactTitle}</span>
-                  <small>{notificationsCopy.impactHint}</small>
-                  <div className="profile-notification-impact-grid">
+              {notificationSection === "news" ? (
+                <>
+                  <button
+                    type="button"
+                    className={`profile-notification-master ${notificationDraft.news_enabled ? "active" : ""}`}
+                    onClick={() => handleNotificationDraftChange("news_enabled", notificationDraft.news_enabled ? 0 : 1)}
+                    role="switch"
+                    aria-checked={notificationDraft.news_enabled === 1}
+                  >
+                    <span>
+                      <strong>{notificationDraft.news_enabled ? notificationsCopy.masterOn : notificationsCopy.masterOff}</strong>
+                      <small>{notificationsCopy.botHint}</small>
+                    </span>
+                    <i aria-hidden="true" />
+                  </button>
+
+                  <div className="profile-notification-feed-grid">
                     {[
-                      { key: "impact_high_enabled", label: notificationsCopy.impactHigh, tone: "high" },
-                      { key: "impact_medium_enabled", label: notificationsCopy.impactMedium, tone: "medium" },
-                      { key: "impact_low_enabled", label: notificationsCopy.impactLow, tone: "low" }
+                      {
+                        key: "economic_enabled",
+                        title: notificationsCopy.economic,
+                        hint: notificationsCopy.economicHint
+                      },
+                      {
+                        key: "market_enabled",
+                        title: notificationsCopy.market,
+                        hint: notificationsCopy.marketHint
+                      }
                     ].map((item) => (
                       <button
                         type="button"
                         key={item.key}
-                        className={`profile-notification-impact-chip tone-${item.tone} ${notificationDraft[item.key] ? "active" : ""}`}
+                        className={`profile-notification-feed ${notificationDraft[item.key] ? "active" : ""}`}
                         onClick={() => handleNotificationDraftChange(item.key, notificationDraft[item.key] ? 0 : 1)}
                       >
-                        {item.label}
+                        <strong>{item.title}</strong>
+                        <span>{item.hint}</span>
                       </button>
                     ))}
                   </div>
+
+                  {notificationDraft.economic_enabled === 1 && (
+                    <div className="profile-notification-impact">
+                      <span>{notificationsCopy.impactTitle}</span>
+                      <small>{notificationsCopy.impactHint}</small>
+                      <div className="profile-notification-impact-grid">
+                        {[
+                          { key: "impact_high_enabled", label: notificationsCopy.impactHigh, tone: "high" },
+                          { key: "impact_medium_enabled", label: notificationsCopy.impactMedium, tone: "medium" },
+                          { key: "impact_low_enabled", label: notificationsCopy.impactLow, tone: "low" }
+                        ].map((item) => (
+                          <button
+                            type="button"
+                            key={item.key}
+                            className={`profile-notification-impact-chip tone-${item.tone} ${notificationDraft[item.key] ? "active" : ""}`}
+                            onClick={() => handleNotificationDraftChange(item.key, notificationDraft[item.key] ? 0 : 1)}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="profile-notification-lead">
+                    <span>{notificationsCopy.leadTitle}</span>
+                    <div className="profile-notification-lead-grid">
+                      {(notificationDraft.lead_options || NEWS_NOTIFICATION_DEFAULTS.lead_options).map((minutes) => (
+                        <button
+                          type="button"
+                          key={minutes}
+                          className={notificationDraft.lead_minutes === minutes ? "active" : ""}
+                          onClick={() => handleNotificationDraftChange("lead_minutes", minutes)}
+                        >
+                          {minutes === 60 ? notificationsCopy.leadHour : `${minutes} ${notificationsCopy.leadSuffix}`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="profile-notification-signals-panel">
+                  <p>{notificationsCopy.signalsIntro}</p>
+                  <button
+                    type="button"
+                    className={`profile-notification-master ${notificationDraft.signals_enabled ? "active" : ""}`}
+                    onClick={() => handleNotificationDraftChange("signals_enabled", notificationDraft.signals_enabled ? 0 : 1)}
+                    role="switch"
+                    aria-checked={notificationDraft.signals_enabled === 1}
+                  >
+                    <span>
+                      <strong>{notificationDraft.signals_enabled ? notificationsCopy.signalsOn : notificationsCopy.signalsOff}</strong>
+                      <small>{notificationsCopy.signalsBotHint}</small>
+                    </span>
+                    <i aria-hidden="true" />
+                  </button>
                 </div>
               )}
-
-              <div className="profile-notification-lead">
-                <span>{notificationsCopy.leadTitle}</span>
-                <div className="profile-notification-lead-grid">
-                  {(notificationDraft.lead_options || NEWS_NOTIFICATION_DEFAULTS.lead_options).map((minutes) => (
-                    <button
-                      type="button"
-                      key={minutes}
-                      className={notificationDraft.lead_minutes === minutes ? "active" : ""}
-                      onClick={() => handleNotificationDraftChange("lead_minutes", minutes)}
-                    >
-                      {minutes === 60 ? notificationsCopy.leadHour : `${minutes} ${notificationsCopy.leadSuffix}`}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
 
             <div className="profile-faq-controls profile-faq-footer">

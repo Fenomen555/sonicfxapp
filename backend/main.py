@@ -509,6 +509,7 @@ class AnalysisSettlementRequest(BaseModel):
 
 class UserNewsNotificationSettingsUpdate(BaseModel):
     news_enabled: int = 0
+    signals_enabled: int = 1
     economic_enabled: int = 1
     market_enabled: int = 1
     impact_high_enabled: int = 1
@@ -2178,6 +2179,7 @@ def _news_notification_payload(row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     row = row or {}
     return {
         "news_enabled": _coerce_bool_flag(row.get("news_enabled"), 0),
+        "signals_enabled": _coerce_bool_flag(row.get("signals_enabled"), 1),
         "economic_enabled": _coerce_bool_flag(row.get("economic_enabled"), 1),
         "market_enabled": _coerce_bool_flag(row.get("market_enabled"), 1),
         "impact_high_enabled": _coerce_bool_flag(row.get("impact_high_enabled"), 1),
@@ -2197,6 +2199,7 @@ async def get_user_news_notification_settings(user_id: int) -> Dict[str, Any]:
                 """
                 SELECT
                     news_enabled,
+                    signals_enabled,
                     economic_enabled,
                     market_enabled,
                     impact_high_enabled,
@@ -2216,6 +2219,7 @@ async def get_user_news_notification_settings(user_id: int) -> Dict[str, Any]:
 
 async def update_user_news_notification_settings(user_id: int, payload: UserNewsNotificationSettingsUpdate) -> Dict[str, Any]:
     news_enabled = _coerce_bool_flag(payload.news_enabled, 0)
+    signals_enabled = _coerce_bool_flag(payload.signals_enabled, 1)
     economic_enabled = _coerce_bool_flag(payload.economic_enabled, 1)
     market_enabled = _coerce_bool_flag(payload.market_enabled, 1)
     impact_high_enabled = _coerce_bool_flag(payload.impact_high_enabled, 1)
@@ -2229,12 +2233,13 @@ async def update_user_news_notification_settings(user_id: int, payload: UserNews
                 """
                 INSERT INTO user_notification_settings
                     (
-                        user_id, news_enabled, economic_enabled, market_enabled,
+                        user_id, news_enabled, signals_enabled, economic_enabled, market_enabled,
                         impact_high_enabled, impact_medium_enabled, impact_low_enabled, lead_minutes
                     )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     news_enabled = VALUES(news_enabled),
+                    signals_enabled = VALUES(signals_enabled),
                     economic_enabled = VALUES(economic_enabled),
                     market_enabled = VALUES(market_enabled),
                     impact_high_enabled = VALUES(impact_high_enabled),
@@ -2245,6 +2250,7 @@ async def update_user_news_notification_settings(user_id: int, payload: UserNews
                 (
                     int(user_id),
                     news_enabled,
+                    signals_enabled,
                     economic_enabled,
                     market_enabled,
                     impact_high_enabled,
@@ -4042,6 +4048,259 @@ async def news_notification_loop() -> None:
         await asyncio.sleep(max(30, NEWS_NOTIFICATION_CHECK_INTERVAL_SEC))
 
 
+def _format_signal_notification_price(value: Any) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if abs(numeric) >= 100:
+        return f"{numeric:.3f}".rstrip("0").rstrip(".")
+    return f"{numeric:.5f}".rstrip("0").rstrip(".")
+
+
+def _format_signal_notification_expiration(value: Any) -> str:
+    raw = _normalize_selected_expiration(value)
+    if not raw:
+        return "-"
+    match = re.match(r"^(\d+)([smh])$", raw)
+    if not match:
+        return html.escape(raw)
+    amount = int(match.group(1))
+    unit = match.group(2)
+    if unit == "s":
+        return f"{amount} сек"
+    if unit == "m":
+        return f"{amount} мин"
+    return f"{amount} ч"
+
+
+def _build_signal_notification_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                _build_inline_button(
+                    text="Открыть SonicFX",
+                    web_app=WebAppInfo(url=build_main_webapp_url()),
+                    style="success",
+                )
+            ]
+        ]
+    )
+
+
+def _fallback_signal_result_quote(outcome: str) -> str:
+    normalized = str(outcome or "").strip().lower()
+    if normalized == "win":
+        return "Отличная работа: дисциплина и терпение снова усилили твоё решение."
+    if normalized == "loss":
+        return "Минус — часть дистанции. Забираем урок, сохраняем фокус и ждем лучший сетап."
+    if normalized == "refund":
+        return "Рынок дал паузу. Спокойствие и контроль — тоже сильная часть стратегии."
+    return "Каждый результат добавляет ясности. Главное — сохранять систему и спокойный темп."
+
+
+async def _generate_signal_result_quote(row: Dict[str, Any], settlement: Dict[str, Any]) -> str:
+    api_key = await get_app_setting("scanner_openai_api_key", DEFAULT_SCANNER_OPENAI_API_KEY)
+    api_key = str(api_key or "").strip()
+    if not api_key:
+        return _fallback_signal_result_quote(settlement.get("outcome"))
+
+    model = await get_app_setting("scanner_openai_model", DEFAULT_SCANNER_OPENAI_MODEL)
+    outcome_label = settlement.get("outcome_label") or _get_settlement_outcome_label(settlement.get("outcome"))
+    prompt = (
+        "Сгенерируй одну короткую профессиональную трейдинговую цитату на русском. "
+        "Тон: спокойный, позитивный, поддерживающий. "
+        "Если итог минусовой — подбодри без обещаний прибыли. "
+        "Если итог плюсовой — похвали дисциплину без эйфории. "
+        "Максимум 18 слов. Без эмодзи, без кавычек, без markdown."
+    )
+    user_text = (
+        f"Итог: {outcome_label}\n"
+        f"Актив: {row.get('asset') or '-'}\n"
+        f"Направление: {row.get('signal') or '-'}\n"
+        f"Цена входа: {settlement.get('entry_price')}\n"
+        f"Цена выхода: {settlement.get('exit_price')}"
+    )
+    request_payload = {
+        "model": str(model or DEFAULT_SCANNER_OPENAI_MODEL).strip() or DEFAULT_SCANNER_OPENAI_MODEL,
+        "temperature": 0.7,
+        "max_tokens": 80,
+        "messages": [
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": user_text},
+        ],
+    }
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=6.0)) as client:
+            response = await client.post(f"{OPENAI_API_BASE_URL}/chat/completions", headers=headers, json=request_payload)
+            response.raise_for_status()
+            payload = response.json()
+        quote = str(payload["choices"][0]["message"]["content"] or "").strip()
+        quote = re.sub(r"^[\"'«“]+|[\"'»”]+$", "", quote).strip()
+        quote = re.sub(r"\s+", " ", quote)
+        return quote[:220] if quote else _fallback_signal_result_quote(settlement.get("outcome"))
+    except Exception as exc:
+        print(f"[Bot] signal quote generation fallback: {exc}")
+        return _fallback_signal_result_quote(settlement.get("outcome"))
+
+
+def _format_signal_result_notification_message(row: Dict[str, Any], settlement: Dict[str, Any], quote: str) -> str:
+    outcome_label = settlement.get("outcome_label") or _get_settlement_outcome_label(settlement.get("outcome"))
+    asset = html.escape(str(row.get("asset") or "не определен"))
+    direction = html.escape(str(settlement.get("direction") or row.get("signal") or "-"))
+    expiration = html.escape(_format_signal_notification_expiration(settlement.get("selected_expiration") or row.get("selected_expiration")))
+    entry_price = html.escape(_format_signal_notification_price(settlement.get("entry_price") or row.get("entry_price")))
+    exit_price = html.escape(_format_signal_notification_price(settlement.get("exit_price") or row.get("exit_price")))
+    delta = html.escape(_format_signal_notification_price(settlement.get("price_delta")))
+    comment = html.escape(str(row.get("comment") or "").strip())
+    quote_text = html.escape(quote or _fallback_signal_result_quote(settlement.get("outcome")))
+
+    lines = [
+        "<b>SonicFX Signal</b>",
+        f"<b>{html.escape(str(outcome_label or 'Не определено'))}</b>",
+        "",
+        f"Актив: <b>{asset}</b>",
+        f"Направление: <b>{direction}</b>",
+        f"Экспирация: <b>{expiration}</b>",
+        f"Цена входа: <code>{entry_price}</code>",
+        f"Цена выхода: <code>{exit_price}</code>",
+        f"Дельта: <code>{delta}</code>",
+    ]
+    if comment:
+        lines.extend(["", f"<i>{comment}</i>"])
+    lines.extend(["", f"<blockquote>{quote_text}</blockquote>"])
+    return "\n".join(lines)
+
+
+def _get_signal_notification_media(row: Dict[str, Any]) -> Optional[types.FSInputFile]:
+    if row.get("upload_archived_at"):
+        return None
+    file_path = str(row.get("upload_file_path") or "").strip()
+    if not file_path:
+        return None
+    target = Path(file_path).resolve()
+    try:
+        target.relative_to(scan_upload_dir.resolve())
+    except ValueError:
+        return None
+    if not target.is_file():
+        return None
+    return types.FSInputFile(str(target))
+
+
+async def send_due_signal_result_notifications_once(limit: int = 50) -> int:
+    if bot is None:
+        return 0
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT
+                    ah.*,
+                    su.file_path AS upload_file_path,
+                    su.content_type AS upload_content_type,
+                    su.archived_at AS upload_archived_at
+                FROM analysis_history ah
+                INNER JOIN users u ON u.user_id = ah.user_id AND COALESCE(u.is_blocked, 0) = 0
+                LEFT JOIN user_notification_settings s ON s.user_id = ah.user_id
+                LEFT JOIN scan_uploads su ON su.id = ah.upload_id
+                WHERE ah.settlement_status = 'settled'
+                  AND ah.settled_at IS NOT NULL
+                  AND ah.signal_notification_sent_at IS NULL
+                  AND COALESCE(s.signals_enabled, 1) = 1
+                  AND UPPER(TRIM(COALESCE(ah.`signal`, ''))) IN ('BUY', 'SELL')
+                ORDER BY ah.settled_at ASC, ah.id ASC
+                LIMIT %s
+                """,
+                (int(limit),),
+            )
+            rows = await cur.fetchall()
+
+    sent = 0
+    for row in rows or []:
+        history_id = int(row.get("id") or 0)
+        user_id = int(row.get("user_id") or 0)
+        if not history_id or not user_id:
+            continue
+        serialized = _serialize_analysis_history(row) or {}
+        settlement = serialized.get("settlement") if isinstance(serialized.get("settlement"), dict) else None
+        if not settlement:
+            continue
+        quote = await _generate_signal_result_quote(row, settlement)
+        message = _format_signal_result_notification_message(row, settlement, quote)
+        keyboard = _build_signal_notification_keyboard()
+        media = _get_signal_notification_media(row)
+        try:
+            if media:
+                try:
+                    await bot.send_photo(
+                        chat_id=user_id,
+                        photo=media,
+                        caption=message,
+                        parse_mode="HTML",
+                        reply_markup=keyboard,
+                    )
+                except Exception as media_exc:
+                    print(f"[Bot] signal result media fallback for {user_id}: {media_exc}")
+                    await bot.send_message(
+                        chat_id=user_id,
+                        text=message,
+                        parse_mode="HTML",
+                        disable_web_page_preview=True,
+                        reply_markup=keyboard,
+                    )
+            else:
+                await bot.send_message(
+                    chat_id=user_id,
+                    text=message,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                    reply_markup=keyboard,
+                )
+        except Exception as exc:
+            print(f"[Bot] signal result notification send error for {user_id}: {exc}")
+            fallback_message = message.replace("<blockquote>", "<i>").replace("</blockquote>", "</i>")
+            try:
+                await bot.send_message(
+                    chat_id=user_id,
+                    text=fallback_message,
+                    parse_mode="HTML",
+                    disable_web_page_preview=True,
+                    reply_markup=keyboard,
+                )
+            except Exception as fallback_exc:
+                print(f"[Bot] signal result notification fallback failed for {user_id}: {fallback_exc}")
+                continue
+
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    UPDATE analysis_history
+                    SET signal_notification_sent_at = CURRENT_TIMESTAMP()
+                    WHERE id = %s AND user_id = %s AND signal_notification_sent_at IS NULL
+                    """,
+                    (history_id, user_id),
+                )
+        sent += 1
+    return sent
+
+
+async def signal_result_notification_loop() -> None:
+    await asyncio.sleep(12)
+    while True:
+        try:
+            await send_due_signal_result_notifications_once()
+        except Exception as exc:
+            print(f"[Bot] signal result notification loop error: {exc}")
+        await asyncio.sleep(15)
+
+
 async def _get_news_updated_at(feed_type: str) -> str:
     pool = await require_db_pool()
     async with pool.acquire() as conn:
@@ -4661,14 +4920,16 @@ async def start_bot():
     except Exception as exc:
         print(f"[Bot] set_my_commands error: {exc}")
     notification_task = asyncio.create_task(news_notification_loop())
+    signal_notification_task = asyncio.create_task(signal_result_notification_loop())
     try:
         await dp.start_polling(bot)
     finally:
-        notification_task.cancel()
-        try:
-            await notification_task
-        except asyncio.CancelledError:
-            pass
+        for task in (notification_task, signal_notification_task):
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 async def start_api():

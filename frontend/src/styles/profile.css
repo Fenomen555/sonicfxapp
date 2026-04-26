@@ -614,6 +614,7 @@
 
 .profile-notification-master,
 .profile-notification-feed,
+.profile-notification-kind,
 .profile-notification-lead {
   border: 1px solid rgba(83, 103, 136, 0.34);
   background:
@@ -622,6 +623,61 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 14px 24px rgba(5, 10, 18, 0.12);
+}
+
+.profile-notification-kind-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.profile-notification-kind {
+  min-height: 88px;
+  padding: 13px;
+  border-radius: 20px;
+  color: var(--text-main);
+  display: grid;
+  gap: 7px;
+  align-content: center;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.profile-notification-kind::after {
+  content: "";
+  position: absolute;
+  top: 13px;
+  right: 13px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(130, 146, 170, 0.7);
+  box-shadow: 0 0 0 4px rgba(130, 146, 170, 0.1);
+}
+
+.profile-notification-kind.active::after {
+  background: #8ff0bd;
+  box-shadow: 0 0 0 4px rgba(77, 217, 146, 0.14), 0 0 18px rgba(77, 217, 146, 0.38);
+}
+
+.profile-notification-kind.selected {
+  border-color: rgba(143, 184, 255, 0.48);
+  background:
+    radial-gradient(circle at top right, rgba(143, 184, 255, 0.2), transparent 44%),
+    linear-gradient(180deg, rgba(22, 34, 54, 0.98), rgba(10, 17, 28, 0.98));
+}
+
+.profile-notification-kind strong {
+  font-size: 15px;
+  line-height: 1.1;
+}
+
+.profile-notification-kind span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
 }
 
 .profile-notification-master {
@@ -729,6 +785,11 @@
   background:
     radial-gradient(circle at top right, rgba(143, 184, 255, 0.18), transparent 44%),
     linear-gradient(180deg, rgba(21, 32, 50, 0.96), rgba(11, 18, 30, 0.96));
+}
+
+.profile-notification-signals-panel {
+  display: grid;
+  gap: 12px;
 }
 
 .profile-notification-impact {

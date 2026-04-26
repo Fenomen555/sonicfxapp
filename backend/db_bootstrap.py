@@ -295,6 +295,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                 CREATE TABLE IF NOT EXISTS user_notification_settings (
                     user_id BIGINT NOT NULL PRIMARY KEY,
                     news_enabled TINYINT(1) NOT NULL DEFAULT 0,
+                    signals_enabled TINYINT(1) NOT NULL DEFAULT 1,
                     economic_enabled TINYINT(1) NOT NULL DEFAULT 1,
                     market_enabled TINYINT(1) NOT NULL DEFAULT 1,
                     impact_high_enabled TINYINT(1) NOT NULL DEFAULT 1,
@@ -439,6 +440,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     settled_at TIMESTAMP NULL DEFAULT NULL,
                     settlement_outcome VARCHAR(16) NULL,
                     exit_price DECIMAL(20,8) NULL,
+                    signal_notification_sent_at TIMESTAMP NULL DEFAULT NULL,
                     comment TEXT NULL,
                     result_json MEDIUMTEXT NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -475,6 +477,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "news_items", "unit", "ALTER TABLE news_items ADD COLUMN unit VARCHAR(32) NULL")
         await _ensure_column(conn, db_name, "news_items", "updated_at", "ALTER TABLE news_items ADD COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
         await _ensure_column(conn, db_name, "user_notification_settings", "news_enabled", "ALTER TABLE user_notification_settings ADD COLUMN news_enabled TINYINT(1) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "user_notification_settings", "signals_enabled", "ALTER TABLE user_notification_settings ADD COLUMN signals_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "user_notification_settings", "economic_enabled", "ALTER TABLE user_notification_settings ADD COLUMN economic_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "user_notification_settings", "market_enabled", "ALTER TABLE user_notification_settings ADD COLUMN market_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "user_notification_settings", "impact_high_enabled", "ALTER TABLE user_notification_settings ADD COLUMN impact_high_enabled TINYINT(1) NOT NULL DEFAULT 1")
@@ -511,6 +514,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "analysis_history", "settled_at", "ALTER TABLE analysis_history ADD COLUMN settled_at TIMESTAMP NULL DEFAULT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "settlement_outcome", "ALTER TABLE analysis_history ADD COLUMN settlement_outcome VARCHAR(16) NULL")
         await _ensure_column(conn, db_name, "analysis_history", "exit_price", "ALTER TABLE analysis_history ADD COLUMN exit_price DECIMAL(20,8) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "signal_notification_sent_at", "ALTER TABLE analysis_history ADD COLUMN signal_notification_sent_at TIMESTAMP NULL DEFAULT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "comment", "ALTER TABLE analysis_history ADD COLUMN comment TEXT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "result_json", "ALTER TABLE analysis_history ADD COLUMN result_json MEDIUMTEXT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "created_at", "ALTER TABLE analysis_history ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
@@ -536,6 +540,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_user_created", "CREATE INDEX idx_analysis_history_user_created ON analysis_history (user_id, created_at)")
         await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_upload", "CREATE INDEX idx_analysis_history_upload ON analysis_history (upload_id)")
         await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_settlement_due", "CREATE INDEX idx_analysis_history_settlement_due ON analysis_history (settlement_status, settlement_due_at)")
+        await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_signal_notify", "CREATE INDEX idx_analysis_history_signal_notify ON analysis_history (settlement_status, signal_notification_sent_at, settled_at)")
 
         await _seed_feature_flags(conn)
         await _seed_signal_indicators(conn)

@@ -394,6 +394,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const [quoteRenderReady, setQuoteRenderReady] = useState(false);
   const [scanUploadState, setScanUploadState] = useState({ status: "idle", file: null, detail: "" });
   const [scanPreview, setScanPreview] = useState({ url: "", status: "idle" });
+  const [analysisMediaPreview, setAnalysisMediaPreview] = useState({ url: "", status: "idle" });
   const [isAnalysisScanning, setIsAnalysisScanning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisSettlement, setAnalysisSettlement] = useState({ status: "idle" });
@@ -422,6 +423,17 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   );
 
   const uploadAccept = "image/jpeg,image/png,image/webp,image/heic,image/heif";
+  const analysisMediaPath = useMemo(() => {
+    const historyPreviewPath = String(analysisResult?.history_item?.preview_path || "").trim();
+    if (historyPreviewPath) return historyPreviewPath;
+
+    const uploadId = Number(analysisResult?.upload?.id || analysisResult?.history_item?.upload_id || 0);
+    return uploadId ? `/api/upload/scan/${encodeURIComponent(uploadId)}/preview` : "";
+  }, [
+    analysisResult?.history_item?.preview_path,
+    analysisResult?.history_item?.upload_id,
+    analysisResult?.upload?.id
+  ]);
 
   const baseSignalModes = useMemo(
     () => [
@@ -612,6 +624,45 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       }
     };
   }, [scanUploadState.file?.id, scanUploadState.status]);
+
+  useEffect(() => {
+    let isActive = true;
+    let objectUrl = "";
+
+    if (!analysisMediaPath) {
+      setAnalysisMediaPreview({ url: "", status: "idle" });
+      return undefined;
+    }
+
+    async function loadAnalysisMediaPreview() {
+      setAnalysisMediaPreview({ url: "", status: "loading" });
+      try {
+        const response = await apiFetch(analysisMediaPath);
+        if (!response.ok) {
+          throw new Error("Analysis media preview request failed");
+        }
+
+        const blob = await response.blob();
+        if (!isActive) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setAnalysisMediaPreview({ url: objectUrl, status: "ready" });
+      } catch (_error) {
+        if (isActive) {
+          setAnalysisMediaPreview({ url: "", status: "error" });
+        }
+      }
+    }
+
+    loadAnalysisMediaPreview();
+
+    return () => {
+      isActive = false;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [analysisMediaPath]);
 
   useEffect(() => {
     let isActive = true;
@@ -1428,24 +1479,86 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     : "";
   const shouldShowActiveAnalysisCard = Boolean(activeAnalysis?.id && !analysisSummary);
 
+  function renderSettlementCard() {
+    if (displayedSettlement.status === "idle") return null;
+    return (
+      <article className={`analysis-result-card analysis-settlement-card settlement-${getSettlementTone(displayedSettlement.settlement?.outcome)}`}>
+        {displayedSettlement.status === "countdown" ? (
+          <>
+            <div className="deal-timer-head">
+              <span>Таймер сделки</span>
+              <strong>{formatCountdown(displayedSettlement.remainingSeconds)}</strong>
+            </div>
+            <div
+              className="deal-timer-flow"
+              style={{ "--deal-progress": `${settlementCountdownProgress.elapsedPercent}%` }}
+            >
+              <span className="deal-timer-percent left">{settlementCountdownProgress.remainingPercent}%</span>
+              <div className="deal-timer-track" aria-hidden="true">
+                <span className="deal-timer-line green" />
+                <span className="deal-timer-pin" />
+                <span className="deal-timer-line red" />
+              </div>
+              <span className="deal-timer-percent right">{settlementCountdownProgress.elapsedPercent}%</span>
+            </div>
+            <small className="analysis-result-subcopy">Финальную цену проверим после экспирации</small>
+          </>
+        ) : (
+          <>
+            <span>
+              {displayedSettlement.status === "settling"
+                ? "Проверка сделки"
+                : displayedSettlement.status === "error"
+                  ? "Проверка сделки"
+                  : "Результат сделки"}
+            </span>
+            <strong>
+              {displayedSettlement.status === "settling"
+                ? "Проверяем..."
+                : displayedSettlement.status === "error"
+                  ? "Ошибка"
+                  : displayedSettlement.settlement?.outcome_label || "Готово"}
+            </strong>
+            <small className="analysis-result-subcopy">
+              {displayedSettlement.status === "settling"
+                ? "Запрашиваем свежую цену актива"
+                : displayedSettlement.status === "error"
+                  ? (displayedSettlement.error || "Не удалось получить финальную цену")
+                  : `Финал: ${formatAnalysisPrice(displayedSettlement.settlement?.exit_price)}`}
+            </small>
+          </>
+        )}
+      </article>
+    );
+  }
+
   function renderAnalysisResultPanel({ showMedia = true } = {}) {
     if (!analysisSummary) return null;
+    const mediaUrl = analysisMediaPath ? analysisMediaPreview.url : scanPreview.url;
+    const handleMediaError = () => {
+      if (analysisMediaPath) {
+        setAnalysisMediaPreview((prev) => ({ ...prev, url: "", status: "error" }));
+        return;
+      }
+      setScanPreview((prev) => ({ ...prev, url: "", status: "error" }));
+    };
+
     return (
       <div className="upload-zone analysis-result-panel">
         <div className="analysis-result-sheet analysis-result-sheet-inline" role="region" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
-          {showMedia && scanPreview.url ? (
+          {showMedia && mediaUrl ? (
             <div className="upload-preview-media analysis-result-media">
               <img
                 className="upload-preview-backdrop"
-                src={scanPreview.url}
+                src={mediaUrl}
                 alt=""
                 aria-hidden="true"
               />
               <img
                 className="upload-preview-image"
-                src={scanPreview.url}
+                src={mediaUrl}
                 alt={t.home.uploadPreviewAlt || "Uploaded chart"}
-                onError={() => setScanPreview((prev) => ({ ...prev, url: "", status: "error" }))}
+                onError={handleMediaError}
               />
             </div>
           ) : null}
@@ -1464,76 +1577,30 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
           </div>
 
           {analysisSummary.status !== "graph_not_found" ? (
-            <div className="analysis-result-grid">
-              <article className="analysis-result-card">
-                <span>{t.home.analysisAssetLabel || "Актив"}</span>
-                <strong>{analysisAssetLabel}</strong>
-              </article>
-              <article className="analysis-result-card">
-                <span>{t.home.analysisPriceLabel || "Цена"}</span>
-                <strong>{analysisPriceLabel}</strong>
-              </article>
-              <article className="analysis-result-card">
-                <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>
-                <strong>{Number(analysisSummary.confidence || 0)}%</strong>
-              </article>
-              <article className="analysis-result-card">
-                <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
-                <strong>{selectedExpirationLabel}</strong>
-                <small className="analysis-result-subcopy">
-                  {(t.home.analysisExpirationRecommendationPrefix || "ИИ рекомендует")}: {formatAnalysisExpiration(analysisSummary.expiration_minutes)}
-                </small>
-              </article>
-              {displayedSettlement.status !== "idle" && (
-                <article className={`analysis-result-card analysis-settlement-card settlement-${getSettlementTone(displayedSettlement.settlement?.outcome)}`}>
-                  {displayedSettlement.status === "countdown" ? (
-                    <>
-                      <div className="deal-timer-head">
-                        <span>Таймер сделки</span>
-                        <strong>{formatCountdown(displayedSettlement.remainingSeconds)}</strong>
-                      </div>
-                      <div
-                        className="deal-timer-flow"
-                        style={{ "--deal-progress": `${settlementCountdownProgress.elapsedPercent}%` }}
-                      >
-                        <span className="deal-timer-percent left">{settlementCountdownProgress.remainingPercent}%</span>
-                        <div className="deal-timer-track" aria-hidden="true">
-                          <span className="deal-timer-line green" />
-                          <span className="deal-timer-pin" />
-                          <span className="deal-timer-line red" />
-                        </div>
-                        <span className="deal-timer-percent right">{settlementCountdownProgress.elapsedPercent}%</span>
-                      </div>
-                      <small className="analysis-result-subcopy">Финальную цену проверим после экспирации</small>
-                    </>
-                  ) : (
-                    <>
-                      <span>
-                        {displayedSettlement.status === "settling"
-                          ? "Проверка сделки"
-                          : displayedSettlement.status === "error"
-                            ? "Проверка сделки"
-                            : "Результат сделки"}
-                      </span>
-                      <strong>
-                        {displayedSettlement.status === "settling"
-                          ? "Проверяем..."
-                          : displayedSettlement.status === "error"
-                            ? "Ошибка"
-                            : displayedSettlement.settlement?.outcome_label || "Готово"}
-                      </strong>
-                      <small className="analysis-result-subcopy">
-                        {displayedSettlement.status === "settling"
-                          ? "Запрашиваем свежую цену актива"
-                          : displayedSettlement.status === "error"
-                            ? (displayedSettlement.error || "Не удалось получить финальную цену")
-                            : `Финал: ${formatAnalysisPrice(displayedSettlement.settlement?.exit_price)}`}
-                      </small>
-                    </>
-                  )}
+            <>
+              {renderSettlementCard()}
+              <div className="analysis-result-grid">
+                <article className="analysis-result-card">
+                  <span>{t.home.analysisAssetLabel || "Актив"}</span>
+                  <strong>{analysisAssetLabel}</strong>
                 </article>
-              )}
-            </div>
+                <article className="analysis-result-card">
+                  <span>{t.home.analysisPriceLabel || "Цена"}</span>
+                  <strong>{analysisPriceLabel}</strong>
+                </article>
+                <article className="analysis-result-card">
+                  <span>{t.home.analysisConfidenceLabel || "Уверенность"}</span>
+                  <strong>{Number(analysisSummary.confidence || 0)}%</strong>
+                </article>
+                <article className="analysis-result-card">
+                  <span>{t.home.analysisExpirationLabel || "Экспирация"}</span>
+                  <strong>{selectedExpirationLabel}</strong>
+                  <small className="analysis-result-subcopy">
+                    {(t.home.analysisExpirationRecommendationPrefix || "ИИ рекомендует")}: {formatAnalysisExpiration(analysisSummary.expiration_minutes)}
+                  </small>
+                </article>
+              </div>
+            </>
           ) : (
             <div className="analysis-result-empty">
               <strong>{t.home.analysisGraphNotFoundTitle || "График не обнаружен"}</strong>
@@ -1609,7 +1676,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               label={t.home.scanAnalysisLabel || "Scanning chart"}
             />
           </div>
-          {analysisSummary ? renderAnalysisResultPanel({ showMedia: false }) : null}
+          {analysisSummary ? renderAnalysisResultPanel({ showMedia: true }) : null}
         </>
       ) : analysisSummary ? (
         renderAnalysisResultPanel({ showMedia: true })

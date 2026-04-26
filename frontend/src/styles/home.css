@@ -1654,6 +1654,10 @@
   gap: 8px;
 }
 
+.analysis-result-sheet-inline > .analysis-settlement-card {
+  margin-top: 10px;
+}
+
 .analysis-settlement-card::before {
   content: "";
   position: absolute;

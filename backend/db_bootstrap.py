@@ -434,6 +434,11 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     confidence INT NULL,
                     expiration_minutes INT NULL,
                     selected_expiration VARCHAR(16) NULL,
+                    settlement_status VARCHAR(16) NOT NULL DEFAULT 'none',
+                    settlement_due_at TIMESTAMP NULL DEFAULT NULL,
+                    settled_at TIMESTAMP NULL DEFAULT NULL,
+                    settlement_outcome VARCHAR(16) NULL,
+                    exit_price DECIMAL(20,8) NULL,
                     comment TEXT NULL,
                     result_json MEDIUMTEXT NULL,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -501,6 +506,11 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "analysis_history", "confidence", "ALTER TABLE analysis_history ADD COLUMN confidence INT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "expiration_minutes", "ALTER TABLE analysis_history ADD COLUMN expiration_minutes INT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "selected_expiration", "ALTER TABLE analysis_history ADD COLUMN selected_expiration VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "settlement_status", "ALTER TABLE analysis_history ADD COLUMN settlement_status VARCHAR(16) NOT NULL DEFAULT 'none'")
+        await _ensure_column(conn, db_name, "analysis_history", "settlement_due_at", "ALTER TABLE analysis_history ADD COLUMN settlement_due_at TIMESTAMP NULL DEFAULT NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "settled_at", "ALTER TABLE analysis_history ADD COLUMN settled_at TIMESTAMP NULL DEFAULT NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "settlement_outcome", "ALTER TABLE analysis_history ADD COLUMN settlement_outcome VARCHAR(16) NULL")
+        await _ensure_column(conn, db_name, "analysis_history", "exit_price", "ALTER TABLE analysis_history ADD COLUMN exit_price DECIMAL(20,8) NULL")
         await _ensure_column(conn, db_name, "analysis_history", "comment", "ALTER TABLE analysis_history ADD COLUMN comment TEXT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "result_json", "ALTER TABLE analysis_history ADD COLUMN result_json MEDIUMTEXT NULL")
         await _ensure_column(conn, db_name, "analysis_history", "created_at", "ALTER TABLE analysis_history ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
@@ -525,6 +535,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "scan_uploads", "idx_scan_uploads_user_date_sequence", "CREATE INDEX idx_scan_uploads_user_date_sequence ON scan_uploads (user_id, upload_date, sequence_number)")
         await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_user_created", "CREATE INDEX idx_analysis_history_user_created ON analysis_history (user_id, created_at)")
         await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_upload", "CREATE INDEX idx_analysis_history_upload ON analysis_history (upload_id)")
+        await _ensure_index(conn, db_name, "analysis_history", "idx_analysis_history_settlement_due", "CREATE INDEX idx_analysis_history_settlement_due ON analysis_history (settlement_status, settlement_due_at)")
 
         await _seed_feature_flags(conn)
         await _seed_signal_indicators(conn)

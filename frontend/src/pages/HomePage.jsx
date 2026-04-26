@@ -384,6 +384,8 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const [isAnalysisScanning, setIsAnalysisScanning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisSettlement, setAnalysisSettlement] = useState({ status: "idle" });
+  const [activeAnalysis, setActiveAnalysis] = useState(null);
+  const [activeAnalysisRemaining, setActiveAnalysisRemaining] = useState(0);
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const analysisScanTimerRef = useRef(0);
@@ -490,6 +492,53 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     }
     settlementTokenRef.current = "";
   }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function loadActiveAnalysis() {
+      try {
+        const data = await apiFetchJson("/api/analysis/active");
+        if (!isActive) return;
+        const item = data?.item || null;
+        setActiveAnalysis(item);
+        setActiveAnalysisRemaining(Number(data?.remaining_seconds || 0));
+      } catch (_error) {
+        if (!isActive) return;
+        setActiveAnalysis(null);
+        setActiveAnalysisRemaining(0);
+      }
+    }
+
+    loadActiveAnalysis();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeAnalysis?.id || activeAnalysisRemaining <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveAnalysisRemaining((prev) => Math.max(0, Number(prev || 0) - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeAnalysis?.id, activeAnalysisRemaining, expiration]);
+
+  useEffect(() => {
+    if (!activeAnalysis?.id || activeAnalysisRemaining !== 0) return;
+    setActiveAnalysisRemaining(-1);
+    settleAnalysisResult(activeAnalysis.id, activeAnalysis.selected_expiration || expiration, "");
+  }, [activeAnalysis?.id, activeAnalysisRemaining]);
+
+  useEffect(() => {
+    if (!activeAnalysis?.id || analysisSettlement.status !== "countdown") return;
+    if (Number(analysisSettlement.historyId || 0) !== Number(activeAnalysis.id)) return;
+    setAnalysisSettlement((prev) => ({
+      ...prev,
+      remainingSeconds: Math.max(0, activeAnalysisRemaining)
+    }));
+  }, [activeAnalysis?.id, activeAnalysisRemaining, analysisSettlement.status, analysisSettlement.historyId]);
 
   useEffect(() => {
     let isActive = true;
@@ -1089,7 +1138,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   }
 
   async function settleAnalysisResult(historyId, selectedExpiration, token) {
-    if (!historyId || settlementTokenRef.current !== token) return;
+    if (!historyId || (token && settlementTokenRef.current !== token)) return;
     setAnalysisSettlement((prev) => ({
       ...prev,
       status: "settling",
@@ -1100,7 +1149,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         method: "POST",
         body: JSON.stringify({ selected_expiration: selectedExpiration })
       });
-      if (settlementTokenRef.current !== token) return;
+      if (token && settlementTokenRef.current !== token) return;
       const settlement = data?.settlement || data?.item?.settlement || null;
       setAnalysisSettlement({
         status: "settled",
@@ -1119,13 +1168,15 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
           }
         };
       });
+      setActiveAnalysis(null);
+      setActiveAnalysisRemaining(0);
       notify?.({
         type: "success",
         title: settlement?.outcome_label || "Результат сделки готов",
         message: `Финальная цена: ${formatAnalysisPrice(settlement?.exit_price)}`
       });
     } catch (error) {
-      if (settlementTokenRef.current !== token) return;
+      if (token && settlementTokenRef.current !== token) return;
       setAnalysisSettlement((prev) => ({
         ...prev,
         status: "error",
@@ -1161,7 +1212,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       remainingSeconds: totalSeconds,
       selectedExpiration
     });
-
     settlementTimerRef.current = window.setInterval(() => {
       const remainingSeconds = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
       setAnalysisSettlement((prev) => ({ ...prev, remainingSeconds }));
@@ -1222,6 +1272,33 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       return;
     }
     await startNewScannerAnalysis();
+  }
+
+  function openActiveAnalysis() {
+    if (!activeAnalysis) return;
+    const result = activeAnalysis.result && typeof activeAnalysis.result === "object"
+      ? activeAnalysis.result
+      : {
+          signal: activeAnalysis.signal,
+          asset: activeAnalysis.asset,
+          market_mode: activeAnalysis.market_mode,
+          entry_price: activeAnalysis.entry_price,
+          confidence: activeAnalysis.confidence,
+          expiration_minutes: activeAnalysis.expiration_minutes,
+          comment: activeAnalysis.comment
+        };
+    setAnalysisResult({
+      status: "success",
+      result,
+      history_item: activeAnalysis
+    });
+    setAnalysisSettlement({
+      status: "countdown",
+      historyId: activeAnalysis.id,
+      totalSeconds: Math.max(0, activeAnalysisRemaining),
+      remainingSeconds: Math.max(0, activeAnalysisRemaining),
+      selectedExpiration: activeAnalysis.selected_expiration || expiration
+    });
   }
 
   async function handleAnalyzeClick() {
@@ -1331,6 +1408,11 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     : analysisSummary?.settlement
       ? { status: "settled", settlement: analysisSummary.settlement }
       : { status: "idle" };
+  const activeAnalysisSignalTone = getAnalysisSignalTone(activeAnalysis?.signal);
+  const activeAnalysisAssetLabel = activeAnalysis
+    ? formatAnalysisAsset(activeAnalysis.asset, activeAnalysis.market_mode)
+    : "";
+  const shouldShowActiveAnalysisCard = Boolean(activeAnalysis?.id && !analysisSummary);
 
   function renderAnalysisResultPanel({ showMedia = true } = {}) {
     if (!analysisSummary) return null;
@@ -1458,6 +1540,22 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
           {t.home.pro || "Get PRO"}
         </button>
       </div>
+
+      {shouldShowActiveAnalysisCard ? (
+        <article className={`active-analysis-card signal-${activeAnalysisSignalTone}`}>
+          <div className="active-analysis-main">
+            <span className="active-analysis-kicker">Анализ 1</span>
+            <strong>{activeAnalysisAssetLabel}</strong>
+            <small>
+              Цена {formatAnalysisPrice(activeAnalysis.entry_price)} · {String(activeAnalysis.signal || "").toUpperCase()}
+            </small>
+          </div>
+          <div className="active-analysis-side">
+            <b>{activeAnalysisRemaining > 0 ? formatCountdown(activeAnalysisRemaining) : "Проверяем"}</b>
+            <button type="button" onClick={openActiveAnalysis}>Открыть</button>
+          </div>
+        </article>
+      ) : null}
 
       {isAutomaticMode ? (
         <>

@@ -234,37 +234,6 @@ function buildLiveChartImageDataUrl({ payload, symbol, marketLabel }) {
   ctx.fillStyle = "#9ed7ff";
   ctx.fillText(String(marketLabel || "LIVE").toUpperCase(), 44, 57);
 
-  const lastClose = candles[candles.length - 1]?.close;
-  if (Number.isFinite(lastClose)) {
-    const priceY = yOf(lastClose);
-    ctx.strokeStyle = "rgba(126, 170, 255, 0.42)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(plot.left, priceY);
-    ctx.lineTo(plot.left + plot.width, priceY);
-    ctx.stroke();
-    ctx.fillStyle = "rgba(11,18,31,0.86)";
-    ctx.strokeStyle = "rgba(142,169,221,0.65)";
-    ctx.lineWidth = 1;
-    const label = formatAnalysisPrice(lastClose);
-    const metrics = ctx.measureText(label);
-    const tagW = metrics.width + 28;
-    const tagH = 32;
-    const tagX = plot.left + plot.width - tagW;
-    const tagY = Math.max(plot.top + 4, Math.min(priceY - tagH / 2, plot.top + plot.height - tagH - 4));
-    ctx.beginPath();
-    if (typeof ctx.roundRect === "function") {
-      ctx.roundRect(tagX, tagY, tagW, tagH, 17);
-    } else {
-      ctx.rect(tagX, tagY, tagW, tagH);
-    }
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#f7fbff";
-    ctx.font = "800 16px Arial";
-    ctx.fillText(label, tagX + 14, tagY + 22);
-  }
-
   candles.forEach((item, index) => {
     const x = plot.left + step * index + step / 2;
     const openY = yOf(item.open);
@@ -852,7 +821,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     : indicators;
 
   const autoQuoteSubscription = useMemo(() => {
-    if (!isAutomaticMode) return [];
+    if (!isAutomaticMode || analysisResult?.result) return [];
     const symbol = selectedPairMeta?.pair || asset;
     if (!symbol) return [];
     return [{
@@ -860,7 +829,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       symbol,
       history_seconds: quotesConfig.history_seconds || 300
     }];
-  }, [asset, isAutomaticMode, marketKind, quotesConfig.history_seconds, selectedPairMeta]);
+  }, [analysisResult?.result, asset, isAutomaticMode, marketKind, quotesConfig.history_seconds, selectedPairMeta]);
 
   useEffect(() => {
     currentQuoteSubscriptionRef.current = autoQuoteSubscription[0] || null;
@@ -1656,7 +1625,9 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         </article>
       ) : null}
 
-      {isAutomaticMode ? (
+      {isAutomaticMode && analysisSummary ? (
+        renderAnalysisResultPanel({ showMedia: true })
+      ) : isAutomaticMode ? (
         <>
           <div
             className="live-quote-stage"
@@ -1676,7 +1647,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               label={t.home.scanAnalysisLabel || "Scanning chart"}
             />
           </div>
-          {analysisSummary ? renderAnalysisResultPanel({ showMedia: true }) : null}
         </>
       ) : analysisSummary ? (
         renderAnalysisResultPanel({ showMedia: true })

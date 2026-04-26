@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import Lottie from "lottie-react";
 import {
   AutoModeIcon,
   CameraIcon,
@@ -9,6 +10,7 @@ import {
   SparkIcon
 } from "../components/AppIcons";
 import AnalyzeCtaAnimation from "../components/AnalyzeCtaAnimation";
+import confettiAnimation from "../assets/confetti.json";
 import homeHistoryIcon from "../assets/profile-history.png";
 import homeInfoIcon from "../assets/home-info.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
@@ -1442,6 +1444,8 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       ? { status: "settled", settlement: analysisSummary.settlement }
       : { status: "idle" };
   const settlementCountdownProgress = getCountdownProgress(displayedSettlement);
+  const shouldShowConfetti = displayedSettlement.status === "settled"
+    && String(displayedSettlement.settlement?.outcome || "").trim().toLowerCase() === "win";
   const isNoTradeResult = String(analysisSummary?.signal || "").trim().toUpperCase() === "NO TRADE";
   const activeAnalysisSignalTone = getAnalysisSignalTone(activeAnalysis?.signal);
   const activeAnalysisAssetLabel = activeAnalysis
@@ -1523,6 +1527,11 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
 
     return (
       <div className="upload-zone analysis-result-panel">
+        {shouldShowConfetti ? (
+          <div className="analysis-confetti-layer" aria-hidden="true">
+            <Lottie animationData={confettiAnimation} loop={false} autoplay />
+          </div>
+        ) : null}
         <div className="analysis-result-sheet analysis-result-sheet-inline" role="region" aria-label={t.home.analysisSheetTitle || "Результат анализа"}>
           {showMedia && mediaUrl ? (
             <div className="upload-preview-media analysis-result-media">

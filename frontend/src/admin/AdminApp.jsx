@@ -20,7 +20,7 @@ const FLAG_META = {
     description: "AI анализ графика по скриншоту или ссылке."
   },
   mode_ai_enabled: {
-    title: "AI",
+    title: "Авто режим",
     short: "AI",
     description: "Автоматический live-поток сигналов по выбранной паре."
   },
@@ -199,6 +199,26 @@ function getFlagMeta(key) {
     short: "FX",
     description: "Служебный переключатель приложения."
   };
+}
+
+function compactSecretPreview(value, isConfigured) {
+  if (!isConfigured) return "Не задан";
+  const clean = String(value || "").replace(/\s+/g, "");
+  if (!clean) return "sk-...активен";
+
+  const normalized = clean
+    .replace(/[•*]+/g, "…")
+    .replace(/\.{2,}/g, "…")
+    .replace(/…+/g, "…");
+
+  if (normalized.includes("…")) {
+    const [startPart, ...tailParts] = normalized.split("…");
+    const tail = tailParts.join("").slice(-4);
+    return `${startPart.slice(0, 8) || "sk"}...${tail || "****"}`;
+  }
+
+  if (normalized.length <= 14) return normalized;
+  return `${normalized.slice(0, 7)}...${normalized.slice(-4)}`;
 }
 
 function getAccountTierMeta(tier) {
@@ -1007,7 +1027,6 @@ export default function AdminApp({ authError }) {
                 >
                   <div className="admin-control-head">
                     <div className="admin-control-title-row">
-                      <span className="admin-mode-code">{meta.short}</span>
                       <strong>{meta.title}</strong>
                     </div>
                     <button
@@ -1024,19 +1043,18 @@ export default function AdminApp({ authError }) {
                   <p>{meta.description}</p>
 
                   {isScannerCard && (
-                    <div className="admin-scanner-inline">
-                      <div className="admin-scanner-inline-head">
+                    <details className="admin-scanner-inline">
+                      <summary className="admin-scanner-inline-summary">
                         <div className="admin-scanner-inline-copy">
-                          <strong>GPT анализ скриншота</strong>
-                          <span>Ключ и режим анализа для SonicFX Scanner. Авто режим с live-графиком управляется отдельной карточкой.</span>
+                          <strong>GPT анализ</strong>
+                          <span>{SCANNER_MODE_META[scannerEditor.analysis_mode]?.title || "Адаптивный"} · {scannerSettings.model || "gpt-4.1-mini"}</span>
                         </div>
                         <div className="admin-scanner-badge-row">
                           <span className={`admin-badge ${scannerSettings.api_key_configured ? "tone-success" : "tone-neutral"}`}>
-                            {scannerSettings.api_key_configured ? "GPT ключ подключён" : "GPT ключ не задан"}
+                            {compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}
                           </span>
-                          <span className="admin-badge tone-accent">{scannerSettings.model || "gpt-4.1-mini"}</span>
                         </div>
-                      </div>
+                      </summary>
 
                       <div className="admin-scanner-mode-grid">
                         {(scannerSettings.mode_options || EMPTY_SCANNER_SETTINGS.mode_options).map((modeItem) => {
@@ -1050,10 +1068,7 @@ export default function AdminApp({ authError }) {
                               onClick={() => setScannerEditor((prev) => ({ ...prev, analysis_mode: modeItem.key }))}
                             >
                               <span className="admin-scanner-mode-top">
-                                <span className="admin-mode-code">{modeMeta.short}</span>
-                                <span className={`admin-badge ${isActive ? "tone-success" : "tone-neutral"}`}>
-                                  {isActive ? "Выбран" : "Доступен"}
-                                </span>
+                                {isActive ? <span className="admin-badge tone-success">Выбран</span> : null}
                               </span>
                               <strong>{modeMeta.title}</strong>
                               <p>{modeMeta.description}</p>
@@ -1069,7 +1084,7 @@ export default function AdminApp({ authError }) {
                             className="admin-input"
                             type="password"
                             autoComplete="off"
-                            placeholder={scannerSettings.api_key_configured ? "Оставьте пустым, чтобы не менять текущий ключ" : "sk-..."}
+                            placeholder={scannerSettings.api_key_configured ? "Новый ключ или оставить пустым" : "sk-..."}
                             value={scannerEditor.api_key}
                             onChange={(e) => setScannerEditor((prev) => ({ ...prev, api_key: e.target.value }))}
                           />
@@ -1077,7 +1092,7 @@ export default function AdminApp({ authError }) {
 
                         <div className="admin-card admin-scanner-key-panel">
                           <span className="admin-kpi-label">Текущий ключ</span>
-                          <strong>{scannerSettings.api_key_preview || "Не задан"}</strong>
+                          <strong>{compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}</strong>
                           <span className="admin-kpi-note">
                             Пустое поле при сохранении оставит текущий ключ без изменений.
                           </span>
@@ -1092,7 +1107,7 @@ export default function AdminApp({ authError }) {
                           {scannerSaving ? "Сохраняем..." : "Сохранить сканер"}
                         </button>
                       </div>
-                    </div>
+                    </details>
                   )}
 
                   <div className="admin-control-footer">

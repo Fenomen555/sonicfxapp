@@ -351,7 +351,7 @@ function getSettlementTone(outcome) {
 
 function getCountdownProgress(settlement) {
   if (!settlement || settlement.status !== "countdown") {
-    return { elapsedPercent: 100, remainingPercent: 0 };
+    return { elapsedPercent: 0, remainingPercent: 100 };
   }
   const total = Math.max(1, Number(settlement.totalSeconds || 0));
   const remaining = Math.max(0, Math.min(total, Number(settlement.remainingSeconds || 0)));
@@ -1491,7 +1491,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
             </div>
             <div
               className="deal-timer-flow"
-              style={{ "--deal-progress": `${settlementCountdownProgress.elapsedPercent}%` }}
+              style={{ "--deal-progress": `${settlementCountdownProgress.remainingPercent}%` }}
             >
               <span className="deal-timer-percent left">{settlementCountdownProgress.remainingPercent}%</span>
               <div className="deal-timer-track" aria-hidden="true">

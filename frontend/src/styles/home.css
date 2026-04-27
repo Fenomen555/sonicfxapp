@@ -51,9 +51,9 @@
 }
 
 .quota-btn-upgrade {
-  width: 122px;
-  min-width: 122px;
-  height: 42px;
+  width: 132px;
+  min-width: 132px;
+  height: 46px;
   padding: 0;
   overflow: hidden;
   border-color: transparent;
@@ -63,10 +63,10 @@
 
 .quota-upgrade-animation {
   display: block;
-  width: 122px;
-  height: 60px;
+  width: 132px;
+  height: 64px;
   margin-top: 0;
-  filter: hue-rotate(164deg) saturate(1.15) brightness(0.9);
+  filter: hue-rotate(164deg) saturate(1.18) brightness(0.92);
   pointer-events: none;
 }
 

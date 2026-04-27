@@ -14,7 +14,7 @@ import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
 
 const TELEGRAM_BOT_USERNAME = "SonicTradeaibot";
-const MIN_BOOT_LOADER_MS = 6000;
+const MIN_BOOT_LOADER_MS = 3000;
 
 function normalizeTheme(value) {
   return value === "light" ? "light" : "dark";
@@ -389,4 +389,3 @@ export default function App() {
     </div>
   );
 }
-

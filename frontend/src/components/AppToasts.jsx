@@ -1,4 +1,5 @@
-import notificationIcon from "../assets/toast-bell.gif";
+import Lottie from "lottie-react";
+import notificationAnimation from "../assets/toast-notifications.json";
 
 export default function AppToasts({ items = [], onDismiss }) {
   if (!items.length) return null;
@@ -8,7 +9,7 @@ export default function AppToasts({ items = [], onDismiss }) {
       {items.map((item) => (
         <article className={`app-toast app-toast-${item.type || "info"}`} key={item.id}>
           <span className="app-toast-icon" aria-hidden="true">
-            <img src={notificationIcon} alt="" />
+            <Lottie animationData={notificationAnimation} loop autoplay className="app-toast-lottie" />
           </span>
           <span className="app-toast-copy">
             <strong>{item.title}</strong>

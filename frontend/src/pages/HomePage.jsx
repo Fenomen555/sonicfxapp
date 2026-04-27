@@ -1642,6 +1642,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
           <span className="quota-upgrade-animation" aria-hidden="true">
             <Lottie animationData={upgradeAnimation} loop autoplay />
           </span>
+          <span className="quota-upgrade-text">{t.home.pro || "Upgrade to PRO"}</span>
         </button>
       </div>
 

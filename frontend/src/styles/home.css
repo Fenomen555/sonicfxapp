@@ -51,6 +51,7 @@
 }
 
 .quota-btn-upgrade {
+  position: relative;
   width: 132px;
   min-width: 132px;
   height: 46px;
@@ -67,6 +68,24 @@
   height: 64px;
   margin-top: 0;
   filter: hue-rotate(164deg) saturate(1.18) brightness(0.92);
+  pointer-events: none;
+}
+
+.quota-upgrade-text {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  color: #f9fbff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  text-align: center;
+  text-shadow: 0 1px 8px rgba(5, 13, 24, 0.64);
   pointer-events: none;
 }
 

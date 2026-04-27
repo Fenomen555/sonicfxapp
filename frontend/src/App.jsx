@@ -14,6 +14,7 @@ import NewsPage from "./pages/NewsPage";
 import ProfilePage from "./pages/ProfilePage";
 
 const TELEGRAM_BOT_USERNAME = "SonicTradeaibot";
+const MIN_BOOT_LOADER_MS = 6000;
 
 function normalizeTheme(value) {
   return value === "light" ? "light" : "dark";
@@ -45,6 +46,7 @@ const FALLBACK_USER = {
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isBootLoaderReady, setIsBootLoaderReady] = useState(false);
   const [user, setUser] = useState(FALLBACK_USER);
   const [tab, setTab] = useState("home");
   const [showOnboarding, setShowOnboarding] = useState(true);
@@ -85,6 +87,11 @@ export default function App() {
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", normalizeTheme(user.theme));
   }, [user.theme]);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => setIsBootLoaderReady(true), MIN_BOOT_LOADER_MS);
+    return () => window.clearTimeout(timerId);
+  }, []);
 
   useEffect(() => () => {
     toastTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
@@ -269,7 +276,7 @@ export default function App() {
     setShowOnboarding(true);
   }
 
-  if (isLoading) {
+  if (isLoading || !isBootLoaderReady) {
     return (
       <div className="loading-screen">
         <AppLoader label={texts[normalizeLang(user.lang)]?.home?.loading || "Loading..."} />

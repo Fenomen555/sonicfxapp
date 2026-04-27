@@ -11,6 +11,7 @@ import {
 } from "../components/AppIcons";
 import AnalyzeCtaAnimation from "../components/AnalyzeCtaAnimation";
 import confettiAnimation from "../assets/confetti.json";
+import trophyAnimation from "../assets/trophy.json";
 import homeHistoryIcon from "../assets/profile-history.png";
 import homeInfoIcon from "../assets/home-info.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
@@ -1486,29 +1487,36 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
             <small className="analysis-result-subcopy">Финальную цену проверим после экспирации</small>
           </>
         ) : (
-          <>
-            <span>
-              {displayedSettlement.status === "settling"
-                ? "Проверка сделки"
-                : displayedSettlement.status === "error"
+          <div className="analysis-settlement-summary">
+            <div className="analysis-settlement-copy">
+              <span>
+                {displayedSettlement.status === "settling"
                   ? "Проверка сделки"
-                  : "Результат сделки"}
-            </span>
-            <strong>
-              {displayedSettlement.status === "settling"
-                ? "Проверяем..."
-                : displayedSettlement.status === "error"
-                  ? "Ошибка"
-                  : displayedSettlement.settlement?.outcome_label || "Готово"}
-            </strong>
-            <small className="analysis-result-subcopy">
-              {displayedSettlement.status === "settling"
-                ? "Запрашиваем свежую цену актива"
-                : displayedSettlement.status === "error"
-                  ? (displayedSettlement.error || "Не удалось получить финальную цену")
-                  : `Финал: ${formatAnalysisPrice(displayedSettlement.settlement?.exit_price)}`}
-            </small>
-          </>
+                  : displayedSettlement.status === "error"
+                    ? "Проверка сделки"
+                    : "Результат сделки"}
+              </span>
+              <strong>
+                {displayedSettlement.status === "settling"
+                  ? "Проверяем..."
+                  : displayedSettlement.status === "error"
+                    ? "Ошибка"
+                    : displayedSettlement.settlement?.outcome_label || "Готово"}
+              </strong>
+              <small className="analysis-result-subcopy">
+                {displayedSettlement.status === "settling"
+                  ? "Запрашиваем свежую цену актива"
+                  : displayedSettlement.status === "error"
+                    ? (displayedSettlement.error || "Не удалось получить финальную цену")
+                    : `Финал: ${formatAnalysisPrice(displayedSettlement.settlement?.exit_price)}`}
+              </small>
+            </div>
+            {shouldShowConfetti ? (
+              <div className="analysis-trophy-badge" aria-hidden="true">
+                <Lottie animationData={trophyAnimation} loop={false} autoplay />
+              </div>
+            ) : null}
+          </div>
         )}
       </article>
     );

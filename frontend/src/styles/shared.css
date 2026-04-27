@@ -65,6 +65,19 @@ textarea {
 .app-loader-label {
   max-width: 260px;
   text-align: center;
+  animation: loaderLabelRise 0.32s ease both;
+}
+
+@keyframes loaderLabelRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .app-loader.compact {

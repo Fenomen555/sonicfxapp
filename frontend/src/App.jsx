@@ -16,6 +16,16 @@ import ProfilePage from "./pages/ProfilePage";
 const TELEGRAM_BOT_USERNAME = "SonicTradeaibot";
 const MIN_BOOT_LOADER_MS = 3000;
 
+function getBootLoaderLabels(lang) {
+  if (lang === "en") {
+    return ["SonicFX wakes the market", "Catching momentum", "Preparing your edge"];
+  }
+  if (lang === "uk") {
+    return ["SonicFX будить ринок", "Ловимо імпульс", "Готуємо точний вхід"];
+  }
+  return ["SonicFX будит рынок", "Ловим импульс", "Готовим точный вход"];
+}
+
 function normalizeTheme(value) {
   return value === "light" ? "light" : "dark";
 }
@@ -65,6 +75,7 @@ export default function App() {
   const adminMode = useMemo(() => isAdminRoute(), []);
   const lang = useMemo(() => normalizeLang(user.lang), [user.lang]);
   const t = texts[lang];
+  const bootLoaderLabels = useMemo(() => getBootLoaderLabels(lang), [lang]);
   const isDesktop = device.isDesktop;
 
   useEffect(() => {
@@ -279,7 +290,7 @@ export default function App() {
   if (isLoading || !isBootLoaderReady) {
     return (
       <div className="loading-screen">
-        <AppLoader label={texts[normalizeLang(user.lang)]?.home?.loading || "Loading..."} />
+        <AppLoader label={bootLoaderLabels} />
       </div>
     );
   }

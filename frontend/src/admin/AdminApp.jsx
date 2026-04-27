@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import AppLoader from "../components/AppLoader";
 import { apiAdminFetchJson } from "../lib/api";
 import { getDeviceProfile } from "../lib/device";
 import { getIndicatorMeta } from "../lib/indicatorMeta";
@@ -874,11 +875,7 @@ export default function AdminApp({ authError }) {
       <main className="admin-page-stack">
         {loading && (
           <div className="admin-card admin-empty-state">
-            <div className="admin-empty-icon">...</div>
-            <div className="admin-empty-copy">
-              <strong>Загружаем раздел</strong>
-              <span>Собираю актуальные данные для текущей вкладки.</span>
-            </div>
+            <AppLoader label="Собираем актуальные данные..." compact />
           </div>
         )}
 

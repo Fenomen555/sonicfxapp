@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import AppLoader from "../components/AppLoader";
 import { apiFetch, apiFetchJson } from "../lib/api";
 
 function getLocale(lang) {
@@ -218,7 +219,9 @@ export default function HistoryPage({ lang = "ru" }) {
       </div>
 
       {status === "loading" && (
-        <div className="history-state-card">{copy.loading}</div>
+        <div className="history-state-card">
+          <AppLoader label={copy.loading} compact />
+        </div>
       )}
 
       {status === "error" && (

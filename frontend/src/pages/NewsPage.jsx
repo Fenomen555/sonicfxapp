@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import ReactCountryFlag from "react-country-flag";
+import AppLoader from "../components/AppLoader";
 import { apiFetchJson } from "../lib/api";
 
 function getImpactLabel(impact, t) {
@@ -308,7 +309,11 @@ export default function NewsPage({ t, lang = "ru", timezone = "" }) {
         </div>
       </div>
 
-      {loading && <div className="card news-empty-card">{t.news.loading || "Загружаем события..."}</div>}
+      {loading && (
+        <div className="card news-empty-card">
+          <AppLoader label={t.news.loading || "Загружаем события..."} compact />
+        </div>
+      )}
 
       {!loading && !hasItems && <div className="card news-empty-card">{t.news.empty}</div>}
 

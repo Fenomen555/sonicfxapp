@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminApp from "./admin/AdminApp";
+import AppLoader from "./components/AppLoader";
 import AppToasts from "./components/AppToasts";
 import BottomNav from "./components/BottomNav";
 import OnboardingScreen from "./components/OnboardingScreen";
@@ -268,7 +269,13 @@ export default function App() {
     setShowOnboarding(true);
   }
 
-  if (isLoading) return <div className="loading-screen">Loading...</div>;
+  if (isLoading) {
+    return (
+      <div className="loading-screen">
+        <AppLoader label={texts[normalizeLang(user.lang)]?.home?.loading || "Loading..."} />
+      </div>
+    );
+  }
 
   const headerTopOffset = isDesktop
     ? 8
@@ -309,7 +316,13 @@ export default function App() {
   }
 
   if (adminMode) {
-    if (!adminInitDone) return <div className="loading-screen">Loading...</div>;
+    if (!adminInitDone) {
+      return (
+        <div className="loading-screen">
+          <AppLoader label="Загружаем админку..." />
+        </div>
+      );
+    }
     return <AdminApp adminUser={adminUser} authError={adminAuthError} />;
   }
 

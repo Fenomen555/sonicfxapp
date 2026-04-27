@@ -13,6 +13,7 @@ import AnalyzeCtaAnimation from "../components/AnalyzeCtaAnimation";
 import confettiAnimation from "../assets/confetti.json";
 import lossSignAnimation from "../assets/loss-sign.json";
 import trophyAnimation from "../assets/trophy.json";
+import upgradeAnimation from "../assets/upgrade.json";
 import homeHistoryIcon from "../assets/profile-history.png";
 import homeInfoIcon from "../assets/home-info.png";
 import LiveQuoteChart from "../components/LiveQuoteChart";
@@ -1637,8 +1638,10 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
           <SparkIcon className="quota-left-icon" aria-hidden="true" />
           <span>{t.home.quota || "Analyses: 3 / 3"}</span>
         </div>
-        <button className="quota-btn" type="button">
-          {t.home.pro || "Get PRO"}
+        <button className="quota-btn quota-btn-upgrade" type="button" aria-label={t.home.pro || "Get PRO"}>
+          <span className="quota-upgrade-animation" aria-hidden="true">
+            <Lottie animationData={upgradeAnimation} loop autoplay />
+          </span>
         </button>
       </div>
 

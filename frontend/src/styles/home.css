@@ -35,6 +35,9 @@
 }
 
 .quota-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   padding: 9px 15px;
@@ -45,6 +48,27 @@
   letter-spacing: 0.01em;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(219, 188, 126, 0.18);
+}
+
+.quota-btn-upgrade {
+  width: 122px;
+  min-width: 122px;
+  height: 42px;
+  padding: 0 12px;
+  overflow: hidden;
+}
+
+.quota-upgrade-animation {
+  display: block;
+  width: 100px;
+  height: 50px;
+  margin-top: -1px;
+  pointer-events: none;
+}
+
+.quota-upgrade-animation > div {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .active-analysis-card {

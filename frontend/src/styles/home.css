@@ -86,7 +86,33 @@
   letter-spacing: -0.03em;
   text-align: center;
   text-shadow: 0 1px 8px rgba(5, 13, 24, 0.64);
+  opacity: 0;
+  transform: translateX(-16px) scale(0.98);
+  animation: upgradeTextSweep 5.005s linear infinite;
   pointer-events: none;
+}
+
+@keyframes upgradeTextSweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-22px) scale(0.98);
+  }
+
+  10%,
+  34% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+
+  41% {
+    opacity: 0;
+    transform: translateX(18px) scale(0.98);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(18px) scale(0.98);
+  }
 }
 
 .quota-upgrade-animation > div {

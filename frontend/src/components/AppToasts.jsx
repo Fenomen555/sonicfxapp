@@ -1,4 +1,4 @@
-import notificationIcon from "../assets/profile-notifications.png";
+import notificationIcon from "../assets/toast-bell.gif";
 
 export default function AppToasts({ items = [], onDismiss }) {
   if (!items.length) return null;

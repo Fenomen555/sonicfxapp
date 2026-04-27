@@ -520,11 +520,11 @@ textarea {
 }
 
 .app-toast-icon img {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
   display: block;
-  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.2));
+  filter: drop-shadow(0 5px 12px rgba(238, 174, 38, 0.28));
 }
 
 .app-toast-copy {

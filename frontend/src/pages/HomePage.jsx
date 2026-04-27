@@ -11,6 +11,7 @@ import {
 } from "../components/AppIcons";
 import AnalyzeCtaAnimation from "../components/AnalyzeCtaAnimation";
 import confettiAnimation from "../assets/confetti.json";
+import lossSignAnimation from "../assets/loss-sign.json";
 import trophyAnimation from "../assets/trophy.json";
 import homeHistoryIcon from "../assets/profile-history.png";
 import homeInfoIcon from "../assets/home-info.png";
@@ -1445,8 +1446,9 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       ? { status: "settled", settlement: analysisSummary.settlement }
       : { status: "idle" };
   const settlementCountdownProgress = getCountdownProgress(displayedSettlement);
-  const shouldShowConfetti = displayedSettlement.status === "settled"
-    && String(displayedSettlement.settlement?.outcome || "").trim().toLowerCase() === "win";
+  const displayedSettlementOutcome = String(displayedSettlement.settlement?.outcome || "").trim().toLowerCase();
+  const shouldShowConfetti = displayedSettlement.status === "settled" && displayedSettlementOutcome === "win";
+  const shouldShowLossAnimation = displayedSettlement.status === "settled" && displayedSettlementOutcome === "loss";
   const isNoTradeResult = String(analysisSummary?.signal || "").trim().toUpperCase() === "NO TRADE";
   const activeAnalysisSignalTone = getAnalysisSignalTone(activeAnalysis?.signal);
   const activeAnalysisAssetLabel = activeAnalysis
@@ -1512,8 +1514,13 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               </small>
             </div>
             {shouldShowConfetti ? (
-              <div className="analysis-trophy-badge" aria-hidden="true">
+              <div className="analysis-outcome-badge analysis-trophy-badge" aria-hidden="true">
                 <Lottie animationData={trophyAnimation} loop={false} autoplay />
+              </div>
+            ) : null}
+            {shouldShowLossAnimation ? (
+              <div className="analysis-outcome-badge analysis-loss-badge" aria-hidden="true">
+                <Lottie animationData={lossSignAnimation} loop={false} autoplay />
               </div>
             ) : null}
           </div>

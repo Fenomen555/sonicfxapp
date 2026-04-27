@@ -458,6 +458,14 @@ textarea {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+.app-toast-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.2));
+}
+
 .app-toast-copy {
   position: relative;
   z-index: 1;

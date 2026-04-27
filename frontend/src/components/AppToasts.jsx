@@ -1,9 +1,4 @@
-const TOAST_ICONS = {
-  success: "OK",
-  error: "!",
-  warning: "!",
-  info: "i"
-};
+import notificationIcon from "../assets/profile-notifications.png";
 
 export default function AppToasts({ items = [], onDismiss }) {
   if (!items.length) return null;
@@ -13,7 +8,7 @@ export default function AppToasts({ items = [], onDismiss }) {
       {items.map((item) => (
         <article className={`app-toast app-toast-${item.type || "info"}`} key={item.id}>
           <span className="app-toast-icon" aria-hidden="true">
-            {TOAST_ICONS[item.type] || TOAST_ICONS.info}
+            <img src={notificationIcon} alt="" />
           </span>
           <span className="app-toast-copy">
             <strong>{item.title}</strong>

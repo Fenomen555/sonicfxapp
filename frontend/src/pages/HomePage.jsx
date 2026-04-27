@@ -1640,7 +1640,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
         </div>
         <button className="quota-btn quota-btn-upgrade" type="button" aria-label={t.home.pro || "Get PRO"}>
           <span className="quota-upgrade-animation" aria-hidden="true">
-            <Lottie animationData={upgradeAnimation} loop autoplay />
+            <Lottie animationData={upgradeAnimation} loop autoplay initialSegment={[15, 47]} />
           </span>
         </button>
       </div>

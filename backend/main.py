@@ -99,6 +99,7 @@ DEFAULT_SUPPORT_CONTACT_URL = (
 DEFAULT_SCANNER_ANALYSIS_MODE = "adaptive"
 DEFAULT_SCANNER_OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip() or "gpt-4.1-mini"
 DEFAULT_SCANNER_OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
+DEFAULT_ACTIVE_SIGNALS_LIMIT = 3
 OPENAI_API_BASE_URL = (os.getenv("OPENAI_API_BASE_URL") or "https://api.openai.com/v1").strip().rstrip("/")
 SCANNER_ANALYSIS_MODE_CHOICES = ("aggressive", "adaptive", "minimal")
 SCANNER_ANALYSIS_MODE_LABELS = {
@@ -402,6 +403,7 @@ class AdminSupportSettingsUpdateRequest(BaseModel):
 class AdminScannerSettingsUpdateRequest(BaseModel):
     analysis_mode: str = Field(min_length=4, max_length=16)
     api_key: Optional[str] = Field(default=None, max_length=512)
+    active_signals_limit: Optional[int] = Field(default=None, ge=1, le=3)
 
 
 class ScannerAnalyzeRequest(BaseModel):
@@ -1062,6 +1064,19 @@ def _normalize_scanner_analysis_mode(value: Any) -> str:
     return DEFAULT_SCANNER_ANALYSIS_MODE
 
 
+def _sanitize_active_signals_limit(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        numeric = DEFAULT_ACTIVE_SIGNALS_LIMIT
+    return min(max(numeric, 1), 3)
+
+
+async def get_active_signals_limit() -> int:
+    value = await get_app_setting("active_signals_limit", str(DEFAULT_ACTIVE_SIGNALS_LIMIT))
+    return _sanitize_active_signals_limit(value)
+
+
 def _mask_secret(value: str) -> str:
     secret = str(value or "").strip()
     if not secret:
@@ -1345,6 +1360,7 @@ async def get_scanner_settings_payload() -> Dict[str, Any]:
     )
     stored_key = await get_app_setting("scanner_openai_api_key", DEFAULT_SCANNER_OPENAI_API_KEY)
     model = await get_app_setting("scanner_openai_model", DEFAULT_SCANNER_OPENAI_MODEL)
+    active_signals_limit = await get_active_signals_limit()
     key_present = bool(str(stored_key or "").strip())
     return {
         "analysis_mode": analysis_mode,
@@ -1352,6 +1368,8 @@ async def get_scanner_settings_payload() -> Dict[str, Any]:
         "api_key_configured": key_present,
         "api_key_preview": _mask_secret(stored_key),
         "model": str(model or DEFAULT_SCANNER_OPENAI_MODEL).strip() or DEFAULT_SCANNER_OPENAI_MODEL,
+        "active_signals_limit": active_signals_limit,
+        "active_signals_limit_options": [1, 2, 3],
         "mode_options": [
             {"key": key, "label": SCANNER_ANALYSIS_MODE_LABELS[key]}
             for key in SCANNER_ANALYSIS_MODE_CHOICES
@@ -1761,6 +1779,7 @@ def _serialize_analysis_history(row: Optional[Dict[str, Any]]) -> Optional[Dict[
         "settlement_status": row.get("settlement_status") or "none",
         "settlement_due_at": _datetime_to_iso(row.get("settlement_due_at")),
         "settled_at": _datetime_to_iso(row.get("settled_at")),
+        "remaining_seconds": int(row.get("remaining_seconds") if row.get("remaining_seconds") is not None else _get_analysis_due_remaining_seconds(row)),
         "settlement": settlement_payload,
         "result": result_payload,
         "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else (str(created_at) if created_at else None),
@@ -1859,6 +1878,39 @@ async def _record_analysis_history(
         await ensure_database_schema(pool)
         row = await insert_history()
     return _serialize_analysis_history(row)
+
+
+async def _count_pending_user_analyses(user_id: int) -> int:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM analysis_history
+                WHERE user_id = %s
+                  AND settlement_status = 'pending'
+                  AND settlement_due_at IS NOT NULL
+                  AND UPPER(TRIM(COALESCE(`signal`, ''))) IN ('BUY', 'SELL')
+                """,
+                (int(user_id),),
+            )
+            row = await cur.fetchone()
+    return int((row or {}).get("total") or 0)
+
+
+async def _ensure_active_analysis_capacity(user_id: int) -> None:
+    try:
+        await settle_due_analysis_once()
+    except Exception as exc:
+        print(f"[AnalysisSettlement] capacity pre-settle failed: {exc}")
+    limit = await get_active_signals_limit()
+    active_count = await _count_pending_user_analyses(user_id)
+    if active_count >= limit:
+        raise HTTPException(
+            status_code=409,
+            detail=f"У вас уже {active_count} активных сигналов. Лимит: {limit}. Дождитесь завершения или откройте активный сигнал.",
+        )
 
 
 def _build_analysis_settlement_payload(
@@ -2940,6 +2992,7 @@ async def analyze_scanner_chart(
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
+    await _ensure_active_analysis_capacity(user_id)
     result = await run_scanner_analysis_for_upload(user_id=user_id, upload_id=payload.upload_id)
     response = {"status": "success", **result}
     try:
@@ -2965,6 +3018,7 @@ async def analyze_auto_chart(
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
+    await _ensure_active_analysis_capacity(user_id)
     content_type, _raw_data_url, image_bytes = _decode_scan_image_data_url(payload.image_data_url)
     upload_row: Optional[Dict[str, Any]] = None
     try:
@@ -3055,8 +3109,9 @@ async def get_active_analysis(
     except Exception as exc:
         print(f"[AnalysisSettlement] active pre-settle failed: {exc}")
     user_id = int(user["user_id"])
+    active_limit = await get_active_signals_limit()
 
-    async def fetch_active() -> Optional[Dict[str, Any]]:
+    async def fetch_active() -> List[Dict[str, Any]]:
         pool = await require_db_pool()
         async with pool.acquire() as conn:
             async with conn.cursor(aiomysql.DictCursor) as cur:
@@ -3070,29 +3125,34 @@ async def get_active_analysis(
                       AND ah.settlement_status = 'pending'
                       AND ah.settlement_due_at IS NOT NULL
                       AND UPPER(TRIM(COALESCE(ah.`signal`, ''))) IN ('BUY', 'SELL')
-                    ORDER BY ah.settlement_due_at ASC
-                    LIMIT 1
+                    ORDER BY ah.created_at DESC, ah.id DESC
+                    LIMIT %s
                     """,
-                    (user_id,),
+                    (user_id, active_limit),
                 )
-                return await cur.fetchone()
+                return await cur.fetchall()
 
     try:
-        row = await fetch_active()
+        rows = await fetch_active()
     except Exception as exc:
         if not _is_analysis_history_schema_error(exc):
             raise
         pool = await require_db_pool()
         await ensure_database_schema(pool)
-        row = await fetch_active()
+        rows = await fetch_active()
 
-    if not row:
-        return {"item": None}
+    items = [_serialize_analysis_history(row) for row in rows if row]
+    items = [item for item in items if item]
+    if not items:
+        return {"item": None, "items": [], "active_limit": active_limit, "active_count": 0}
 
-    item = _serialize_analysis_history(row)
+    item = items[0]
     return {
         "item": item,
-        "remaining_seconds": int(row.get("remaining_seconds") if row.get("remaining_seconds") is not None else _get_analysis_due_remaining_seconds(row)),
+        "items": items,
+        "active_limit": active_limit,
+        "active_count": len(items),
+        "remaining_seconds": int(item.get("remaining_seconds") or 0),
     }
 
 
@@ -4646,6 +4706,10 @@ async def admin_update_scanner_settings(
     next_key = str(payload.api_key or "").strip()
     if next_key:
         await set_app_setting("scanner_openai_api_key", next_key)
+    active_limit = _sanitize_active_signals_limit(
+        payload.active_signals_limit if payload.active_signals_limit is not None else await get_active_signals_limit()
+    )
+    await set_app_setting("active_signals_limit", str(active_limit))
 
     await add_admin_audit(
         int(admin["user_id"]),
@@ -4653,6 +4717,7 @@ async def admin_update_scanner_settings(
         {
             "analysis_mode": analysis_mode,
             "api_key_updated": bool(next_key),
+            "active_signals_limit": active_limit,
         },
     )
     return await get_scanner_settings_payload()

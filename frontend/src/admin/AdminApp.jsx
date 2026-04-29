@@ -91,6 +91,8 @@ const EMPTY_SCANNER_SETTINGS = {
   api_key_configured: false,
   api_key_preview: "",
   model: "gpt-4.1-mini",
+  active_signals_limit: 3,
+  active_signals_limit_options: [1, 2, 3],
   mode_options: [
     { key: "aggressive", label: "АГРЕССИВНЫЙ" },
     { key: "adaptive", label: "АДАПТИВНЫЙ" },
@@ -270,7 +272,7 @@ export default function AdminApp({ authError }) {
   const [supportSettings, setSupportSettings] = useState(EMPTY_SUPPORT_SETTINGS);
   const [supportEditor, setSupportEditor] = useState(EMPTY_SUPPORT_SETTINGS);
   const [scannerSettings, setScannerSettings] = useState(EMPTY_SCANNER_SETTINGS);
-  const [scannerEditor, setScannerEditor] = useState({ analysis_mode: "adaptive", api_key: "" });
+  const [scannerEditor, setScannerEditor] = useState({ analysis_mode: "adaptive", api_key: "", active_signals_limit: 3 });
   const [scannerSettingsOpen, setScannerSettingsOpen] = useState(false);
   const [marketInterval, setMarketInterval] = useState("5");
   const [marketSaving, setMarketSaving] = useState(false);
@@ -389,7 +391,11 @@ export default function AdminApp({ authError }) {
         setFlags(flagsData?.items || []);
         const nextScanner = { ...EMPTY_SCANNER_SETTINGS, ...(scannerData || {}) };
         setScannerSettings(nextScanner);
-        setScannerEditor({ analysis_mode: nextScanner.analysis_mode || "adaptive", api_key: "" });
+        setScannerEditor({
+          analysis_mode: nextScanner.analysis_mode || "adaptive",
+          api_key: "",
+          active_signals_limit: Number(nextScanner.active_signals_limit || 3)
+        });
       }
       if (targetTab === "market") {
         const data = await apiAdminFetchJson("/api/admin/market-settings");
@@ -624,7 +630,8 @@ export default function AdminApp({ authError }) {
     try {
       const payload = {
         analysis_mode: scannerEditor.analysis_mode || "adaptive",
-        api_key: scannerEditor.api_key.trim()
+        api_key: scannerEditor.api_key.trim(),
+        active_signals_limit: Number(scannerEditor.active_signals_limit || 3)
       };
       const data = await apiAdminFetchJson("/api/admin/scanner-settings", {
         method: "POST",
@@ -632,7 +639,11 @@ export default function AdminApp({ authError }) {
       });
       const next = { ...EMPTY_SCANNER_SETTINGS, ...(data || {}) };
       setScannerSettings(next);
-      setScannerEditor({ analysis_mode: next.analysis_mode || "adaptive", api_key: "" });
+      setScannerEditor({
+        analysis_mode: next.analysis_mode || "adaptive",
+        api_key: "",
+        active_signals_limit: Number(next.active_signals_limit || 3)
+      });
       pushToast(
         "success",
         "Сканер обновлён",
@@ -1126,6 +1137,29 @@ export default function AdminApp({ authError }) {
                     <span className="admin-kpi-label">Текущий ключ</span>
                     <strong>{compactSecretPreview(scannerSettings.api_key_preview, scannerSettings.api_key_configured)}</strong>
                     <span className="admin-kpi-note">Пустое поле при сохранении оставит текущий ключ без изменений.</span>
+                  </div>
+                </div>
+
+                <div className="admin-active-limit-panel">
+                  <div className="admin-active-limit-copy">
+                    <span>Активные сигналы</span>
+                    <strong>Лимит одновременно открытых сделок</strong>
+                    <small>Если пользователь достиг лимита, новый анализ не стартует до завершения одной из сделок.</small>
+                  </div>
+                  <div className="admin-active-limit-options" role="group" aria-label="Лимит активных сигналов">
+                    {(scannerSettings.active_signals_limit_options || [1, 2, 3]).map((value) => {
+                      const isActive = Number(scannerEditor.active_signals_limit || 3) === Number(value);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`admin-active-limit-option ${isActive ? "active" : ""}`}
+                          onClick={() => setScannerEditor((prev) => ({ ...prev, active_signals_limit: Number(value) }))}
+                        >
+                          {value}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 

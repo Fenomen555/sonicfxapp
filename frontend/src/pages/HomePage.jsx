@@ -372,8 +372,10 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const [isAnalysisScanning, setIsAnalysisScanning] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisSettlement, setAnalysisSettlement] = useState({ status: "idle" });
+  const [activeAnalyses, setActiveAnalyses] = useState([]);
   const [activeAnalysis, setActiveAnalysis] = useState(null);
   const [activeAnalysisRemaining, setActiveAnalysisRemaining] = useState(0);
+  const [isActiveSignalsSheetOpen, setIsActiveSignalsSheetOpen] = useState(false);
   const galleryInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const analysisScanTimerRef = useRef(0);
@@ -499,11 +501,14 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       try {
         const data = await apiFetchJson("/api/analysis/active");
         if (!isActive) return;
-        const item = data?.item || null;
+        const items = Array.isArray(data?.items) ? data.items : data?.item ? [data.item] : [];
+        const item = items[0] || null;
+        setActiveAnalyses(items);
         setActiveAnalysis(item);
-        setActiveAnalysisRemaining(Number(data?.remaining_seconds || 0));
+        setActiveAnalysisRemaining(Number(item?.remaining_seconds ?? data?.remaining_seconds ?? 0));
       } catch (_error) {
         if (!isActive) return;
+        setActiveAnalyses([]);
         setActiveAnalysis(null);
         setActiveAnalysisRemaining(0);
       }
@@ -520,6 +525,12 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     if (!activeAnalysis?.id || activeAnalysisRemaining <= 0) return undefined;
     const timer = window.setInterval(() => {
       setActiveAnalysisRemaining((prev) => Math.max(0, Number(prev || 0) - 1));
+      setActiveAnalyses((prev) =>
+        prev.map((item) => ({
+          ...item,
+          remaining_seconds: Math.max(0, Number(item.remaining_seconds || 0) - 1)
+        }))
+      );
     }, 1000);
     return () => window.clearInterval(timer);
   }, [activeAnalysis?.id, activeAnalysisRemaining, expiration]);
@@ -531,13 +542,21 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   }, [activeAnalysis?.id, activeAnalysisRemaining]);
 
   useEffect(() => {
-    if (!activeAnalysis?.id || analysisSettlement.status !== "countdown") return;
-    if (Number(analysisSettlement.historyId || 0) !== Number(activeAnalysis.id)) return;
+    if (analysisSettlement.status !== "countdown") return;
+    const currentItem = activeAnalyses.find((item) => Number(item.id) === Number(analysisSettlement.historyId || 0));
+    if (!currentItem) return;
     setAnalysisSettlement((prev) => ({
       ...prev,
-      remainingSeconds: Math.max(0, activeAnalysisRemaining)
+      remainingSeconds: Math.max(0, Number(currentItem.remaining_seconds || 0))
     }));
-  }, [activeAnalysis?.id, activeAnalysisRemaining, analysisSettlement.status, analysisSettlement.historyId]);
+  }, [activeAnalyses, analysisSettlement.status, analysisSettlement.historyId]);
+
+  useEffect(() => {
+    if (analysisSettlement.status !== "countdown" || !analysisSettlement.historyId) return;
+    const currentItem = activeAnalyses.find((item) => Number(item.id) === Number(analysisSettlement.historyId));
+    if (!currentItem || Number(currentItem.remaining_seconds || 0) > 0) return;
+    settleAnalysisResult(analysisSettlement.historyId, currentItem.selected_expiration || analysisSettlement.selectedExpiration || expiration, "");
+  }, [activeAnalyses, analysisSettlement.historyId, analysisSettlement.selectedExpiration, analysisSettlement.status, expiration]);
 
   useEffect(() => {
     let isActive = true;
@@ -1206,8 +1225,10 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
           }
         };
       });
-      setActiveAnalysis(null);
-      setActiveAnalysisRemaining(0);
+      const nextActiveItems = activeAnalyses.filter((item) => Number(item.id) !== Number(historyId));
+      setActiveAnalyses(nextActiveItems);
+      setActiveAnalysis(nextActiveItems[0] || null);
+      setActiveAnalysisRemaining(Number(nextActiveItems[0]?.remaining_seconds || 0));
       notify?.({
         type: "success",
         title: settlement?.outcome_label || "Результат сделки готов",
@@ -1312,31 +1333,42 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     await startNewScannerAnalysis();
   }
 
-  function openActiveAnalysis() {
-    if (!activeAnalysis) return;
-    const result = activeAnalysis.result && typeof activeAnalysis.result === "object"
-      ? activeAnalysis.result
+  function openActiveAnalysis(item = activeAnalysis) {
+    if (!item) return;
+    setIsActiveSignalsSheetOpen(false);
+    const remainingSeconds = Math.max(0, Number(item.remaining_seconds ?? activeAnalysisRemaining ?? 0));
+    const result = item.result && typeof item.result === "object"
+      ? item.result
       : {
-          signal: activeAnalysis.signal,
-          asset: activeAnalysis.asset,
-          market_mode: activeAnalysis.market_mode,
-          entry_price: activeAnalysis.entry_price,
-          confidence: activeAnalysis.confidence,
-          expiration_minutes: activeAnalysis.expiration_minutes,
-          comment: activeAnalysis.comment
+          signal: item.signal,
+          asset: item.asset,
+          market_mode: item.market_mode,
+          entry_price: item.entry_price,
+          confidence: item.confidence,
+          expiration_minutes: item.expiration_minutes,
+          comment: item.comment
         };
     setAnalysisResult({
       status: "success",
       result,
-      history_item: activeAnalysis
+      history_item: item
     });
     setAnalysisSettlement({
       status: "countdown",
-      historyId: activeAnalysis.id,
-      totalSeconds: Math.max(0, activeAnalysisRemaining),
-      remainingSeconds: Math.max(0, activeAnalysisRemaining),
-      selectedExpiration: activeAnalysis.selected_expiration || expiration
+      historyId: item.id,
+      totalSeconds: Math.max(0, remainingSeconds),
+      remainingSeconds,
+      selectedExpiration: item.selected_expiration || expiration
     });
+  }
+
+  function handleActiveAnalysisCardClick() {
+    if (!activeAnalysis) return;
+    if (activeAnalyses.length > 1) {
+      setIsActiveSignalsSheetOpen(true);
+      return;
+    }
+    openActiveAnalysis(activeAnalysis);
   }
 
   async function handleAnalyzeClick() {
@@ -1403,6 +1435,15 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
             })
           });
       setAnalysisResult(data || null);
+      if (data?.history_item && ["BUY", "SELL"].includes(String(data?.history_item?.signal || data?.result?.signal || "").toUpperCase())) {
+        const nextItem = {
+          ...data.history_item,
+          remaining_seconds: getExpirationSeconds(expiration)
+        };
+        setActiveAnalyses((prev) => [nextItem, ...prev.filter((item) => Number(item.id) !== Number(nextItem.id))]);
+        setActiveAnalysis(nextItem);
+        setActiveAnalysisRemaining(Number(nextItem.remaining_seconds || 0));
+      }
       startSettlementCountdown(data || null, expiration);
     } catch (error) {
       notify?.({
@@ -1455,6 +1496,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const activeAnalysisAssetLabel = activeAnalysis
     ? formatAnalysisAsset(activeAnalysis.asset, activeAnalysis.market_mode)
     : "";
+  const activeAnalysisCount = activeAnalyses.length;
   const shouldShowActiveAnalysisCard = Boolean(activeAnalysis?.id && !analysisSummary);
 
   function renderSettlementCard() {
@@ -1649,18 +1691,67 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       {shouldShowActiveAnalysisCard ? (
         <article className={`active-analysis-card signal-${activeAnalysisSignalTone}`}>
           <div className="active-analysis-main">
-            <span className="active-analysis-kicker">Анализ 1</span>
-            <strong>{activeAnalysisAssetLabel}</strong>
+            <span className="active-analysis-kicker">
+              {activeAnalysisCount > 1 ? `Активных сигналов: ${activeAnalysisCount}` : "Анализ 1"}
+            </span>
+            <strong>{activeAnalysisCount > 1 ? "Выберите сигнал" : activeAnalysisAssetLabel}</strong>
             <small>
-              Цена {formatAnalysisPrice(activeAnalysis.entry_price)} · {String(activeAnalysis.signal || "").toUpperCase()}
+              {activeAnalysisCount > 1
+                ? `${activeAnalysisAssetLabel} · ${String(activeAnalysis.signal || "").toUpperCase()}`
+                : `Цена ${formatAnalysisPrice(activeAnalysis.entry_price)} · ${String(activeAnalysis.signal || "").toUpperCase()}`}
             </small>
           </div>
           <div className="active-analysis-side">
             <b>{activeAnalysisRemaining > 0 ? formatCountdown(activeAnalysisRemaining) : "Проверяем"}</b>
-            <button type="button" onClick={openActiveAnalysis}>Открыть</button>
+            <button type="button" onClick={handleActiveAnalysisCardClick}>
+              {activeAnalysisCount > 1 ? "Выбрать" : "Открыть"}
+            </button>
           </div>
         </article>
       ) : null}
+
+      {isActiveSignalsSheetOpen && (
+        <div className="action-sheet-layer" role="presentation">
+          <button
+            className="action-sheet-backdrop"
+            type="button"
+            aria-label={t.home.close || "Close"}
+            onClick={() => setIsActiveSignalsSheetOpen(false)}
+          />
+          <div className="action-sheet active-signals-sheet" role="dialog" aria-modal="true" aria-label="Активные сигналы">
+            <div className="action-sheet-handle" aria-hidden="true" />
+            <div className="action-sheet-head active-signals-head">
+              <div className="action-sheet-title">Активные сигналы</div>
+              <div className="action-sheet-copy">Выберите сделку, которую хотите открыть сейчас.</div>
+            </div>
+            <div className="active-signals-list">
+              {activeAnalyses.map((item, index) => {
+                const tone = getAnalysisSignalTone(item.signal);
+                const label = formatAnalysisAsset(item.asset, item.market_mode);
+                const remaining = Math.max(0, Number(item.remaining_seconds || 0));
+                return (
+                  <article className={`active-signal-option signal-${tone}`} key={item.id || index}>
+                    <div className="active-signal-option-main">
+                      <span>Анализ {index + 1}</span>
+                      <strong>{label}</strong>
+                      <small>
+                        Цена {formatAnalysisPrice(item.entry_price)} · {String(item.signal || "").toUpperCase()}
+                      </small>
+                    </div>
+                    <div className="active-signal-option-side">
+                      <b>{remaining > 0 ? formatCountdown(remaining) : "Проверяем"}</b>
+                      <button type="button" onClick={() => openActiveAnalysis(item)}>Открыть</button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <button className="action-sheet-close" type="button" onClick={() => setIsActiveSignalsSheetOpen(false)}>
+              {t.home.close || "Close"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {isAutomaticMode && analysisSummary ? (
         renderAnalysisResultPanel({ showMedia: true })

@@ -194,6 +194,7 @@ async def _seed_app_settings(conn) -> None:
         ("scanner_analysis_mode", "adaptive"),
         ("scanner_openai_api_key", os.getenv("OPENAI_API_KEY") or ""),
         ("scanner_openai_model", os.getenv("OPENAI_MODEL") or "gpt-4.1-mini"),
+        ("active_signals_limit", "3"),
         ("support_channel_url", os.getenv("SUPPORT_CHANNEL_URL") or os.getenv("CHANNEL_URL") or "https://t.me/+TthmjdpAkv5hNjdi"),
         ("support_contact_url", os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"),
     )

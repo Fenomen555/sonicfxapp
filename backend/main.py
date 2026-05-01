@@ -2191,7 +2191,7 @@ async def run_indicator_analysis(
         history_seconds=INDICATOR_LOCAL_HISTORY_SECONDS,
     )
     sanitized = _build_local_indicator_analysis(
-        payload,
+        payload=payload,
         category=normalized_category,
         symbol=normalized_symbol,
         selected_expiration=selected_expiration,

@@ -1493,7 +1493,7 @@ async def _fetch_quote_price(category: str, symbol: str) -> Optional[float]:
         return None
 
     normalized_category = normalize_quote_category(category)
-    normalized_symbol = normalize_quote_symbol(symbol)
+    normalized_symbol = normalize_quote_symbol(_strip_otc_suffix(symbol))
     url = f"{DEVSBITE_API_BASE_URL}/quotes/price"
     headers = {
         "accept": "application/json",
@@ -1535,7 +1535,7 @@ async def _fetch_quote_snapshot(category: str, symbol: str) -> Optional[Dict[str
         return None
 
     normalized_category = normalize_quote_category(category)
-    normalized_symbol = normalize_quote_symbol(symbol)
+    normalized_symbol = normalize_quote_symbol(_strip_otc_suffix(symbol))
     url = f"{DEVSBITE_API_BASE_URL}/quotes/price"
     headers = {
         "accept": "application/json",
@@ -2788,7 +2788,7 @@ async def _fetch_quote_history(category: str, symbol: str, history_seconds: int)
         raise HTTPException(status_code=503, detail="Quote history is not configured")
 
     normalized_category = normalize_quote_category(category)
-    normalized_symbol = normalize_quote_symbol(symbol)
+    normalized_symbol = normalize_quote_symbol(_strip_otc_suffix(symbol))
     normalized_history_seconds = max(int(history_seconds or QUOTE_HISTORY_SECONDS), 60)
     url = f"{DEVSBITE_API_BASE_URL}/quotes/quote"
     headers = {

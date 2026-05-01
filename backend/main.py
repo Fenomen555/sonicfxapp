@@ -1608,15 +1608,15 @@ def _indicator_api_codes(indicator_code: Optional[str]) -> List[str]:
 def _normalize_indicator_signal(value: Any) -> str:
     raw = str(value or "").strip().upper()
     compact = re.sub(r"[^A-Z]+", "", raw)
-    if compact in {"BUY", "CALL", "UP", "LONG"}:
+    if compact in {"BUY", "CALL", "UP", "LONG", "BULL", "BULLISH", "STRONGBUY"}:
         return "BUY"
-    if compact in {"SELL", "PUT", "DOWN", "SHORT"}:
+    if compact in {"SELL", "PUT", "DOWN", "SHORT", "BEAR", "BEARISH", "STRONGSELL"}:
         return "SELL"
     if compact in {"NOTRADE", "HOLD", "WAIT", "NEUTRAL", "NONE"}:
         return "NO TRADE"
-    if "BUY" in compact or "CALL" in compact:
+    if "BUY" in compact or "CALL" in compact or "BULL" in compact:
         return "BUY"
-    if "SELL" in compact or "PUT" in compact:
+    if "SELL" in compact or "PUT" in compact or "BEAR" in compact:
         return "SELL"
     return "NO TRADE"
 
@@ -1624,7 +1624,7 @@ def _normalize_indicator_signal(value: Any) -> str:
 def _coerce_indicator_confidence(*values: Any) -> int:
     for value in values:
         label = str(value or "").strip().lower()
-        if label in {"high", "strong", "высокая", "сильный"}:
+        if label in {"very high", "high", "strong", "высокая", "сильный"}:
             return 70
         if label in {"medium", "moderate", "средняя", "умеренный"}:
             return 60
@@ -1698,10 +1698,10 @@ def _sanitize_indicator_analysis_result(
 ) -> Dict[str, Any]:
     root = _extract_indicator_result_root(payload)
     signal = _normalize_indicator_signal(
-        _first_present(root, "signal", "direction", "recommendation", "action", "decision", "side")
+        _first_present(root, "signal", "final_signal", "trade_signal", "direction", "recommendation", "action", "decision", "side")
     )
     confidence = _coerce_indicator_confidence(
-        _first_present(root, "confidence", "confidence_percent", "probability", "probability_percent", "winrate", "score", "strength")
+        _first_present(root, "confidence", "confidence_percent", "confidence_score", "probability", "probability_percent", "winrate", "score", "strength")
     )
     expiration_minutes = _coerce_indicator_expiration_minutes(
         _first_present(root, "expiration_minutes", "expiration", "expiry", "recommended_expiration", "duration")

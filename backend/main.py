@@ -1889,8 +1889,8 @@ def _calc_roc(closes: List[float], period: int = 10) -> Optional[float]:
     return ((closes[-1] - closes[-period - 1]) / closes[-period - 1]) * 100
 
 
-def _vote_result(signal: str, weight: float, label: str, detail: str) -> Dict[str, Any]:
-    return {"signal": signal, "weight": float(weight), "label": label, "detail": detail}
+def _vote_result(signal: str, weight: float, label: str, detail: str, *, source: str = "indicator") -> Dict[str, Any]:
+    return {"signal": signal, "weight": float(weight), "label": label, "detail": detail, "source": source}
 
 
 def _build_local_indicator_snapshot(candles: List[Dict[str, float]]) -> Dict[str, Any]:
@@ -2077,11 +2077,41 @@ def _indicator_votes(snapshot: Dict[str, Any], allowed_indicators: List[str]) ->
         impulse_ratio = abs(move_20) / range_20
         weight = 1.6 if impulse_ratio >= 0.32 else 1.1 if impulse_ratio >= 0.18 else 0
         if weight and move_20 > 0 and price >= previous_close:
-            votes.append(_vote_result("BUY", weight, "Price Action", "Последняя структура цены поддерживает восходящий импульс."))
+            votes.append(_vote_result("BUY", weight, "Price Action", "Последняя структура цены поддерживает восходящий импульс.", source="context"))
         elif weight and move_20 < 0 and price <= previous_close:
-            votes.append(_vote_result("SELL", weight, "Price Action", "Последняя структура цены поддерживает нисходящий импульс."))
+            votes.append(_vote_result("SELL", weight, "Price Action", "Последняя структура цены поддерживает нисходящий импульс.", source="context"))
 
     return votes
+
+
+def _compact_indicator_snapshot(snapshot: Dict[str, Any], allowed_indicators: List[str], candles_count: int) -> Dict[str, Any]:
+    allowed = set(allowed_indicators or [])
+    values: Dict[str, Any] = {}
+    if "RSI" in allowed:
+        values["rsi"] = snapshot.get("rsi")
+    if "STOCH" in allowed:
+        values["stochastic"] = snapshot.get("stochastic")
+    if "CCI" in allowed:
+        values["cci"] = snapshot.get("cci")
+    if "WILLR" in allowed:
+        values["williams_r"] = snapshot.get("williams_r")
+    if "MACD" in allowed:
+        values["macd"] = snapshot.get("macd")
+    if {"EMA9", "EMA50", "EMA200"} & allowed:
+        values["ema"] = snapshot.get("ema")
+    if "ADX" in allowed:
+        values["adx"] = snapshot.get("adx")
+    if "ATR" in allowed:
+        values["atr"] = snapshot.get("atr")
+    if "BB" in allowed:
+        values["bollinger"] = snapshot.get("bollinger")
+    if "PSAR" in allowed:
+        values["psar"] = snapshot.get("psar")
+    if "MOM" in allowed:
+        values["momentum"] = snapshot.get("momentum")
+    if "ROC" in allowed:
+        values["roc"] = snapshot.get("roc")
+    return {"candles": candles_count, "values": values}
 
 
 def _build_local_indicator_analysis(
@@ -2106,7 +2136,35 @@ def _build_local_indicator_analysis(
     selected_mode = len(allowed_indicators) <= 3
     threshold = 1.35 if selected_mode else 2.2
 
-    if abs(score_delta) >= threshold:
+    signal = "NO TRADE"
+    confidence = 0
+    comment = "Индикаторы дают смешанную картину без явного преимущества. Лучше дождаться более чистого импульса."
+    decision_strength = abs(score_delta)
+
+    indicator_votes = [item for item in votes if item.get("source") == "indicator"]
+    if selected_mode and indicator_votes:
+        primary_vote = max(indicator_votes, key=lambda item: item["weight"])
+        primary_signal = str(primary_vote["signal"])
+        same_votes = [item for item in votes if item["signal"] == primary_signal]
+        opposite_votes = [item for item in votes if item["signal"] != primary_signal]
+        same_weight = sum(item["weight"] for item in same_votes)
+        opposite_weight = sum(item["weight"] for item in opposite_votes)
+        decision_strength = max(float(primary_vote["weight"]), abs(same_weight - opposite_weight))
+        if float(primary_vote["weight"]) >= 1.0 and same_weight >= opposite_weight * 0.65:
+            signal = primary_signal
+            confidence = int(round(50 + min(float(primary_vote["weight"]) * 7, 20) + min((same_weight - float(primary_vote["weight"])) * 4, 10) - min(opposite_weight * 3, 12)))
+            if float(primary_vote["weight"]) >= 2.0:
+                confidence = max(confidence, 58)
+            confidence = min(max(confidence, 50), 85)
+            context_note = ""
+            supporting_context = [item for item in same_votes if item.get("source") == "context"]
+            opposing_context = [item for item in opposite_votes if item.get("source") == "context"]
+            if supporting_context:
+                context_note = " Движение цены дополнительно поддерживает сценарий."
+            elif opposing_context:
+                context_note = " Контекст цены спорит с сигналом, поэтому уверенность снижена."
+            comment = f"{primary_vote['detail']}{context_note}"
+    elif abs(score_delta) >= threshold:
         signal = "BUY" if score_delta > 0 else "SELL"
         dominant_votes = [item for item in votes if item["signal"] == signal]
         opposing_votes = [item for item in votes if item["signal"] != signal]
@@ -2117,7 +2175,8 @@ def _build_local_indicator_analysis(
         comment = best_detail
         if supporting:
             comment = f"{best_detail} Подтверждения: {supporting}."
-    else:
+
+    if signal == "NO TRADE":
         signal = "NO TRADE"
         confidence = 0
         comment = "Индикаторы дают смешанную картину без явного преимущества. Лучше дождаться более чистого импульса."
@@ -2131,7 +2190,7 @@ def _build_local_indicator_analysis(
         expiration_minutes = 1
     elif range_20 and price and range_20 / price > 0.004:
         expiration_minutes = 2
-    elif abs(score_delta) >= 4:
+    elif decision_strength >= 4:
         expiration_minutes = 3
     else:
         expiration_minutes = 5
@@ -2147,21 +2206,10 @@ def _build_local_indicator_analysis(
         "comment": comment[:260],
         "raw_source": "local_indicators",
         "indicator_snapshot": {
-            "candles": len(candles),
+            **_compact_indicator_snapshot(snapshot, allowed_indicators, len(candles)),
             "buy_score": round(buy_score, 2),
             "sell_score": round(sell_score, 2),
-            "rsi": snapshot.get("rsi"),
-            "stochastic": snapshot.get("stochastic"),
-            "cci": snapshot.get("cci"),
-            "williams_r": snapshot.get("williams_r"),
-            "macd": snapshot.get("macd"),
-            "ema": snapshot.get("ema"),
-            "adx": snapshot.get("adx"),
-            "atr": snapshot.get("atr"),
-            "bollinger": snapshot.get("bollinger"),
-            "psar": snapshot.get("psar"),
-            "momentum": snapshot.get("momentum"),
-            "roc": snapshot.get("roc"),
+            "primary_mode": selected_mode,
         },
     }
     return result

@@ -236,6 +236,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     lang VARCHAR(8) NOT NULL DEFAULT 'ru',
                     timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev',
                     theme VARCHAR(16) NOT NULL DEFAULT 'dark',
+                    preferred_signal_mode VARCHAR(16) NOT NULL DEFAULT 'scanner',
                     account_tier VARCHAR(16) NOT NULL DEFAULT 'trader',
                     trader_id VARCHAR(128) NULL,
                     activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive',
@@ -460,6 +461,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
             )
 
         await _ensure_column(conn, db_name, "users", "theme", "ALTER TABLE users ADD COLUMN theme VARCHAR(16) NOT NULL DEFAULT 'dark'")
+        await _ensure_column(conn, db_name, "users", "preferred_signal_mode", "ALTER TABLE users ADD COLUMN preferred_signal_mode VARCHAR(16) NOT NULL DEFAULT 'scanner'")
         await _ensure_column(conn, db_name, "users", "lang", "ALTER TABLE users ADD COLUMN lang VARCHAR(8) NOT NULL DEFAULT 'ru'")
         await _ensure_column(conn, db_name, "users", "timezone", "ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev'")
         await _ensure_column(conn, db_name, "users", "mini_username", "ALTER TABLE users ADD COLUMN mini_username VARCHAR(64) NULL")
@@ -564,6 +566,13 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                 UPDATE users
                 SET account_tier = 'trader'
                 WHERE account_tier IS NULL OR account_tier = '' OR account_tier NOT IN ('trader', 'pro', 'vip')
+                """
+            )
+            await cur.execute(
+                """
+                UPDATE users
+                SET preferred_signal_mode = 'scanner'
+                WHERE preferred_signal_mode IS NULL OR preferred_signal_mode = '' OR preferred_signal_mode NOT IN ('scanner', 'automatic', 'indicators')
                 """
             )
 

@@ -381,6 +381,10 @@ class UserSettingsUpdate(BaseModel):
     timezone: Optional[str] = Field(default=None, max_length=64)
 
 
+class UserSignalModeUpdate(BaseModel):
+    mode: str = Field(min_length=3, max_length=16)
+
+
 class ScanLinkUploadRequest(BaseModel):
     url: str = Field(min_length=8, max_length=2000)
 
@@ -1023,6 +1027,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "lang": normalize_user_lang(row.get("lang") or "ru"),
         "timezone": row.get("timezone") or "Europe/Kiev",
         "theme": _coerce_theme(row.get("theme") or "dark"),
+        "preferred_signal_mode": _normalize_preferred_signal_mode(row.get("preferred_signal_mode") or "scanner"),
         "account_tier": normalize_account_tier(row.get("account_tier") or "trader"),
         "trader_id": row.get("trader_id") or "",
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
@@ -1095,6 +1100,13 @@ def _sanitize_active_signals_limit(value: Any) -> int:
     except (TypeError, ValueError):
         numeric = DEFAULT_ACTIVE_SIGNALS_LIMIT
     return min(max(numeric, 1), 3)
+
+
+def _normalize_preferred_signal_mode(value: Any) -> str:
+    mode = str(value or "").strip().lower()
+    if mode in {"scanner", "automatic", "indicators"}:
+        return mode
+    return "scanner"
 
 
 async def get_active_signals_limit() -> int:
@@ -3571,6 +3583,29 @@ async def update_user_settings(
                     tuple(values),
                 )
     return {"status": "success", "user": await fetch_user_profile(user_id)}
+
+
+@app.post("/api/user/signal-mode")
+async def update_user_signal_mode(
+    payload: UserSignalModeUpdate,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    mode = _normalize_preferred_signal_mode(payload.mode)
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users
+                SET preferred_signal_mode = %s,
+                    last_active_at = NOW()
+                WHERE user_id = %s
+                """,
+                (mode, user_id),
+            )
+    return {"status": "success", "mode": mode, "user": await fetch_user_profile(user_id)}
 
 
 @app.get("/api/user/news-notifications")

@@ -334,8 +334,12 @@ function getCountdownProgress(settlement) {
 }
 
 
-export default function HomePage({ t, notify, featureFlags = {} }) {
-  const [signalMode, setSignalMode] = useState("scanner");
+function normalizeSignalMode(value) {
+  return ["scanner", "automatic", "indicators"].includes(value) ? value : "scanner";
+}
+
+export default function HomePage({ t, notify, featureFlags = {}, preferredSignalMode = "scanner", onPreferredSignalModeChange }) {
+  const [signalMode, setSignalMode] = useState(() => normalizeSignalMode(preferredSignalMode));
   const [isSignalModeExpanded, setIsSignalModeExpanded] = useState(false);
   const [marketKind, setMarketKind] = useState("otc");
   const [pairs, setPairs] = useState([]);
@@ -385,6 +389,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   const quoteUnlockTimerRef = useRef(null);
   const currentQuoteLoadKeyRef = useRef("");
   const lastQuoteSubscriptionKeyRef = useRef("");
+  const signalModePersistTimerRef = useRef(0);
 
   const quickActions = useMemo(
     () => [
@@ -441,12 +446,45 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
   );
 
   useEffect(() => {
+    const normalized = normalizeSignalMode(preferredSignalMode);
+    setSignalMode((prev) => (prev === normalized ? prev : normalized));
+  }, [preferredSignalMode]);
+
+  useEffect(() => () => {
+    if (signalModePersistTimerRef.current) {
+      window.clearTimeout(signalModePersistTimerRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!signalModes.length) return;
     if (!signalModes.some((item) => item.id === signalMode)) {
       setSignalMode(signalModes[0].id);
       setIsSignalModeExpanded(false);
     }
   }, [signalMode, signalModes]);
+
+  function persistSignalMode(mode) {
+    const normalized = normalizeSignalMode(mode);
+    setSignalMode(normalized);
+    onPreferredSignalModeChange?.(normalized);
+    if (signalModePersistTimerRef.current) {
+      window.clearTimeout(signalModePersistTimerRef.current);
+    }
+    signalModePersistTimerRef.current = window.setTimeout(async () => {
+      try {
+        const result = await apiFetchJson("/api/user/signal-mode", {
+          method: "POST",
+          body: JSON.stringify({ mode: normalized })
+        });
+        const savedMode = normalizeSignalMode(result?.mode || result?.user?.preferred_signal_mode || normalized);
+        onPreferredSignalModeChange?.(savedMode);
+        setSignalMode((prev) => (prev === normalized ? savedMode : prev));
+      } catch (_error) {
+        // The local mode remains active; the next successful profile sync will restore the server value.
+      }
+    }, 180);
+  }
 
   const allowedMarkets = useMemo(
     () => (signalMode === "indicators" ? INDICATOR_MARKETS : BASIC_MARKETS),
@@ -1313,7 +1351,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
     setAnalysisSettlement({ status: "idle" });
     setScanPreview({ url: "", status: "idle" });
     setScanUploadState({ status: "idle", file: null, detail: "" });
-    setSignalMode("scanner");
     setIsSignalModeExpanded(false);
     setIsActionSheetOpen(false);
     setIsLinkSheetOpen(false);
@@ -1894,7 +1931,7 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
                   <button
                     key={item.id}
                     className="signal-mode-card"
-                    onClick={() => { setSignalMode(item.id); setIsSignalModeExpanded(false); }}
+                    onClick={() => { persistSignalMode(item.id); setIsSignalModeExpanded(false); }}
                     type="button"
                   >
                     <span className="signal-mode-icon" aria-hidden="true">

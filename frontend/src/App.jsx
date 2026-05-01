@@ -42,6 +42,7 @@ const FALLBACK_USER = {
   lang: "ru",
   timezone: "Europe/Kiev",
   theme: "dark",
+  preferred_signal_mode: "scanner",
   activation_status: "inactive",
   trader_id: "",
   scanner_access: 0,
@@ -377,7 +378,15 @@ export default function App() {
         ) : (
           <>
             {tab === "news" && <NewsPage t={t} lang={lang} timezone={user.timezone || FALLBACK_USER.timezone} />}
-            {tab === "home" && <HomePage t={t} notify={notify} featureFlags={user.feature_flags || FALLBACK_USER.feature_flags} />}
+            {tab === "home" && (
+              <HomePage
+                t={t}
+                notify={notify}
+                featureFlags={user.feature_flags || FALLBACK_USER.feature_flags}
+                preferredSignalMode={user.preferred_signal_mode || FALLBACK_USER.preferred_signal_mode}
+                onPreferredSignalModeChange={(mode) => setUser((prev) => ({ ...prev, preferred_signal_mode: mode }))}
+              />
+            )}
             {tab === "history" && <HistoryPage lang={lang} />}
             {tab === "profile" && (
               <ProfilePage

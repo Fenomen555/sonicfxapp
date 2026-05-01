@@ -124,6 +124,7 @@ INDICATOR_ANALYSIS_CODE_MAP = {
 }
 INDICATOR_ANALYSIS_SUPPORTED_CODES = set(INDICATOR_ANALYSIS_CODE_MAP)
 INDICATOR_ANALYSIS_INTERVALS = {"5min", "15min", "30min", "1h"}
+INDICATOR_LOCAL_HISTORY_SECONDS = 1800
 SCANNER_ANALYSIS_PROMPT = """Ты — профессиональный трейдинг-аналитик SonicFX.
 Анализируешь скриншот свечного графика Forex или OTC и выдаёшь короткий, но профессиональный торговый сценарий.
 
@@ -1601,44 +1602,8 @@ def _indicator_api_codes(indicator_code: Optional[str]) -> List[str]:
             codes.extend(values)
         return codes
     if normalized not in INDICATOR_ANALYSIS_CODE_MAP:
-        raise HTTPException(status_code=400, detail="Indicator is not supported by advanced analysis")
+        raise HTTPException(status_code=400, detail="Indicator is not supported by local analysis")
     return list(INDICATOR_ANALYSIS_CODE_MAP[normalized])
-
-
-def _normalize_indicator_signal(value: Any) -> str:
-    raw = str(value or "").strip().upper()
-    compact = re.sub(r"[^A-Z]+", "", raw)
-    if compact in {"BUY", "CALL", "UP", "LONG", "BULL", "BULLISH", "STRONGBUY"}:
-        return "BUY"
-    if compact in {"SELL", "PUT", "DOWN", "SHORT", "BEAR", "BEARISH", "STRONGSELL"}:
-        return "SELL"
-    if compact in {"NOTRADE", "HOLD", "WAIT", "NEUTRAL", "NONE"}:
-        return "NO TRADE"
-    if "BUY" in compact or "CALL" in compact or "BULL" in compact:
-        return "BUY"
-    if "SELL" in compact or "PUT" in compact or "BEAR" in compact:
-        return "SELL"
-    return "NO TRADE"
-
-
-def _coerce_indicator_confidence(*values: Any) -> int:
-    for value in values:
-        label = str(value or "").strip().lower()
-        if label in {"very high", "high", "strong", "высокая", "сильный"}:
-            return 70
-        if label in {"medium", "moderate", "средняя", "умеренный"}:
-            return 60
-        if label in {"low", "weak", "низкая", "слабый"}:
-            return 52
-        try:
-            confidence = float(value)
-        except (TypeError, ValueError):
-            continue
-        if confidence <= 1:
-            confidence *= 100
-        if confidence > 0:
-            return min(max(int(round(confidence)), 0), 85)
-    return 0
 
 
 def _coerce_indicator_expiration_minutes(*values: Any) -> int:
@@ -1659,131 +1624,547 @@ def _coerce_indicator_expiration_minutes(*values: Any) -> int:
     return 0
 
 
-def _first_present(mapping: Dict[str, Any], *keys: str) -> Any:
-    for key in keys:
-        if key in mapping and mapping.get(key) not in (None, ""):
-            return mapping.get(key)
-    wanted = {str(key).lower() for key in keys}
-    stack: List[Any] = list(mapping.values())
-    while stack:
-        current = stack.pop(0)
-        if isinstance(current, dict):
-            for key, value in current.items():
-                if str(key).lower() in wanted and value not in (None, ""):
-                    return value
-                if isinstance(value, (dict, list)):
-                    stack.append(value)
-        elif isinstance(current, list):
-            stack.extend(item for item in current if isinstance(item, (dict, list)))
+def _safe_number(value: Any) -> Optional[float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None
+
+
+def _extract_indicator_candles(payload: Any) -> List[Dict[str, float]]:
+    if not isinstance(payload, dict):
+        return []
+    candles = payload.get("candles")
+    if not isinstance(candles, list):
+        return []
+
+    normalized: List[Dict[str, float]] = []
+    for item in candles:
+        if not isinstance(item, dict):
+            continue
+        open_price = _safe_number(item.get("open"))
+        high_price = _safe_number(item.get("high"))
+        low_price = _safe_number(item.get("low"))
+        close_price = _safe_number(item.get("close"))
+        if None in (open_price, high_price, low_price, close_price):
+            continue
+        ts = _safe_number(item.get("ts")) or float(len(normalized))
+        normalized.append(
+            {
+                "ts": ts,
+                "open": float(open_price),
+                "high": float(high_price),
+                "low": float(low_price),
+                "close": float(close_price),
+            }
+        )
+    normalized.sort(key=lambda row: row["ts"])
+    return normalized
+
+
+def _sma(values: List[float], period: int) -> Optional[float]:
+    if period <= 0 or len(values) < period:
+        return None
+    chunk = values[-period:]
+    return sum(chunk) / period
+
+
+def _ema_series(values: List[float], period: int) -> List[Optional[float]]:
+    if period <= 0 or len(values) < period:
+        return [None for _ in values]
+    result: List[Optional[float]] = [None for _ in values]
+    initial = sum(values[:period]) / period
+    result[period - 1] = initial
+    multiplier = 2 / (period + 1)
+    previous = initial
+    for index in range(period, len(values)):
+        previous = (values[index] - previous) * multiplier + previous
+        result[index] = previous
+    return result
+
+
+def _last_number(values: List[Optional[float]]) -> Optional[float]:
+    for value in reversed(values):
+        if value is not None:
+            return float(value)
     return None
 
 
-def _extract_indicator_result_root(payload: Any) -> Dict[str, Any]:
-    if not isinstance(payload, dict):
-        return {}
-    for key in ("result", "analysis", "signal", "data"):
-        value = payload.get(key)
-        if isinstance(value, dict):
-            return value
-    return payload
+def _calc_rsi(closes: List[float], period: int = 14) -> Optional[float]:
+    if len(closes) <= period:
+        return None
+    gains: List[float] = []
+    losses: List[float] = []
+    for index in range(1, len(closes)):
+        change = closes[index] - closes[index - 1]
+        gains.append(max(change, 0))
+        losses.append(abs(min(change, 0)))
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+    for index in range(period, len(gains)):
+        avg_gain = ((avg_gain * (period - 1)) + gains[index]) / period
+        avg_loss = ((avg_loss * (period - 1)) + losses[index]) / period
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
 
 
-def _sanitize_indicator_analysis_result(
-    payload: Dict[str, Any],
+def _calc_stochastic(candles: List[Dict[str, float]], period: int = 14, smooth: int = 3) -> tuple[Optional[float], Optional[float]]:
+    if len(candles) < period:
+        return None, None
+    k_values: List[float] = []
+    for index in range(period - 1, len(candles)):
+        window = candles[index - period + 1 : index + 1]
+        highest = max(row["high"] for row in window)
+        lowest = min(row["low"] for row in window)
+        close = candles[index]["close"]
+        k_values.append(50.0 if highest == lowest else ((close - lowest) / (highest - lowest)) * 100)
+    k = k_values[-1] if k_values else None
+    d = sum(k_values[-smooth:]) / min(len(k_values), smooth) if k_values else None
+    return k, d
+
+
+def _calc_cci(candles: List[Dict[str, float]], period: int = 20) -> Optional[float]:
+    if len(candles) < period:
+        return None
+    typical = [(row["high"] + row["low"] + row["close"]) / 3 for row in candles]
+    window = typical[-period:]
+    average = sum(window) / period
+    mean_deviation = sum(abs(value - average) for value in window) / period
+    if mean_deviation == 0:
+        return 0.0
+    return (typical[-1] - average) / (0.015 * mean_deviation)
+
+
+def _calc_williams_r(candles: List[Dict[str, float]], period: int = 14) -> Optional[float]:
+    if len(candles) < period:
+        return None
+    window = candles[-period:]
+    highest = max(row["high"] for row in window)
+    lowest = min(row["low"] for row in window)
+    if highest == lowest:
+        return -50.0
+    return ((highest - candles[-1]["close"]) / (highest - lowest)) * -100
+
+
+def _true_ranges(candles: List[Dict[str, float]]) -> List[float]:
+    ranges: List[float] = []
+    previous_close: Optional[float] = None
+    for row in candles:
+        high = row["high"]
+        low = row["low"]
+        if previous_close is None:
+            ranges.append(high - low)
+        else:
+            ranges.append(max(high - low, abs(high - previous_close), abs(low - previous_close)))
+        previous_close = row["close"]
+    return ranges
+
+
+def _calc_atr(candles: List[Dict[str, float]], period: int = 14) -> Optional[float]:
+    ranges = _true_ranges(candles)
+    if len(ranges) < period:
+        return None
+    atr = sum(ranges[:period]) / period
+    for value in ranges[period:]:
+        atr = ((atr * (period - 1)) + value) / period
+    return atr
+
+
+def _calc_adx(candles: List[Dict[str, float]], period: int = 14) -> Dict[str, Optional[float]]:
+    if len(candles) <= period * 2:
+        return {"adx": None, "plus_di": None, "minus_di": None}
+    tr_values: List[float] = []
+    plus_dm: List[float] = []
+    minus_dm: List[float] = []
+    for index in range(1, len(candles)):
+        current = candles[index]
+        previous = candles[index - 1]
+        up_move = current["high"] - previous["high"]
+        down_move = previous["low"] - current["low"]
+        plus_dm.append(up_move if up_move > down_move and up_move > 0 else 0.0)
+        minus_dm.append(down_move if down_move > up_move and down_move > 0 else 0.0)
+        tr_values.append(max(current["high"] - current["low"], abs(current["high"] - previous["close"]), abs(current["low"] - previous["close"])))
+
+    atr = sum(tr_values[:period])
+    plus = sum(plus_dm[:period])
+    minus = sum(minus_dm[:period])
+    dx_values: List[float] = []
+    plus_di = minus_di = None
+    for index in range(period, len(tr_values)):
+        atr = atr - (atr / period) + tr_values[index]
+        plus = plus - (plus / period) + plus_dm[index]
+        minus = minus - (minus / period) + minus_dm[index]
+        if atr == 0:
+            continue
+        plus_di = 100 * (plus / atr)
+        minus_di = 100 * (minus / atr)
+        total = plus_di + minus_di
+        dx_values.append(0.0 if total == 0 else 100 * abs(plus_di - minus_di) / total)
+    if len(dx_values) < period:
+        return {"adx": None, "plus_di": plus_di, "minus_di": minus_di}
+    adx = sum(dx_values[:period]) / period
+    for value in dx_values[period:]:
+        adx = ((adx * (period - 1)) + value) / period
+    return {"adx": adx, "plus_di": plus_di, "minus_di": minus_di}
+
+
+def _calc_bollinger(closes: List[float], period: int = 20) -> Dict[str, Optional[float]]:
+    if len(closes) < period:
+        return {"middle": None, "upper": None, "lower": None, "width": None}
+    window = closes[-period:]
+    middle = sum(window) / period
+    variance = sum((value - middle) ** 2 for value in window) / period
+    deviation = variance ** 0.5
+    upper = middle + deviation * 2
+    lower = middle - deviation * 2
+    width = (upper - lower) / middle if middle else None
+    return {"middle": middle, "upper": upper, "lower": lower, "width": width}
+
+
+def _calc_macd(closes: List[float]) -> Dict[str, Optional[float]]:
+    ema12 = _ema_series(closes, 12)
+    ema26 = _ema_series(closes, 26)
+    macd_line: List[Optional[float]] = []
+    for fast, slow in zip(ema12, ema26):
+        macd_line.append(None if fast is None or slow is None else fast - slow)
+    compact = [value for value in macd_line if value is not None]
+    signal_series = _ema_series(compact, 9) if compact else []
+    macd = _last_number(macd_line)
+    signal = _last_number(signal_series)
+    histogram = macd - signal if macd is not None and signal is not None else None
+    previous_histogram = None
+    if len(compact) >= 2 and len(signal_series) >= 2:
+        previous_signal = signal_series[-2]
+        previous_macd = compact[-2]
+        if previous_signal is not None:
+            previous_histogram = previous_macd - previous_signal
+    return {"macd": macd, "signal": signal, "histogram": histogram, "previous_histogram": previous_histogram}
+
+
+def _calc_psar(candles: List[Dict[str, float]], step: float = 0.02, maximum: float = 0.2) -> Optional[float]:
+    if len(candles) < 3:
+        return None
+    bull = candles[1]["close"] >= candles[0]["close"]
+    psar = candles[0]["low"] if bull else candles[0]["high"]
+    extreme = candles[0]["high"] if bull else candles[0]["low"]
+    acceleration = step
+    for index in range(1, len(candles)):
+        row = candles[index]
+        psar = psar + acceleration * (extreme - psar)
+        if bull:
+            if row["low"] < psar:
+                bull = False
+                psar = extreme
+                extreme = row["low"]
+                acceleration = step
+            else:
+                if row["high"] > extreme:
+                    extreme = row["high"]
+                    acceleration = min(acceleration + step, maximum)
+        else:
+            if row["high"] > psar:
+                bull = True
+                psar = extreme
+                extreme = row["high"]
+                acceleration = step
+            else:
+                if row["low"] < extreme:
+                    extreme = row["low"]
+                    acceleration = min(acceleration + step, maximum)
+    return psar
+
+
+def _calc_momentum(closes: List[float], period: int = 10) -> Optional[float]:
+    if len(closes) <= period:
+        return None
+    return closes[-1] - closes[-period - 1]
+
+
+def _calc_roc(closes: List[float], period: int = 10) -> Optional[float]:
+    if len(closes) <= period or closes[-period - 1] == 0:
+        return None
+    return ((closes[-1] - closes[-period - 1]) / closes[-period - 1]) * 100
+
+
+def _vote_result(signal: str, weight: float, label: str, detail: str) -> Dict[str, Any]:
+    return {"signal": signal, "weight": float(weight), "label": label, "detail": detail}
+
+
+def _build_local_indicator_snapshot(candles: List[Dict[str, float]]) -> Dict[str, Any]:
+    closes = [row["close"] for row in candles]
+    highs = [row["high"] for row in candles]
+    lows = [row["low"] for row in candles]
+    ema9 = _last_number(_ema_series(closes, 9))
+    ema50 = _last_number(_ema_series(closes, 50))
+    ema200 = _last_number(_ema_series(closes, 200))
+    atr = _calc_atr(candles)
+    last_close = closes[-1] if closes else None
+    previous_close = closes[-2] if len(closes) >= 2 else None
+    move_20 = closes[-1] - closes[-21] if len(closes) > 20 else 0.0
+    range_20 = max(highs[-20:]) - min(lows[-20:]) if len(candles) >= 20 else 0.0
+    return {
+        "price": last_close,
+        "previous_close": previous_close,
+        "rsi": _calc_rsi(closes),
+        "stochastic": dict(zip(("k", "d"), _calc_stochastic(candles))),
+        "cci": _calc_cci(candles),
+        "williams_r": _calc_williams_r(candles),
+        "macd": _calc_macd(closes),
+        "ema": {"ema9": ema9, "ema50": ema50, "ema200": ema200},
+        "adx": _calc_adx(candles),
+        "atr": atr,
+        "bollinger": _calc_bollinger(closes),
+        "psar": _calc_psar(candles),
+        "momentum": _calc_momentum(closes),
+        "roc": _calc_roc(closes),
+        "move_20": move_20,
+        "range_20": range_20,
+    }
+
+
+def _indicator_votes(snapshot: Dict[str, Any], allowed_indicators: List[str]) -> List[Dict[str, Any]]:
+    allowed = set(allowed_indicators or [])
+    votes: List[Dict[str, Any]] = []
+    price = _safe_number(snapshot.get("price"))
+
+    if "RSI" in allowed:
+        rsi = _safe_number(snapshot.get("rsi"))
+        if rsi is not None:
+            if rsi <= 30:
+                votes.append(_vote_result("BUY", 2.6, "RSI", f"RSI {rsi:.1f}: зона перепроданности, возможен отскок."))
+            elif rsi >= 70:
+                votes.append(_vote_result("SELL", 2.6, "RSI", f"RSI {rsi:.1f}: зона перекупленности, возможен откат."))
+            elif rsi >= 57:
+                votes.append(_vote_result("BUY", 1.1, "RSI", f"RSI {rsi:.1f}: покупатели сохраняют умеренное давление."))
+            elif rsi <= 43:
+                votes.append(_vote_result("SELL", 1.1, "RSI", f"RSI {rsi:.1f}: продавцы сохраняют умеренное давление."))
+
+    if "STOCH" in allowed:
+        stochastic = snapshot.get("stochastic") or {}
+        k = _safe_number(stochastic.get("k"))
+        d = _safe_number(stochastic.get("d"))
+        if k is not None and d is not None:
+            if k <= 20 and k >= d:
+                votes.append(_vote_result("BUY", 2.2, "Stochastic", f"Stochastic {k:.1f}: выход из перепроданности."))
+            elif k >= 80 and k <= d:
+                votes.append(_vote_result("SELL", 2.2, "Stochastic", f"Stochastic {k:.1f}: слабость в перекупленности."))
+            elif k > d and k < 80:
+                votes.append(_vote_result("BUY", 1.0, "Stochastic", "Stochastic направлен вверх, импульс поддерживает BUY."))
+            elif k < d and k > 20:
+                votes.append(_vote_result("SELL", 1.0, "Stochastic", "Stochastic направлен вниз, импульс поддерживает SELL."))
+
+    if "CCI" in allowed:
+        cci = _safe_number(snapshot.get("cci"))
+        if cci is not None:
+            if cci <= -100:
+                votes.append(_vote_result("BUY", 2.0, "CCI", f"CCI {cci:.0f}: перепроданность и шанс на восстановление."))
+            elif cci >= 100:
+                votes.append(_vote_result("SELL", 2.0, "CCI", f"CCI {cci:.0f}: перегрев и риск отката."))
+            elif cci > 40:
+                votes.append(_vote_result("BUY", 0.9, "CCI", f"CCI {cci:.0f}: положительный импульс."))
+            elif cci < -40:
+                votes.append(_vote_result("SELL", 0.9, "CCI", f"CCI {cci:.0f}: отрицательный импульс."))
+
+    if "WILLR" in allowed:
+        willr = _safe_number(snapshot.get("williams_r"))
+        if willr is not None:
+            if willr <= -80:
+                votes.append(_vote_result("BUY", 2.0, "Williams %R", f"Williams %R {willr:.0f}: рынок в перепроданности."))
+            elif willr >= -20:
+                votes.append(_vote_result("SELL", 2.0, "Williams %R", f"Williams %R {willr:.0f}: рынок в перекупленности."))
+            elif willr > -50:
+                votes.append(_vote_result("BUY", 0.8, "Williams %R", "Williams %R держится выше середины диапазона."))
+            elif willr < -50:
+                votes.append(_vote_result("SELL", 0.8, "Williams %R", "Williams %R держится ниже середины диапазона."))
+
+    if "MACD" in allowed:
+        macd = snapshot.get("macd") or {}
+        histogram = _safe_number(macd.get("histogram"))
+        previous_histogram = _safe_number(macd.get("previous_histogram"))
+        if histogram is not None:
+            if histogram > 0 and (previous_histogram is None or histogram >= previous_histogram):
+                votes.append(_vote_result("BUY", 2.1, "MACD", "MACD histogram растет выше нуля, импульс на стороне покупателей."))
+            elif histogram < 0 and (previous_histogram is None or histogram <= previous_histogram):
+                votes.append(_vote_result("SELL", 2.1, "MACD", "MACD histogram снижается ниже нуля, давление на стороне продавцов."))
+            elif histogram > 0:
+                votes.append(_vote_result("BUY", 1.0, "MACD", "MACD остается в положительной зоне."))
+            elif histogram < 0:
+                votes.append(_vote_result("SELL", 1.0, "MACD", "MACD остается в отрицательной зоне."))
+
+    if {"EMA9", "EMA50", "EMA200"} & allowed:
+        ema = snapshot.get("ema") or {}
+        ema9 = _safe_number(ema.get("ema9"))
+        ema50 = _safe_number(ema.get("ema50"))
+        ema200 = _safe_number(ema.get("ema200"))
+        if price is not None and ema9 is not None and ema50 is not None:
+            if ema9 > ema50 and price >= ema9:
+                weight = 2.4 if ema200 is None or ema50 >= ema200 else 1.6
+                votes.append(_vote_result("BUY", weight, "EMA", "EMA 9 выше EMA 50, цена удерживает восходящую структуру."))
+            elif ema9 < ema50 and price <= ema9:
+                weight = 2.4 if ema200 is None or ema50 <= ema200 else 1.6
+                votes.append(_vote_result("SELL", weight, "EMA", "EMA 9 ниже EMA 50, цена удерживает нисходящую структуру."))
+            elif price > ema50:
+                votes.append(_vote_result("BUY", 0.9, "EMA", "Цена остается выше EMA 50."))
+            elif price < ema50:
+                votes.append(_vote_result("SELL", 0.9, "EMA", "Цена остается ниже EMA 50."))
+
+    if "ADX" in allowed:
+        adx_payload = snapshot.get("adx") or {}
+        adx = _safe_number(adx_payload.get("adx"))
+        plus_di = _safe_number(adx_payload.get("plus_di"))
+        minus_di = _safe_number(adx_payload.get("minus_di"))
+        if adx is not None and plus_di is not None and minus_di is not None:
+            if adx >= 18 and plus_di > minus_di:
+                votes.append(_vote_result("BUY", 2.0 if adx >= 25 else 1.3, "ADX", f"ADX {adx:.1f}: тренд поддерживает покупателей."))
+            elif adx >= 18 and minus_di > plus_di:
+                votes.append(_vote_result("SELL", 2.0 if adx >= 25 else 1.3, "ADX", f"ADX {adx:.1f}: тренд поддерживает продавцов."))
+
+    if "ATR" in allowed:
+        atr = _safe_number(snapshot.get("atr"))
+        move_20 = _safe_number(snapshot.get("move_20")) or 0
+        if atr is not None and atr > 0:
+            if move_20 > atr * 1.2:
+                votes.append(_vote_result("BUY", 1.5, "ATR", "ATR показывает рабочую волатильность, последний импульс направлен вверх."))
+            elif move_20 < -atr * 1.2:
+                votes.append(_vote_result("SELL", 1.5, "ATR", "ATR показывает рабочую волатильность, последний импульс направлен вниз."))
+
+    if "BB" in allowed:
+        bb = snapshot.get("bollinger") or {}
+        upper = _safe_number(bb.get("upper"))
+        lower = _safe_number(bb.get("lower"))
+        middle = _safe_number(bb.get("middle"))
+        if price is not None and upper is not None and lower is not None and middle is not None:
+            if price <= lower:
+                votes.append(_vote_result("BUY", 1.9, "Bollinger Bands", "Цена у нижней полосы Bollinger, вероятен отскок."))
+            elif price >= upper:
+                votes.append(_vote_result("SELL", 1.9, "Bollinger Bands", "Цена у верхней полосы Bollinger, вероятен откат."))
+            elif price > middle:
+                votes.append(_vote_result("BUY", 0.7, "Bollinger Bands", "Цена выше средней Bollinger, структура умеренно бычья."))
+            elif price < middle:
+                votes.append(_vote_result("SELL", 0.7, "Bollinger Bands", "Цена ниже средней Bollinger, структура умеренно медвежья."))
+
+    if "PSAR" in allowed:
+        psar = _safe_number(snapshot.get("psar"))
+        if price is not None and psar is not None:
+            if price > psar:
+                votes.append(_vote_result("BUY", 1.3, "Parabolic SAR", "Цена выше Parabolic SAR, направление остается вверх."))
+            elif price < psar:
+                votes.append(_vote_result("SELL", 1.3, "Parabolic SAR", "Цена ниже Parabolic SAR, направление остается вниз."))
+
+    if "MOM" in allowed:
+        momentum = _safe_number(snapshot.get("momentum"))
+        if momentum is not None:
+            if momentum > 0:
+                votes.append(_vote_result("BUY", 1.2, "Momentum", "Momentum положительный, импульс поддерживает рост."))
+            elif momentum < 0:
+                votes.append(_vote_result("SELL", 1.2, "Momentum", "Momentum отрицательный, импульс поддерживает снижение."))
+
+    if "ROC" in allowed:
+        roc = _safe_number(snapshot.get("roc"))
+        if roc is not None:
+            if roc > 0:
+                votes.append(_vote_result("BUY", 1.1, "Rate Of Change", f"ROC {roc:.2f}%: цена растет относительно прошлых свечей."))
+            elif roc < 0:
+                votes.append(_vote_result("SELL", 1.1, "Rate Of Change", f"ROC {roc:.2f}%: цена снижается относительно прошлых свечей."))
+
+    move_20 = _safe_number(snapshot.get("move_20")) or 0
+    range_20 = _safe_number(snapshot.get("range_20")) or 0
+    previous_close = _safe_number(snapshot.get("previous_close"))
+    if price is not None and previous_close is not None and range_20 > 0:
+        impulse_ratio = abs(move_20) / range_20
+        weight = 1.6 if impulse_ratio >= 0.32 else 1.1 if impulse_ratio >= 0.18 else 0
+        if weight and move_20 > 0 and price >= previous_close:
+            votes.append(_vote_result("BUY", weight, "Price Action", "Последняя структура цены поддерживает восходящий импульс."))
+        elif weight and move_20 < 0 and price <= previous_close:
+            votes.append(_vote_result("SELL", weight, "Price Action", "Последняя структура цены поддерживает нисходящий импульс."))
+
+    return votes
+
+
+def _build_local_indicator_analysis(
     *,
+    payload: Dict[str, Any],
     category: str,
     symbol: str,
     selected_expiration: Optional[str],
-    entry_price: Optional[float],
+    allowed_indicators: List[str],
 ) -> Dict[str, Any]:
-    root = _extract_indicator_result_root(payload)
-    signal = _normalize_indicator_signal(
-        _first_present(root, "signal", "final_signal", "trade_signal", "direction", "recommendation", "action", "decision", "side")
-    )
-    confidence = _coerce_indicator_confidence(
-        _first_present(root, "confidence", "confidence_percent", "confidence_score", "probability", "probability_percent", "winrate", "score", "strength")
-    )
-    expiration_minutes = _coerce_indicator_expiration_minutes(
-        _first_present(root, "expiration_minutes", "expiration", "expiry", "recommended_expiration", "duration")
-    )
-    if not expiration_minutes:
-        expiration_minutes = _coerce_indicator_expiration_minutes(selected_expiration)
-
-    comment = str(
-        _first_present(root, "comment", "summary", "reason", "description", "analysis", "message")
-        or ""
-    ).strip()
-    if not comment:
-        if signal == "BUY":
-            comment = "Индикаторы подтверждают восходящий сценарий, вход возможен по текущей структуре."
-        elif signal == "SELL":
-            comment = "Индикаторы подтверждают нисходящий сценарий, вход возможен по текущей структуре."
-        else:
-            comment = "Индикаторы не дают достаточно чистого подтверждения для входа."
-
-    resolved_price = entry_price
-    if resolved_price is None:
-        try:
-            resolved_price = float(_first_present(root, "entry_price", "price", "current_price", "last_price"))
-        except (TypeError, ValueError):
-            resolved_price = None
+    candles = _extract_indicator_candles(payload)
+    if len(candles) < 20:
+        raise HTTPException(status_code=502, detail="Not enough quote candles for local indicator analysis")
 
     normalized_category = normalize_quote_category(category)
     normalized_symbol = normalize_quote_symbol(_strip_otc_suffix(symbol))
-    return {
+    snapshot = _build_local_indicator_snapshot(candles)
+    votes = _indicator_votes(snapshot, allowed_indicators)
+    buy_score = sum(item["weight"] for item in votes if item["signal"] == "BUY")
+    sell_score = sum(item["weight"] for item in votes if item["signal"] == "SELL")
+    score_delta = buy_score - sell_score
+    selected_mode = len(allowed_indicators) <= 3
+    threshold = 1.35 if selected_mode else 2.2
+
+    if abs(score_delta) >= threshold:
+        signal = "BUY" if score_delta > 0 else "SELL"
+        dominant_votes = [item for item in votes if item["signal"] == signal]
+        opposing_votes = [item for item in votes if item["signal"] != signal]
+        confidence = int(round(52 + min(abs(score_delta) * 6, 24) + min(len(dominant_votes) * 2, 8) - min(len(opposing_votes) * 2, 8)))
+        confidence = min(max(confidence, 50), 85)
+        best_detail = dominant_votes[0]["detail"] if dominant_votes else ""
+        supporting = ", ".join(item["label"] for item in dominant_votes[:3])
+        comment = best_detail
+        if supporting:
+            comment = f"{best_detail} Подтверждения: {supporting}."
+    else:
+        signal = "NO TRADE"
+        confidence = 0
+        comment = "Индикаторы дают смешанную картину без явного преимущества. Лучше дождаться более чистого импульса."
+
+    atr = _safe_number(snapshot.get("atr")) or 0
+    price = _safe_number(snapshot.get("price")) or _extract_quote_price(payload)
+    range_20 = abs(_safe_number(snapshot.get("range_20")) or 0)
+    if signal == "NO TRADE":
+        expiration_minutes = _coerce_indicator_expiration_minutes(selected_expiration) or 5
+    elif atr and price and atr / price > 0.0018:
+        expiration_minutes = 1
+    elif range_20 and price and range_20 / price > 0.004:
+        expiration_minutes = 2
+    elif abs(score_delta) >= 4:
+        expiration_minutes = 3
+    else:
+        expiration_minutes = 5
+
+    result = {
         "status": "ok",
         "asset": _display_quote_symbol(normalized_symbol, normalized_category),
         "market_mode": "OTC" if normalized_category == "otc" else "MARKET",
         "signal": signal,
         "confidence": confidence,
         "expiration_minutes": expiration_minutes,
-        "entry_price": resolved_price,
+        "entry_price": price,
         "comment": comment[:260],
-        "raw_source": "devsbite_advanced",
+        "raw_source": "local_indicators",
+        "indicator_snapshot": {
+            "candles": len(candles),
+            "buy_score": round(buy_score, 2),
+            "sell_score": round(sell_score, 2),
+            "rsi": snapshot.get("rsi"),
+            "stochastic": snapshot.get("stochastic"),
+            "cci": snapshot.get("cci"),
+            "williams_r": snapshot.get("williams_r"),
+            "macd": snapshot.get("macd"),
+            "ema": snapshot.get("ema"),
+            "adx": snapshot.get("adx"),
+            "atr": snapshot.get("atr"),
+            "bollinger": snapshot.get("bollinger"),
+            "psar": snapshot.get("psar"),
+            "momentum": snapshot.get("momentum"),
+            "roc": snapshot.get("roc"),
+        },
     }
-
-
-async def _fetch_advanced_indicator_analysis(
-    *,
-    category: str,
-    symbol: str,
-    interval: str,
-    allowed_indicators: List[str],
-) -> Dict[str, Any]:
-    if not DEVSBITE_CLIENT_TOKEN:
-        raise HTTPException(status_code=503, detail="Advanced analysis token is not configured")
-
-    url = f"{DEVSBITE_API_BASE_URL}/analysis/advanced"
-    headers = {
-        "accept": "application/json",
-        "Content-Type": "application/json",
-        "X-Client-Token": DEVSBITE_CLIENT_TOKEN,
-        "Cache-Control": "no-cache",
-    }
-    body = {
-        "symbol": normalize_quote_symbol(_strip_otc_suffix(symbol)),
-        "interval": interval,
-        "category": normalize_quote_category(category),
-    }
-    if allowed_indicators:
-        body["allowed_indicators"] = allowed_indicators
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=body, timeout=18.0)
-            response.raise_for_status()
-            payload = response.json()
-    except httpx.HTTPStatusError as exc:
-        detail = exc.response.text.strip() if exc.response is not None else ""
-        raise HTTPException(status_code=502, detail=detail or "Advanced indicator analysis request failed") from exc
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="Advanced indicator analysis request failed") from exc
-
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=502, detail="Advanced indicator analysis response is invalid")
-    if payload.get("ok") is False:
-        raise HTTPException(status_code=502, detail=str(payload.get("detail") or payload.get("message") or "Advanced indicator analysis failed"))
-    return payload
+    return result
 
 
 async def run_indicator_analysis(
@@ -1798,25 +2179,23 @@ async def run_indicator_analysis(
     normalized_symbol = normalize_quote_symbol(_strip_otc_suffix(symbol))
     normalized_indicator = str(indicator_code or "").strip().lower()
     if normalized_indicator and normalized_indicator not in INDICATOR_ANALYSIS_SUPPORTED_CODES:
-        raise HTTPException(status_code=400, detail="Indicator is not supported by advanced analysis")
+        raise HTTPException(status_code=400, detail="Indicator is not supported by local analysis")
 
     interval_value = _normalize_indicator_interval(interval, selected_expiration)
     if interval_value not in INDICATOR_ANALYSIS_INTERVALS:
         interval_value = "5min"
     allowed_indicators = _indicator_api_codes(normalized_indicator)
-    entry_price = await _fetch_quote_price(normalized_category, normalized_symbol)
-    payload = await _fetch_advanced_indicator_analysis(
+    payload = await _fetch_quote_history(
         category=normalized_category,
         symbol=normalized_symbol,
-        interval=interval_value,
-        allowed_indicators=allowed_indicators,
+        history_seconds=INDICATOR_LOCAL_HISTORY_SECONDS,
     )
-    sanitized = _sanitize_indicator_analysis_result(
+    sanitized = _build_local_indicator_analysis(
         payload,
         category=normalized_category,
         symbol=normalized_symbol,
         selected_expiration=selected_expiration,
-        entry_price=entry_price,
+        allowed_indicators=allowed_indicators,
     )
     sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
     return {
@@ -1826,6 +2205,7 @@ async def run_indicator_analysis(
         "indicator": normalized_indicator,
         "interval": interval_value,
         "allowed_indicators": allowed_indicators,
+        "history_seconds": INDICATOR_LOCAL_HISTORY_SECONDS,
     }
 
 
@@ -2107,6 +2487,8 @@ async def _record_analysis_history(
     selected_expiration_seconds = _get_selected_expiration_seconds(normalized_selected_expiration)
     signal_value = str(result.get("signal") or "NO TRADE")[:16]
     signal_upper = signal_value.strip().upper()
+    if signal_upper not in {"BUY", "SELL"}:
+        return None
     is_settleable_signal = signal_upper in {"BUY", "SELL"} and bool(entry_price and entry_price > 0)
     settlement_due_seconds = selected_expiration_seconds if is_settleable_signal and selected_expiration_seconds > 0 else 0
     settlement_status = "pending" if settlement_due_seconds else "none"

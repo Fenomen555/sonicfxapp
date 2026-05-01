@@ -108,6 +108,22 @@ SCANNER_ANALYSIS_MODE_LABELS = {
     "minimal": "МИНИМАЛЬНЫЙ",
 }
 OPENAI_SCAN_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+INDICATOR_ANALYSIS_CODE_MAP = {
+    "rsi": ("RSI",),
+    "stochastic_oscillator": ("STOCH",),
+    "cci": ("CCI",),
+    "williams_r": ("WILLR",),
+    "macd": ("MACD",),
+    "ema_9_50_200": ("EMA9", "EMA50", "EMA200"),
+    "adx": ("ADX",),
+    "atr": ("ATR",),
+    "bollinger_bands": ("BB",),
+    "parabolic_sar": ("PSAR",),
+    "momentum": ("MOM",),
+    "rate_of_change": ("ROC",),
+}
+INDICATOR_ANALYSIS_SUPPORTED_CODES = set(INDICATOR_ANALYSIS_CODE_MAP)
+INDICATOR_ANALYSIS_INTERVALS = {"5min", "15min", "30min", "1h"}
 SCANNER_ANALYSIS_PROMPT = """Ты — профессиональный трейдинг-аналитик SonicFX.
 Анализируешь скриншот свечного графика Forex или OTC и выдаёшь короткий, но профессиональный торговый сценарий.
 
@@ -416,6 +432,14 @@ class AutoAnalyzeRequest(BaseModel):
     symbol: str = Field(min_length=3, max_length=64)
     image_data_url: str = Field(min_length=32, max_length=8_000_000)
     selected_expiration: Optional[str] = Field(default=None, max_length=16)
+
+
+class IndicatorAnalyzeRequest(BaseModel):
+    category: str = Field(min_length=2, max_length=32)
+    symbol: str = Field(min_length=3, max_length=64)
+    indicator_code: Optional[str] = Field(default=None, max_length=64)
+    selected_expiration: Optional[str] = Field(default=None, max_length=16)
+    interval: Optional[str] = Field(default=None, max_length=16)
 
 
 class AnalysisSettlementRequest(BaseModel):
@@ -1537,6 +1561,272 @@ async def _fetch_quote_snapshot(category: str, symbol: str) -> Optional[Dict[str
         return payload
 
     return None
+
+
+def _strip_otc_suffix(symbol: Any) -> str:
+    return re.sub(r"\s+OTC$", "", str(symbol or "").strip(), flags=re.IGNORECASE).strip()
+
+
+def _normalize_indicator_interval(value: Optional[str], selected_expiration: Optional[str] = None) -> str:
+    raw = str(value or "").strip().lower()
+    aliases = {
+        "5m": "5min",
+        "5min": "5min",
+        "15m": "15min",
+        "15min": "15min",
+        "30m": "30min",
+        "30min": "30min",
+        "1h": "1h",
+        "60m": "1h",
+        "60min": "1h",
+    }
+    if raw in aliases:
+        return aliases[raw]
+
+    seconds = _get_selected_expiration_seconds(selected_expiration)
+    if seconds >= 3600:
+        return "1h"
+    if seconds >= 1800:
+        return "30min"
+    if seconds >= 900:
+        return "15min"
+    return "5min"
+
+
+def _indicator_api_codes(indicator_code: Optional[str]) -> List[str]:
+    normalized = str(indicator_code or "").strip().lower()
+    if not normalized:
+        codes: List[str] = []
+        for values in INDICATOR_ANALYSIS_CODE_MAP.values():
+            codes.extend(values)
+        return codes
+    if normalized not in INDICATOR_ANALYSIS_CODE_MAP:
+        raise HTTPException(status_code=400, detail="Indicator is not supported by advanced analysis")
+    return list(INDICATOR_ANALYSIS_CODE_MAP[normalized])
+
+
+def _normalize_indicator_signal(value: Any) -> str:
+    raw = str(value or "").strip().upper()
+    compact = re.sub(r"[^A-Z]+", "", raw)
+    if compact in {"BUY", "CALL", "UP", "LONG"}:
+        return "BUY"
+    if compact in {"SELL", "PUT", "DOWN", "SHORT"}:
+        return "SELL"
+    if compact in {"NOTRADE", "HOLD", "WAIT", "NEUTRAL", "NONE"}:
+        return "NO TRADE"
+    if "BUY" in compact or "CALL" in compact:
+        return "BUY"
+    if "SELL" in compact or "PUT" in compact:
+        return "SELL"
+    return "NO TRADE"
+
+
+def _coerce_indicator_confidence(*values: Any) -> int:
+    for value in values:
+        label = str(value or "").strip().lower()
+        if label in {"high", "strong", "высокая", "сильный"}:
+            return 70
+        if label in {"medium", "moderate", "средняя", "умеренный"}:
+            return 60
+        if label in {"low", "weak", "низкая", "слабый"}:
+            return 52
+        try:
+            confidence = float(value)
+        except (TypeError, ValueError):
+            continue
+        if confidence <= 1:
+            confidence *= 100
+        if confidence > 0:
+            return min(max(int(round(confidence)), 0), 85)
+    return 0
+
+
+def _coerce_indicator_expiration_minutes(*values: Any) -> int:
+    for value in values:
+        raw = str(value or "").strip().lower()
+        if not raw:
+            continue
+        match = re.search(r"(\d+(?:\.\d+)?)\s*(seconds?|сек|s|minutes?|мин|m|hours?|час|h)?", raw)
+        if not match:
+            continue
+        amount = float(match.group(1))
+        unit = (match.group(2) or "m").lower()
+        if unit.startswith("s") or unit.startswith("сек"):
+            return max(int(round(amount / 60)), 1)
+        if unit.startswith("h") or unit.startswith("час"):
+            return max(int(round(amount * 60)), 1)
+        return max(int(round(amount)), 1)
+    return 0
+
+
+def _first_present(mapping: Dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in mapping and mapping.get(key) not in (None, ""):
+            return mapping.get(key)
+    wanted = {str(key).lower() for key in keys}
+    stack: List[Any] = list(mapping.values())
+    while stack:
+        current = stack.pop(0)
+        if isinstance(current, dict):
+            for key, value in current.items():
+                if str(key).lower() in wanted and value not in (None, ""):
+                    return value
+                if isinstance(value, (dict, list)):
+                    stack.append(value)
+        elif isinstance(current, list):
+            stack.extend(item for item in current if isinstance(item, (dict, list)))
+    return None
+
+
+def _extract_indicator_result_root(payload: Any) -> Dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    for key in ("result", "analysis", "signal", "data"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            return value
+    return payload
+
+
+def _sanitize_indicator_analysis_result(
+    payload: Dict[str, Any],
+    *,
+    category: str,
+    symbol: str,
+    selected_expiration: Optional[str],
+    entry_price: Optional[float],
+) -> Dict[str, Any]:
+    root = _extract_indicator_result_root(payload)
+    signal = _normalize_indicator_signal(
+        _first_present(root, "signal", "direction", "recommendation", "action", "decision", "side")
+    )
+    confidence = _coerce_indicator_confidence(
+        _first_present(root, "confidence", "confidence_percent", "probability", "probability_percent", "winrate", "score", "strength")
+    )
+    expiration_minutes = _coerce_indicator_expiration_minutes(
+        _first_present(root, "expiration_minutes", "expiration", "expiry", "recommended_expiration", "duration")
+    )
+    if not expiration_minutes:
+        expiration_minutes = _coerce_indicator_expiration_minutes(selected_expiration)
+
+    comment = str(
+        _first_present(root, "comment", "summary", "reason", "description", "analysis", "message")
+        or ""
+    ).strip()
+    if not comment:
+        if signal == "BUY":
+            comment = "Индикаторы подтверждают восходящий сценарий, вход возможен по текущей структуре."
+        elif signal == "SELL":
+            comment = "Индикаторы подтверждают нисходящий сценарий, вход возможен по текущей структуре."
+        else:
+            comment = "Индикаторы не дают достаточно чистого подтверждения для входа."
+
+    resolved_price = entry_price
+    if resolved_price is None:
+        try:
+            resolved_price = float(_first_present(root, "entry_price", "price", "current_price", "last_price"))
+        except (TypeError, ValueError):
+            resolved_price = None
+
+    normalized_category = normalize_quote_category(category)
+    normalized_symbol = normalize_quote_symbol(_strip_otc_suffix(symbol))
+    return {
+        "status": "ok",
+        "asset": _display_quote_symbol(normalized_symbol, normalized_category),
+        "market_mode": "OTC" if normalized_category == "otc" else "MARKET",
+        "signal": signal,
+        "confidence": confidence,
+        "expiration_minutes": expiration_minutes,
+        "entry_price": resolved_price,
+        "comment": comment[:260],
+        "raw_source": "devsbite_advanced",
+    }
+
+
+async def _fetch_advanced_indicator_analysis(
+    *,
+    category: str,
+    symbol: str,
+    interval: str,
+    allowed_indicators: List[str],
+) -> Dict[str, Any]:
+    if not DEVSBITE_CLIENT_TOKEN:
+        raise HTTPException(status_code=503, detail="Advanced analysis token is not configured")
+
+    url = f"{DEVSBITE_API_BASE_URL}/analysis/advanced"
+    headers = {
+        "accept": "application/json",
+        "Content-Type": "application/json",
+        "X-Client-Token": DEVSBITE_CLIENT_TOKEN,
+        "Cache-Control": "no-cache",
+    }
+    body = {
+        "symbol": normalize_quote_symbol(_strip_otc_suffix(symbol)),
+        "interval": interval,
+        "category": normalize_quote_category(category),
+    }
+    if allowed_indicators:
+        body["allowed_indicators"] = allowed_indicators
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=body, timeout=18.0)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text.strip() if exc.response is not None else ""
+        raise HTTPException(status_code=502, detail=detail or "Advanced indicator analysis request failed") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Advanced indicator analysis request failed") from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=502, detail="Advanced indicator analysis response is invalid")
+    if payload.get("ok") is False:
+        raise HTTPException(status_code=502, detail=str(payload.get("detail") or payload.get("message") or "Advanced indicator analysis failed"))
+    return payload
+
+
+async def run_indicator_analysis(
+    *,
+    category: str,
+    symbol: str,
+    indicator_code: Optional[str],
+    selected_expiration: Optional[str],
+    interval: Optional[str] = None,
+) -> Dict[str, Any]:
+    normalized_category = normalize_quote_category(category)
+    normalized_symbol = normalize_quote_symbol(_strip_otc_suffix(symbol))
+    normalized_indicator = str(indicator_code or "").strip().lower()
+    if normalized_indicator and normalized_indicator not in INDICATOR_ANALYSIS_SUPPORTED_CODES:
+        raise HTTPException(status_code=400, detail="Indicator is not supported by advanced analysis")
+
+    interval_value = _normalize_indicator_interval(interval, selected_expiration)
+    if interval_value not in INDICATOR_ANALYSIS_INTERVALS:
+        interval_value = "5min"
+    allowed_indicators = _indicator_api_codes(normalized_indicator)
+    entry_price = await _fetch_quote_price(normalized_category, normalized_symbol)
+    payload = await _fetch_advanced_indicator_analysis(
+        category=normalized_category,
+        symbol=normalized_symbol,
+        interval=interval_value,
+        allowed_indicators=allowed_indicators,
+    )
+    sanitized = _sanitize_indicator_analysis_result(
+        payload,
+        category=normalized_category,
+        symbol=normalized_symbol,
+        selected_expiration=selected_expiration,
+        entry_price=entry_price,
+    )
+    sanitized["formatted_text"] = _build_scanner_analysis_text(sanitized)
+    return {
+        "result": sanitized,
+        "mode": "indicators",
+        "mode_label": "ИНДИКАТОРЫ",
+        "indicator": normalized_indicator,
+        "interval": interval_value,
+        "allowed_indicators": allowed_indicators,
+    }
 
 
 def _decode_scan_image_data_url(image_data_url: str) -> tuple[str, str, bytes]:
@@ -2714,7 +3004,7 @@ async def get_enabled_indicators_payload() -> Dict[str, Any]:
             "description": str(row.get("description") or ""),
         }
         for row in rows
-        if row.get("code") and row.get("title")
+        if row.get("code") in INDICATOR_ANALYSIS_SUPPORTED_CODES and row.get("title")
     ]
     return {
         "items": items,
@@ -2745,7 +3035,7 @@ async def get_admin_indicators_payload() -> Dict[str, Any]:
             "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
         }
         for row in rows
-        if row.get("code") and row.get("title")
+        if row.get("code") in INDICATOR_ANALYSIS_SUPPORTED_CODES and row.get("title")
     ]
     enabled_total = sum(1 for item in items if item["is_enabled"] == 1)
     return {
@@ -3054,6 +3344,38 @@ async def analyze_auto_chart(
             response["history_item"] = history_item
     except Exception as exc:
         print(f"[AnalysisHistory] failed to save auto analysis: {exc}")
+    return response
+
+
+@app.post("/api/analyze/indicators")
+async def analyze_indicator_signal(
+    payload: IndicatorAnalyzeRequest,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    await _ensure_active_analysis_capacity(user_id)
+    result = await run_indicator_analysis(
+        category=payload.category,
+        symbol=payload.symbol,
+        indicator_code=payload.indicator_code,
+        selected_expiration=payload.selected_expiration,
+        interval=payload.interval,
+    )
+    response = {"status": "success", **result, "source": "indicators"}
+    try:
+        history_item = await _record_analysis_history(
+            user_id=user_id,
+            source_type="indicators",
+            upload_id=None,
+            result_payload=result,
+            analysis_mode=str(result.get("mode") or "indicators"),
+            selected_expiration=payload.selected_expiration or "",
+        )
+        if history_item:
+            response["history_item"] = history_item
+    except Exception as exc:
+        print(f"[AnalysisHistory] failed to save indicator analysis: {exc}")
     return response
 
 

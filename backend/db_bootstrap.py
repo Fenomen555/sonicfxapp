@@ -111,14 +111,17 @@ async def _seed_signal_indicators(conn) -> None:
         ("adx", "ADX", "Average Directional Index", 7),
         ("atr", "ATR", "Average True Range", 8),
         ("bollinger_bands", "Bollinger Bands", "Volatility envelope", 9),
-        ("keltner_channel", "Keltner Channel", "ATR-based channel", 10),
-        ("supertrend", "SuperTrend", "Trend-following overlay", 11),
-        ("parabolic_sar", "Parabolic SAR", "Stop and reverse trend marker", 12),
-        ("vortex", "Vortex", "Directional trend strength", 13),
-        ("momentum", "Momentum", "Raw momentum oscillator", 14),
-        ("rate_of_change", "Rate Of Change", "ROC momentum percentage", 15),
+        ("parabolic_sar", "Parabolic SAR", "Stop and reverse trend marker", 10),
+        ("momentum", "Momentum", "Raw momentum oscillator", 11),
+        ("rate_of_change", "Rate Of Change", "ROC momentum percentage", 12),
     )
     async with conn.cursor() as cur:
+        await cur.execute(
+            """
+            DELETE FROM signal_indicators
+            WHERE `code` IN ('keltner_channel', 'supertrend', 'vortex')
+            """
+        )
         for code, title, description, order in defaults:
             await cur.execute(
                 """

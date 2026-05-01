@@ -75,10 +75,7 @@ const FALLBACK_INDICATORS = [
   { code: "adx", title: "ADX", description: "Average Directional Index" },
   { code: "atr", title: "ATR", description: "Average True Range" },
   { code: "bollinger_bands", title: "Bollinger Bands", description: "Volatility envelope" },
-  { code: "keltner_channel", title: "Keltner Channel", description: "ATR-based channel" },
-  { code: "supertrend", title: "SuperTrend", description: "Trend-following overlay" },
   { code: "parabolic_sar", title: "Parabolic SAR", description: "Stop and reverse trend marker" },
-  { code: "vortex", title: "Vortex", description: "Directional trend strength" },
   { code: "momentum", title: "Momentum", description: "Raw momentum oscillator" },
   { code: "rate_of_change", title: "Rate Of Change", description: "ROC momentum percentage" }
 ];
@@ -1381,15 +1378,6 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
       return;
     }
 
-    if (signalMode === "indicators") {
-      notify?.({
-        type: "info",
-        title: t.home.analyzeSoonTitle || "Режим в работе",
-        message: t.home.analyzeSoonMessage || "GPT-анализ сейчас подключен для SonicFX Scanner и SonicFX Auto. Indicators добавим отдельным потоком."
-      });
-      return;
-    }
-
     if (isAnalysisScanning) return;
 
     clearSettlementTimer();
@@ -1427,7 +1415,26 @@ export default function HomePage({ t, notify, featureFlags = {} }) {
               })
             });
           })()
-        : await apiFetchJson("/api/analyze/scanner", {
+        : signalMode === "indicators"
+          ? await (async () => {
+              const symbol = selectedPairMeta?.pair || asset;
+              if (!symbol) {
+                throw new Error(t.home.autoAnalyzeNoPairMessage || "Выберите валютную пару для анализа.");
+              }
+              if (!selectedIndicatorMeta?.code) {
+                throw new Error(t.home.indicatorSearchEmpty || "Выберите индикатор для сигнала.");
+              }
+              return apiFetchJson("/api/analyze/indicators", {
+                method: "POST",
+                body: JSON.stringify({
+                  category: marketKind,
+                  symbol,
+                  indicator_code: selectedIndicatorMeta.code,
+                  selected_expiration: expiration
+                })
+              });
+            })()
+          : await apiFetchJson("/api/analyze/scanner", {
             method: "POST",
             body: JSON.stringify({
               upload_id: scanUploadState.file?.id || null,

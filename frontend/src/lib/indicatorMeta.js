@@ -44,25 +44,10 @@ const INDICATOR_META = {
     title: "Bollinger Bands",
     tone: "indigo"
   },
-  keltner_channel: {
-    short: "KC",
-    title: "Keltner Channel",
-    tone: "mint"
-  },
-  supertrend: {
-    short: "ST",
-    title: "SuperTrend",
-    tone: "gold"
-  },
   parabolic_sar: {
     short: "PSAR",
     title: "Parabolic SAR",
     tone: "pink"
-  },
-  vortex: {
-    short: "VTX",
-    title: "Vortex",
-    tone: "aqua"
   },
   momentum: {
     short: "MOM",

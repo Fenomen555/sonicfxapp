@@ -21,7 +21,7 @@ import httpx
 import uvicorn
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,6 +68,7 @@ WEB_APP_URL = (os.getenv("WEB_APP_URL") or "").strip().rstrip("/")
 BOT_USERNAME = (os.getenv("BOT_USERNAME") or "").strip().lstrip("@")
 BOT_TOKEN = (os.getenv("BOT_TOKEN") or "").strip()
 LANGS = {"ru", "en", "uk"}
+BOT_MENU_IMAGE_PATH = Path(__file__).resolve().parent / "assets" / "sonicfx_bot_menu.png"
 THEMES = {"dark", "light"}
 ACTIVATION_STATUSES = {"inactive", "active", "active_scanner"}
 DEVSBITE_API_BASE_URL = (os.getenv("DEVSBITE_API_BASE_URL") or "https://api.devsbite.com").strip().rstrip("/")
@@ -1364,6 +1365,41 @@ def build_welcome_message(lang: str, name: str) -> str:
     normalized = normalize_user_lang(lang)
     template = WELCOME_TEXTS[normalized]["welcome"]
     return template.format(name=name or "Trader")
+
+
+async def send_main_menu_message(message: types.Message, text: str, lang: str, user_id: int) -> None:
+    reply_markup = await build_main_menu_keyboard(lang, user_id)
+    if BOT_MENU_IMAGE_PATH.is_file():
+        await message.answer_photo(
+            FSInputFile(BOT_MENU_IMAGE_PATH),
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=reply_markup,
+        )
+        return
+    await message.answer(
+        text,
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+        reply_markup=reply_markup,
+    )
+
+
+async def edit_main_menu_message(message: types.Message, text: str, lang: str, user_id: int) -> None:
+    reply_markup = await build_main_menu_keyboard(lang, user_id)
+    if message.photo:
+        await message.edit_caption(
+            caption=text,
+            parse_mode="HTML",
+            reply_markup=reply_markup,
+        )
+        return
+    await message.edit_text(
+        text,
+        parse_mode="HTML",
+        disable_web_page_preview=True,
+        reply_markup=reply_markup,
+    )
 
 
 async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
@@ -6213,12 +6249,7 @@ async def cmd_start(message: types.Message):
     await upsert_user_from_telegram(tg_payload)
     lang = await get_user_lang(int(from_user.id), fallback=from_user.language_code or "ru")
     welcome_text = build_welcome_message(lang, from_user.first_name or from_user.username or "Trader")
-    await message.answer(
-        welcome_text,
-        parse_mode="HTML",
-        disable_web_page_preview=True,
-        reply_markup=await build_main_menu_keyboard(lang, int(from_user.id)),
-    )
+    await send_main_menu_message(message, welcome_text, lang, int(from_user.id))
 
 
 @dp.callback_query(F.data.startswith("lang:"))
@@ -6235,12 +6266,7 @@ async def on_language_change(callback: types.CallbackQuery):
 
     if callback.message:
         try:
-            await callback.message.edit_text(
-                welcome_text,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-                reply_markup=await build_main_menu_keyboard(lang, int(callback.from_user.id)),
-            )
+            await edit_main_menu_message(callback.message, welcome_text, lang, int(callback.from_user.id))
         except Exception:
             pass
     await callback.answer(WELCOME_TEXTS[lang]["lang_saved"], show_alert=False)

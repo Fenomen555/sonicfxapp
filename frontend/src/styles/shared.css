@@ -1088,17 +1088,6 @@ textarea {
   animation: pageRise 0.34s ease both;
 }
 
-.status-page-back {
-  justify-self: start;
-  min-height: 38px;
-  padding: 0 16px;
-  border-radius: 999px;
-  color: var(--text);
-  background: rgba(12, 21, 36, 0.72);
-  border: 1px solid rgba(135, 166, 221, 0.32);
-  font-weight: 900;
-}
-
 .status-upgrade-head {
   display: grid;
   gap: 7px;
@@ -1109,20 +1098,6 @@ textarea {
 .status-page-head {
   margin: 0 auto 2px;
   max-width: 430px;
-}
-
-.status-upgrade-kicker {
-  justify-self: center;
-  display: inline-flex;
-  padding: 5px 12px;
-  border-radius: 999px;
-  color: #bcd1ff;
-  background: rgba(91, 136, 207, 0.2);
-  border: 1px solid rgba(144, 174, 229, 0.32);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .status-upgrade-head h1,
@@ -1357,7 +1332,6 @@ textarea {
   background: rgba(255, 255, 255, 0.86);
 }
 
-[data-theme="light"] .status-page-back,
 [data-theme="light"] .status-page-controls button {
   color: #142139;
   background: rgba(255, 255, 255, 0.76);

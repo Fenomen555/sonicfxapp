@@ -127,12 +127,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
 
   return (
     <section className="status-upgrade-page">
-      <button className="status-page-back" type="button" onClick={onClose}>
-        Вернуться
-      </button>
-
       <div className="status-upgrade-head status-page-head">
-        <span className="status-upgrade-kicker">Статусы SonicFX</span>
         <h1>Открой следующий уровень</h1>
         <p>Выбери доступ под свой стиль торговли. Текущий уровень и следующие статусы собраны в одном разделе.</p>
       </div>

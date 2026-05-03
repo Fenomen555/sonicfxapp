@@ -3,8 +3,8 @@ set -euo pipefail
 
 APP_ROOT="/root/miniapp"
 FRONTEND_DIR="$APP_ROOT/frontend"
-TARGET_DIR="/var/www/apps_devsbit_usr/data/www/apps.devsbite.com"
-OWNER="apps_devsbit_usr:apps_devsbit_usr"
+TARGET_DIR="/var/www/app_sonic_fx_usr/data/www/app.sonic-fx.com"
+OWNER="app_sonic_fx_usr:app_sonic_fx_usr"
 
 cd "$FRONTEND_DIR"
 

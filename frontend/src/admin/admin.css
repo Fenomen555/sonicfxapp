@@ -558,6 +558,13 @@
   color: var(--text-muted);
 }
 
+.admin-field-hint {
+  margin-top: -2px;
+  color: #7f98c8 !important;
+  font-size: 10.5px !important;
+  line-height: 1.35;
+}
+
 .admin-input,
 .admin-select {
   width: 100%;
@@ -567,6 +574,13 @@
   background: rgba(9, 15, 24, 0.9);
   color: var(--text-main);
   padding: 0 14px;
+}
+
+.admin-input[readonly] {
+  color: #b9cef8;
+  background:
+    linear-gradient(180deg, rgba(20, 31, 50, 0.78), rgba(10, 17, 29, 0.86));
+  border-style: dashed;
 }
 
 .admin-user-card {

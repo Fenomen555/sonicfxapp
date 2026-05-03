@@ -89,6 +89,34 @@ const normalizeStatusCode = (value = "") => (
     .replace(/^_+|_+$/g, "")
 );
 
+const CYRILLIC_STATUS_MAP = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
+  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+  х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya"
+};
+
+const transliterateStatusName = (value = "") => (
+  String(value || "")
+    .toLowerCase()
+    .split("")
+    .map((char) => CYRILLIC_STATUS_MAP[char] ?? char)
+    .join("")
+);
+
+const buildStatusCodeFromName = (value = "") => normalizeStatusCode(transliterateStatusName(value));
+
+const buildStatusBadgeFromName = (value = "") => {
+  const code = buildStatusCodeFromName(value);
+  if (!code) return "";
+  return code.replace(/_/g, "").slice(0, 12).toUpperCase();
+};
+
+const normalizeStatusSortOrderForEditor = (value) => {
+  const numeric = Number(value || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 1;
+  return numeric > 9 && numeric % 10 === 0 ? numeric / 10 : numeric;
+};
+
 const FILTER_DEFAULTS = {
   status: "all",
   access: "all",
@@ -362,6 +390,13 @@ export default function AdminApp({ authError }) {
       { code: "unlimited", name: "Unlimited", is_enabled: 1 }
     ];
   }, [accountStatuses]);
+
+  const nextStatusSortOrder = useMemo(() => {
+    const values = accountStatusOptions
+      .map((item) => normalizeStatusSortOrderForEditor(item.sort_order))
+      .filter((value) => Number.isFinite(value));
+    return Math.max(0, ...values) + 1;
+  }, [accountStatusOptions]);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -707,17 +742,38 @@ export default function AdminApp({ authError }) {
   };
 
   const startCreateStatus = () => {
-    setStatusEditor({ ...STATUS_EDITOR_DEFAULT, code: "", name: "", badge_text: "NEW" });
+    setStatusEditor({
+      ...STATUS_EDITOR_DEFAULT,
+      code: "",
+      name: "",
+      badge_text: "",
+      sort_order: nextStatusSortOrder
+    });
     setStatusEditorOpen(true);
   };
 
   const editStatus = (item) => {
-    setStatusEditor({ ...STATUS_EDITOR_DEFAULT, ...(item || {}) });
+    const nextItem = { ...STATUS_EDITOR_DEFAULT, ...(item || {}) };
+    setStatusEditor({
+      ...nextItem,
+      code: nextItem.code || buildStatusCodeFromName(nextItem.name),
+      badge_text: nextItem.badge_text || buildStatusBadgeFromName(nextItem.name),
+      sort_order: normalizeStatusSortOrderForEditor(nextItem.sort_order)
+    });
     setStatusEditorOpen(true);
   };
 
   const updateStatusField = (key, value) => {
     setStatusEditor((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateStatusName = (value) => {
+    setStatusEditor((prev) => ({
+      ...prev,
+      name: value,
+      code: buildStatusCodeFromName(value),
+      badge_text: buildStatusBadgeFromName(value)
+    }));
   };
 
   const updateStatusNumberField = (key, value) => {
@@ -743,12 +799,13 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Название обязательно", "Укажи имя статуса перед сохранением.");
       return;
     }
-    const normalizedCode = normalizeStatusCode(payload.code || payload.name);
+    const normalizedCode = buildStatusCodeFromName(payload.code || payload.name);
     if (!normalizedCode) {
       pushToast("error", "Код обязателен", "Для русских названий укажи латинский код, например premium_plus.");
       return;
     }
     payload.code = normalizedCode;
+    payload.badge_text = payload.badge_text || buildStatusBadgeFromName(payload.name);
     [
       "sort_order",
       "access_required",
@@ -1295,19 +1352,22 @@ export default function AdminApp({ authError }) {
               <div className="admin-status-editor-grid">
                 <label className="admin-field">
                   <span>Код</span>
-                  <input className="admin-input" value={statusEditor.code} onChange={(e) => updateStatusField("code", e.target.value)} placeholder="premium" />
+                  <input className="admin-input" value={statusEditor.code || buildStatusCodeFromName(statusEditor.name)} readOnly placeholder="Автоматически" />
+                  <span className="admin-field-hint">Создаётся из названия. Нужен системе для лимитов и выдачи статуса.</span>
                 </label>
                 <label className="admin-field">
                   <span>Название</span>
-                  <input className="admin-input" value={statusEditor.name} onChange={(e) => updateStatusField("name", e.target.value)} placeholder="Premium" />
+                  <input className="admin-input" value={statusEditor.name} onChange={(e) => updateStatusName(e.target.value)} placeholder="Premium" />
                 </label>
                 <label className="admin-field">
                   <span>Бейдж</span>
-                  <input className="admin-input" value={statusEditor.badge_text || ""} onChange={(e) => updateStatusField("badge_text", e.target.value)} placeholder="PRO" />
+                  <input className="admin-input" value={statusEditor.badge_text || buildStatusBadgeFromName(statusEditor.name)} readOnly placeholder="Автоматически" />
+                  <span className="admin-field-hint">Показывается в карточках и тоже формируется автоматически.</span>
                 </label>
                 <label className="admin-field">
                   <span>Порядок</span>
                   <input className="admin-input" type="number" value={statusEditor.sort_order} onChange={(e) => updateStatusNumberField("sort_order", e.target.value)} />
+                  <span className="admin-field-hint">Обычный номер позиции: 1, 2, 3, 4.</span>
                 </label>
                 <label className="admin-field">
                   <span>Доступ по регистрации</span>
@@ -1357,14 +1417,18 @@ export default function AdminApp({ authError }) {
                       <label className="admin-field">
                         <span>Лимит запросов</span>
                         <input className="admin-input" type="number" value={statusEditor[limitKey]} onChange={(e) => updateStatusNumberField(limitKey, e.target.value)} placeholder="-1" />
+                        <span className="admin-field-hint">-1 означает безлимитное количество запросов без ограничений.</span>
                       </label>
                       <label className="admin-field">
                         <span>Окно восстановления</span>
-                        <select className="admin-select" value={Number(statusEditor[windowKey] || 3)} onChange={(e) => updateStatusNumberField(windowKey, e.target.value)} disabled={Number(statusEditor[limitKey] || 0) < 0}>
+                        <select className="admin-select" value={Number(statusEditor[windowKey] || 3)} onChange={(e) => updateStatusNumberField(windowKey, e.target.value)}>
                           {[1, 3, 8, 12, 24].map((hours) => (
                             <option key={hours} value={hours}>{hours} ч</option>
                           ))}
                         </select>
+                        <span className="admin-field-hint">
+                          {Number(statusEditor[limitKey] || 0) < 0 ? "При безлимите окно не применяется, но значение можно оставить для будущих лимитов." : "Через это время запрос становится доступен снова."}
+                        </span>
                       </label>
                     </article>
                   );

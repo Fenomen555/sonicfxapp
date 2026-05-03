@@ -1253,6 +1253,71 @@ async def ensure_status_analysis_access(user_id: int, signal_mode: str) -> Dict[
     return {"status": status_config, "mode": mode_key, "remaining": max(limit - used, 0)}
 
 
+async def get_user_account_usage_payload(user_id: int, status_config: Dict[str, Any]) -> Dict[str, Any]:
+    status_code = _normalize_status_code(status_config.get("code"))
+    payload: Dict[str, Any] = {}
+    mode_sources = {
+        "scanner": ["scanner"],
+        "live": ["auto"],
+        "indicators": ["indicators"],
+    }
+
+    trader_shared_used: Optional[int] = None
+    trader_shared_limit = max(
+        _sanitize_status_limit(status_config.get("live_limit")),
+        _sanitize_status_limit(status_config.get("indicators_limit")),
+    )
+
+    for mode_key, sources in mode_sources.items():
+        enabled = int(status_config.get(f"{mode_key}_enabled") or 0) == 1
+        limit = _sanitize_status_limit(status_config.get(f"{mode_key}_limit"))
+        window_hours = _sanitize_status_window(status_config.get(f"{mode_key}_window_hours"))
+
+        if not enabled or limit == 0:
+            payload[mode_key] = {
+                "enabled": 0,
+                "limit": 0,
+                "used": 0,
+                "remaining": 0,
+                "window_hours": window_hours,
+                "is_unlimited": 0,
+            }
+            continue
+
+        if limit < 0:
+            payload[mode_key] = {
+                "enabled": 1,
+                "limit": -1,
+                "used": 0,
+                "remaining": -1,
+                "window_hours": window_hours,
+                "is_unlimited": 1,
+            }
+            continue
+
+        if status_code == "trader" and mode_key == "scanner":
+            used = await count_user_mode_signals(int(user_id), "scanner", None)
+        elif status_code == "trader" and mode_key in {"live", "indicators"}:
+            if trader_shared_used is None:
+                trader_shared_used = await count_user_source_signals(int(user_id), ["auto", "indicators"], None)
+            used = trader_shared_used
+            limit = max(trader_shared_limit, limit)
+            window_hours = 0
+        else:
+            used = await count_user_source_signals(int(user_id), sources, window_hours)
+
+        payload[mode_key] = {
+            "enabled": 1,
+            "limit": limit,
+            "used": max(int(used), 0),
+            "remaining": max(limit - int(used), 0),
+            "window_hours": window_hours,
+            "is_unlimited": 0,
+        }
+
+    return payload
+
+
 def _build_inline_button(**kwargs: Any) -> InlineKeyboardButton:
     try:
         return InlineKeyboardButton(**kwargs)
@@ -1307,6 +1372,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
     feature_flags = await get_feature_flags_payload()
     account_tier = _normalize_status_code(row.get("account_tier") or "trader")
     account_status = await get_account_status_config(account_tier)
+    account_usage = await get_user_account_usage_payload(int(row["user_id"]), account_status)
     return {
         "user_id": int(row["user_id"]),
         "tg_username": row.get("tg_username") or "",
@@ -1320,6 +1386,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "preferred_signal_mode": _normalize_preferred_signal_mode(row.get("preferred_signal_mode") or "scanner"),
         "account_tier": account_tier,
         "account_status": account_status,
+        "account_usage": account_usage,
         "trader_id": row.get("trader_id") or "",
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
         "deposit_amount": float(row.get("deposit_amount") or 0),

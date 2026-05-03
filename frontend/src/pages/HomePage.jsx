@@ -338,7 +338,16 @@ function normalizeSignalMode(value) {
   return ["scanner", "automatic", "indicators"].includes(value) ? value : "scanner";
 }
 
-export default function HomePage({ t, notify, featureFlags = {}, preferredSignalMode = "scanner", onPreferredSignalModeChange, onOpenUpgrade }) {
+export default function HomePage({
+  t,
+  notify,
+  user = {},
+  featureFlags = {},
+  preferredSignalMode = "scanner",
+  onPreferredSignalModeChange,
+  onUserUpdate,
+  onOpenUpgrade
+}) {
   const [signalMode, setSignalMode] = useState(() => normalizeSignalMode(preferredSignalMode));
   const [isSignalModeExpanded, setIsSignalModeExpanded] = useState(false);
   const [marketKind, setMarketKind] = useState("otc");
@@ -444,6 +453,31 @@ export default function HomePage({ t, notify, featureFlags = {}, preferredSignal
     () => baseSignalModes.filter((item) => Number(featureFlags?.[item.flagKey] ?? 1) === 1),
     [baseSignalModes, featureFlags]
   );
+
+  const quotaModeItems = useMemo(() => {
+    const usage = user?.account_usage || {};
+    const modeUsageKeys = {
+      scanner: "scanner",
+      automatic: "live",
+      indicators: "indicators"
+    };
+    return baseSignalModes.map((item) => {
+      const usageKey = modeUsageKeys[item.id] || item.id;
+      const quota = usage?.[usageKey] || null;
+      const limit = Number(quota?.limit ?? 0);
+      const remaining = Number(quota?.remaining ?? 0);
+      const enabled = Number(quota?.enabled ?? (Number(featureFlags?.[item.flagKey] ?? 1) === 1 ? 1 : 0)) === 1;
+      const value = limit < 0 ? "∞" : `${Math.max(remaining, 0)}/${Math.max(limit, 0)}`;
+      return {
+        id: item.id,
+        label: item.label,
+        icon: item.icon,
+        value,
+        enabled,
+        isUnlimited: limit < 0
+      };
+    });
+  }, [baseSignalModes, featureFlags, user?.account_usage]);
 
   useEffect(() => {
     const normalized = normalizeSignalMode(preferredSignalMode);
@@ -1487,6 +1521,9 @@ export default function HomePage({ t, notify, featureFlags = {}, preferredSignal
         setActiveAnalyses((prev) => [nextItem, ...prev.filter((item) => Number(item.id) !== Number(nextItem.id))]);
         setActiveAnalysis(nextItem);
         setActiveAnalysisRemaining(Number(nextItem.remaining_seconds || 0));
+        apiFetchJson("/api/user/profile", { method: "POST" })
+          .then((profile) => onUserUpdate?.(profile || {}))
+          .catch(() => {});
       }
       startSettlementCountdown(data || null, expiration);
     } catch (error) {
@@ -1720,9 +1757,20 @@ export default function HomePage({ t, notify, featureFlags = {}, preferredSignal
       />
 
       <div className="home-quota">
-        <div className="quota-left">
-          <SparkIcon className="quota-left-icon" aria-hidden="true" />
-          <span>{t.home.quota || "Analyses: 3 / 3"}</span>
+        <div className="quota-left quota-mode-list" aria-label={t.home.quota || "Analyses"}>
+          {quotaModeItems.map((item) => {
+            const QuotaIcon = item.icon || SparkIcon;
+            return (
+              <span
+                className={`quota-mode-chip ${item.enabled ? "" : "disabled"} ${item.isUnlimited ? "unlimited" : ""}`}
+                key={item.id}
+                title={`${item.label}: ${item.value}`}
+              >
+                <QuotaIcon aria-hidden="true" />
+                <b>{item.value}</b>
+              </span>
+            );
+          })}
         </div>
         <button className="quota-btn quota-btn-upgrade" type="button" aria-label={t.home.pro || "Get PRO"} onClick={onOpenUpgrade}>
           <span className="quota-upgrade-animation" aria-hidden="true">

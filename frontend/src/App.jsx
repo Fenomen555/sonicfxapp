@@ -46,6 +46,7 @@ const FALLBACK_USER = {
   preferred_signal_mode: "scanner",
   account_tier: "trader",
   account_status: null,
+  account_usage: {},
   activation_status: "inactive",
   trader_id: "",
   scanner_access: 0,
@@ -391,9 +392,11 @@ export default function App() {
               <HomePage
                 t={t}
                 notify={notify}
+                user={user}
                 featureFlags={user.feature_flags || FALLBACK_USER.feature_flags}
                 preferredSignalMode={user.preferred_signal_mode || FALLBACK_USER.preferred_signal_mode}
                 onPreferredSignalModeChange={(mode) => setUser((prev) => ({ ...prev, preferred_signal_mode: mode }))}
+                onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
                 onOpenUpgrade={openStatusUpgrade}
               />
             )}

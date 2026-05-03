@@ -1171,35 +1171,36 @@ async def get_account_status_config(code: str) -> Dict[str, Any]:
     return _serialize_account_status(row) if row else _fallback_status_config(normalized)
 
 
-async def count_user_mode_signals(user_id: int, source_type: str, window_hours: Optional[int] = None) -> int:
+async def count_user_source_signals(user_id: int, source_types: List[str], window_hours: Optional[int] = None) -> int:
+    sources = [str(item or "").strip() for item in source_types if str(item or "").strip()]
+    if not sources:
+        return 0
+    placeholders = ", ".join(["%s"] * len(sources))
+    window_sql = ""
+    params: List[Any] = [int(user_id), *sources]
+    if window_hours:
+        window_sql = "AND created_at >= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL %s HOUR)"
+        params.append(int(window_hours))
     pool = await require_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
-            if window_hours:
-                await cur.execute(
-                    """
-                    SELECT COUNT(*) AS total
-                    FROM analysis_history
-                    WHERE user_id = %s
-                      AND source_type = %s
-                      AND UPPER(TRIM(COALESCE(`signal`, ''))) IN ('BUY', 'SELL')
-                      AND created_at >= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL %s HOUR)
-                    """,
-                    (int(user_id), source_type, int(window_hours)),
-                )
-            else:
-                await cur.execute(
-                    """
-                    SELECT COUNT(*) AS total
-                    FROM analysis_history
-                    WHERE user_id = %s
-                      AND source_type = %s
-                      AND UPPER(TRIM(COALESCE(`signal`, ''))) IN ('BUY', 'SELL')
-                    """,
-                    (int(user_id), source_type),
-                )
+            await cur.execute(
+                f"""
+                SELECT COUNT(*) AS total
+                FROM analysis_history
+                WHERE user_id = %s
+                  AND source_type IN ({placeholders})
+                  AND UPPER(TRIM(COALESCE(`signal`, ''))) IN ('BUY', 'SELL')
+                  {window_sql}
+                """,
+                tuple(params),
+            )
             row = await cur.fetchone()
     return int((row or {}).get("total") or 0)
+
+
+async def count_user_mode_signals(user_id: int, source_type: str, window_hours: Optional[int] = None) -> int:
+    return await count_user_source_signals(user_id, [source_type], window_hours)
 
 
 async def ensure_status_analysis_access(user_id: int, signal_mode: str) -> Dict[str, Any]:
@@ -1218,7 +1219,8 @@ async def ensure_status_analysis_access(user_id: int, signal_mode: str) -> Dict[
     if limit < 0:
         return {"status": status_config, "mode": mode_key, "remaining": -1}
 
-    if _normalize_status_code(status_config.get("code")) == "trader" and mode_key == "scanner":
+    status_code = _normalize_status_code(status_config.get("code"))
+    if status_code == "trader" and mode_key == "scanner":
         used_total = await count_user_mode_signals(int(user_id), "scanner", None)
         if used_total >= limit:
             raise HTTPException(
@@ -1226,6 +1228,20 @@ async def ensure_status_analysis_access(user_id: int, signal_mode: str) -> Dict[
                 detail="Пробный Scanner уже использован. Откройте Premium или VIP для продолжения.",
             )
         return {"status": status_config, "mode": mode_key, "remaining": max(limit - used_total, 0)}
+
+    if status_code == "trader" and mode_key in {"live", "indicators"}:
+        shared_limit = max(
+            _sanitize_status_limit(status_config.get("live_limit")),
+            _sanitize_status_limit(status_config.get("indicators_limit")),
+            limit,
+        )
+        used_total = await count_user_source_signals(int(user_id), ["auto", "indicators"], None)
+        if used_total >= shared_limit:
+            raise HTTPException(
+                status_code=403,
+                detail="Пробный Live/Indicators анализ уже использован. Откройте Premium для продолжения.",
+            )
+        return {"status": status_config, "mode": mode_key, "remaining": max(shared_limit - used_total, 0)}
 
     source_type = "auto" if mode_key == "live" else mode_key
     used = await count_user_mode_signals(int(user_id), source_type, window_hours)
@@ -5699,9 +5715,9 @@ async def admin_upsert_status(
     payload: AccountStatusUpsertRequest,
     admin: Dict[str, Any] = Depends(get_admin_user),
 ):
-    code = _normalize_status_code(payload.code or payload.name)
+    code = _normalize_status_code(payload.code or payload.name, fallback="")
     if not code:
-        raise HTTPException(status_code=400, detail="Status code is required")
+        raise HTTPException(status_code=400, detail="Status code is required. Use latin letters, numbers or underscore.")
     pool = await require_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:

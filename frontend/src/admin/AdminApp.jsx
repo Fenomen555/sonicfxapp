@@ -82,6 +82,14 @@ const STATUS_EDITOR_DEFAULT = {
   marketing_text: ""
 };
 
+const normalizeStatusCode = (value = "") => (
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+);
+
 const FILTER_DEFAULTS = {
   status: "all",
   access: "all",
@@ -688,7 +696,7 @@ export default function AdminApp({ authError }) {
   };
 
   const startCreateStatus = () => {
-    setStatusEditor({ ...STATUS_EDITOR_DEFAULT, code: "", name: "Новый статус", badge_text: "NEW" });
+    setStatusEditor({ ...STATUS_EDITOR_DEFAULT, code: "", name: "", badge_text: "NEW" });
   };
 
   const editStatus = (item) => {
@@ -722,6 +730,28 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Название обязательно", "Укажи имя статуса перед сохранением.");
       return;
     }
+    const normalizedCode = normalizeStatusCode(payload.code || payload.name);
+    if (!normalizedCode) {
+      pushToast("error", "Код обязателен", "Для русских названий укажи латинский код, например premium_plus.");
+      return;
+    }
+    payload.code = normalizedCode;
+    [
+      "sort_order",
+      "access_required",
+      "min_deposit",
+      "scanner_enabled",
+      "scanner_limit",
+      "scanner_window_hours",
+      "live_enabled",
+      "live_limit",
+      "live_window_hours",
+      "indicators_enabled",
+      "indicators_limit",
+      "indicators_window_hours"
+    ].forEach((key) => {
+      if (payload[key] === "") payload[key] = STATUS_EDITOR_DEFAULT[key] ?? 0;
+    });
     setStatusSavingCode(payload.code || "new");
     try {
       const data = await apiAdminFetchJson("/api/admin/statuses", {
@@ -1221,7 +1251,7 @@ export default function AdminApp({ authError }) {
               <div className="admin-filter-head">
                 <div>
                   <div className="admin-section-title">{statusEditor.code ? `Редактируем ${statusEditor.name || statusEditor.code}` : "Новый статус"}</div>
-                  <div className="admin-muted-text">Код можно оставить пустым для автогенерации. Лимит -1 означает безлимит.</div>
+                  <div className="admin-muted-text">Код нужен латиницей, если название на русском. Лимит -1 означает безлимит.</div>
                 </div>
                 <button className="admin-ghost-button" type="button" onClick={() => setStatusEditor(STATUS_EDITOR_DEFAULT)}>
                   Очистить

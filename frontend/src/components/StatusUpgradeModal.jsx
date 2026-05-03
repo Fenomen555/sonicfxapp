@@ -8,6 +8,9 @@ function normalizeCode(value) {
 function getModeLimitText(status, mode) {
   const enabled = Number(status?.[`${mode}_enabled`] || 0) === 1;
   if (!enabled) return "Нет доступа";
+  const code = normalizeCode(status?.code);
+  if (code === "trader" && mode === "scanner") return "1 пробный";
+  if (code === "trader" && (mode === "live" || mode === "indicators")) return "1 общий";
   const limit = Number(status?.[`${mode}_limit`] ?? 0);
   if (limit < 0) return "Безлимит";
   const hours = Number(status?.[`${mode}_window_hours`] || 3);
@@ -103,7 +106,7 @@ export default function StatusUpgradeModal({ isOpen, user, onClose, onUserUpdate
         <div className="status-upgrade-head">
           <span className="status-upgrade-kicker">Статусы SonicFX</span>
           <h2>Открой следующий уровень</h2>
-          <p>Выбери доступ под свой стиль торговли. Статусы ниже текущего отмечены как уже доступные.</p>
+          <p>Выбери доступ под свой стиль торговли. Ниже показываем текущий статус и следующие доступные уровни.</p>
         </div>
 
         {loading ? (

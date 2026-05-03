@@ -4,7 +4,7 @@ import AppLoader from "./components/AppLoader";
 import AppToasts from "./components/AppToasts";
 import BottomNav from "./components/BottomNav";
 import OnboardingScreen from "./components/OnboardingScreen";
-import StatusUpgradeModal from "./components/StatusUpgradeModal";
+import StatusUpgradePage from "./components/StatusUpgradeModal";
 import { apiAdminFetchJson, apiFetchJson, isAdminRoute, isTelegramWebAppAvailable } from "./lib/api";
 import { getDeviceProfile } from "./lib/device";
 import { initTelegramApp } from "./lib/tgSetup";
@@ -74,7 +74,7 @@ export default function App() {
   const [adminUser, setAdminUser] = useState(null);
   const [adminAuthError, setAdminAuthError] = useState("");
   const [toastItems, setToastItems] = useState([]);
-  const [isStatusUpgradeOpen, setIsStatusUpgradeOpen] = useState(false);
+  const [statusBackTab, setStatusBackTab] = useState("profile");
   const toastTimersRef = useRef(new Map());
 
   const adminMode = useMemo(() => isAdminRoute(), []);
@@ -292,6 +292,11 @@ export default function App() {
     setShowOnboarding(true);
   }
 
+  const openStatusUpgrade = useCallback(() => {
+    setStatusBackTab((tab && tab !== "status") ? tab : "profile");
+    setTab("status");
+  }, [tab]);
+
   if (isLoading || !isBootLoaderReady) {
     return (
       <div className="loading-screen">
@@ -389,10 +394,18 @@ export default function App() {
                 featureFlags={user.feature_flags || FALLBACK_USER.feature_flags}
                 preferredSignalMode={user.preferred_signal_mode || FALLBACK_USER.preferred_signal_mode}
                 onPreferredSignalModeChange={(mode) => setUser((prev) => ({ ...prev, preferred_signal_mode: mode }))}
-                onOpenUpgrade={() => setIsStatusUpgradeOpen(true)}
+                onOpenUpgrade={openStatusUpgrade}
               />
             )}
             {tab === "history" && <HistoryPage lang={lang} />}
+            {tab === "status" && (
+              <StatusUpgradePage
+                user={user}
+                notify={notify}
+                onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
+                onClose={() => setTab(statusBackTab || "profile")}
+              />
+            )}
             {tab === "profile" && (
               <ProfilePage
                 t={t}
@@ -403,7 +416,7 @@ export default function App() {
                 onLangPreview={(nextLang) => setUser((prev) => ({ ...prev, lang: normalizeLang(nextLang) }))}
                 onOpenOnboarding={openOnboardingFromProfile}
                 onOpenHistory={() => setTab("history")}
-                onOpenUpgrade={() => setIsStatusUpgradeOpen(true)}
+                onOpenUpgrade={openStatusUpgrade}
               />
             )}
           </>
@@ -411,13 +424,6 @@ export default function App() {
       </main>
 
       {!showOnboarding && <BottomNav tabs={tabs} activeTab={tab} onChange={setTab} />}
-      <StatusUpgradeModal
-        isOpen={isStatusUpgradeOpen}
-        user={user}
-        notify={notify}
-        onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}
-        onClose={() => setIsStatusUpgradeOpen(false)}
-      />
       <AppToasts items={toastItems} onDismiss={dismissToast} />
     </div>
   );

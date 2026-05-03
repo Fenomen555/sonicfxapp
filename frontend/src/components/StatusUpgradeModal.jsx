@@ -25,15 +25,21 @@ function getStatusTone(code) {
   return "trader";
 }
 
-export default function StatusUpgradeModal({ isOpen, user, onClose, onUserUpdate, notify }) {
+const MODE_ROWS = [
+  { key: "scanner", label: "Scanner" },
+  { key: "live", label: "Live" },
+  { key: "indicators", label: "Indicators" }
+];
+
+export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify }) {
   const [items, setItems] = useState([]);
   const [currentStatus, setCurrentStatus] = useState(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [traderId, setTraderId] = useState(user?.trader_id || "");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!isOpen) return;
     let isActive = true;
     setLoading(true);
     apiFetchJson("/api/statuses")
@@ -48,7 +54,7 @@ export default function StatusUpgradeModal({ isOpen, user, onClose, onUserUpdate
         notify?.({
           type: "error",
           title: "Не удалось загрузить статусы",
-          message: error.message || "Попробуйте открыть окно ещё раз."
+          message: error.message || "Попробуйте открыть раздел ещё раз."
         });
       })
       .finally(() => {
@@ -57,24 +63,25 @@ export default function StatusUpgradeModal({ isOpen, user, onClose, onUserUpdate
     return () => {
       isActive = false;
     };
-  }, [isOpen, notify, user?.trader_id]);
-
-  useEffect(() => {
-    if (!isOpen) return undefined;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isOpen]);
+  }, [notify, user?.trader_id]);
 
   const currentOrder = Number(currentStatus?.sort_order || user?.account_status?.sort_order || 0);
   const visibleItems = useMemo(() => {
     const sorted = [...items].sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
-    return sorted.filter((item) => Number(item.sort_order || 0) >= currentOrder || item.code === user?.account_tier);
+    return sorted.filter((item) => Number(item.sort_order || 0) >= currentOrder || normalizeCode(item.code) === normalizeCode(user?.account_tier));
   }, [currentOrder, items, user?.account_tier]);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setActiveIndex((prev) => Math.min(Math.max(prev, 0), Math.max(visibleItems.length - 1, 0)));
+  }, [visibleItems.length]);
+
+  const activeItem = visibleItems[activeIndex] || visibleItems[0] || null;
+  const activeCode = normalizeCode(activeItem?.code);
+  const isCurrent = activeCode === normalizeCode(user?.account_tier);
+  const isUnlocked = Number(activeItem?.sort_order || 0) <= currentOrder;
+
+  const goPrev = () => setActiveIndex((prev) => Math.max(prev - 1, 0));
+  const goNext = () => setActiveIndex((prev) => Math.min(prev + 1, Math.max(visibleItems.length - 1, 0)));
 
   const saveTraderId = async () => {
     setSaving(true);
@@ -101,66 +108,84 @@ export default function StatusUpgradeModal({ isOpen, user, onClose, onUserUpdate
   };
 
   return (
-    <div className="status-upgrade-layer" role="presentation" onClick={onClose}>
-      <section className="status-upgrade-panel card" role="dialog" aria-modal="true" aria-label="Повысить статус" onClick={(event) => event.stopPropagation()}>
-        <div className="status-upgrade-head">
-          <span className="status-upgrade-kicker">Статусы SonicFX</span>
-          <h2>Открой следующий уровень</h2>
-          <p>Выбери доступ под свой стиль торговли. Ниже показываем текущий статус и следующие доступные уровни.</p>
-        </div>
+    <section className="status-upgrade-page">
+      <button className="status-page-back" type="button" onClick={onClose}>
+        Назад
+      </button>
 
-        {loading ? (
-          <div className="status-upgrade-empty">Загружаем статусы...</div>
-        ) : (
-          <div className="status-upgrade-track">
-            {visibleItems.map((item) => {
-              const code = normalizeCode(item.code);
-              const isCurrent = code === normalizeCode(user?.account_tier);
-              const isUnlocked = Number(item.sort_order || 0) <= currentOrder;
-              return (
-                <article className={`status-upgrade-card tone-${getStatusTone(code)} ${isCurrent ? "current" : ""}`} key={code}>
-                  <div className="status-upgrade-card-top">
-                    <span>{item.badge_text || item.name}</span>
-                    <strong>{item.name}</strong>
-                    <i>{isCurrent ? "Текущий" : isUnlocked ? "Есть доступ" : `от $${Number(item.min_deposit || 0)}`}</i>
-                  </div>
-                  <p>{item.description || "Статус SonicFX с индивидуальными лимитами."}</p>
-                  <div className="status-upgrade-lines">
-                    {(item.marketing_text || "").split("\n").filter(Boolean).map((line) => (
-                      <span key={line}>{line}</span>
-                    ))}
-                  </div>
-                  <div className="status-upgrade-limits">
-                    <span>Scanner <b>{getModeLimitText(item, "scanner")}</b></span>
-                    <span>Live <b>{getModeLimitText(item, "live")}</b></span>
-                    <span>Indicators <b>{getModeLimitText(item, "indicators")}</b></span>
-                  </div>
-                </article>
-              );
-            })}
+      <div className="status-upgrade-head status-page-head">
+        <span className="status-upgrade-kicker">Статусы SonicFX</span>
+        <h1>Открой следующий уровень</h1>
+        <p>Выбери доступ под свой стиль торговли. Текущий уровень и следующие статусы собраны в одном разделе.</p>
+      </div>
+
+      {loading ? (
+        <div className="status-upgrade-empty status-page-empty">Загружаем статусы...</div>
+      ) : activeItem ? (
+        <>
+          <div className="status-page-slider" aria-live="polite">
+            <article className={`status-upgrade-card status-page-card tone-${getStatusTone(activeCode)} ${isCurrent ? "current" : ""}`}>
+              <div className="status-upgrade-card-top status-page-card-top">
+                <span>{activeItem.badge_text || activeItem.name}</span>
+                <strong>{activeItem.name}</strong>
+                <i>{isCurrent ? "Текущий" : isUnlocked ? "Есть доступ" : `от $${Number(activeItem.min_deposit || 0)}`}</i>
+              </div>
+              <p>{activeItem.description || "Статус SonicFX с индивидуальными лимитами."}</p>
+              <div className="status-upgrade-lines">
+                {(activeItem.marketing_text || "").split("\n").filter(Boolean).map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </div>
+              <div className="status-upgrade-limits">
+                {MODE_ROWS.map((mode) => (
+                  <span key={mode.key}>
+                    {mode.label}
+                    <b>{getModeLimitText(activeItem, mode.key)}</b>
+                  </span>
+                ))}
+              </div>
+            </article>
           </div>
-        )}
 
-        <div className="status-upgrade-form">
-          <label>
-            <span>Trader ID для получения доступа</span>
-            <input
-              type="text"
-              maxLength="128"
-              value={traderId}
-              onChange={(event) => setTraderId(event.target.value)}
-              placeholder="Введите Trader ID"
-            />
-          </label>
-          <button type="button" onClick={saveTraderId} disabled={saving}>
-            {saving ? "Сохраняем..." : traderId.trim() ? "Повысить" : "Сохранить Trader ID"}
-          </button>
-        </div>
+          <div className="status-page-controls">
+            <button type="button" onClick={goPrev} disabled={activeIndex <= 0}>
+              Назад
+            </button>
+            <div className="status-page-dots" aria-label="Навигация по статусам">
+              {visibleItems.map((item, index) => (
+                <button
+                  type="button"
+                  className={index === activeIndex ? "active" : ""}
+                  key={item.code || index}
+                  onClick={() => setActiveIndex(index)}
+                  aria-label={`Открыть статус ${item.name || index + 1}`}
+                />
+              ))}
+            </div>
+            <button type="button" onClick={goNext} disabled={activeIndex >= visibleItems.length - 1}>
+              Далее
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="status-upgrade-empty status-page-empty">Статусы пока не настроены.</div>
+      )}
 
-        <button className="status-upgrade-close" type="button" onClick={onClose}>
-          Закрыть
+      <div className="status-upgrade-form status-page-form">
+        <label>
+          <span>Trader ID для получения доступа</span>
+          <input
+            type="text"
+            maxLength="128"
+            value={traderId}
+            onChange={(event) => setTraderId(event.target.value)}
+            placeholder="Введите Trader ID"
+          />
+        </label>
+        <button type="button" onClick={saveTraderId} disabled={saving}>
+          {saving ? "Сохраняем..." : traderId.trim() ? "Повысить" : "Сохранить Trader ID"}
         </button>
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }

@@ -35,6 +35,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
   const [items, setItems] = useState([]);
   const [currentStatus, setCurrentStatus] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState(null);
   const [traderId, setTraderId] = useState(user?.trader_id || "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -83,6 +84,23 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
   const goPrev = () => setActiveIndex((prev) => Math.max(prev - 1, 0));
   const goNext = () => setActiveIndex((prev) => Math.min(prev + 1, Math.max(visibleItems.length - 1, 0)));
 
+  const handleTouchStart = (event) => {
+    setTouchStartX(event.touches?.[0]?.clientX ?? null);
+  };
+
+  const handleTouchEnd = (event) => {
+    if (touchStartX == null) return;
+    const endX = event.changedTouches?.[0]?.clientX ?? touchStartX;
+    const deltaX = endX - touchStartX;
+    setTouchStartX(null);
+    if (Math.abs(deltaX) < 42) return;
+    if (deltaX < 0) {
+      goNext();
+    } else {
+      goPrev();
+    }
+  };
+
   const saveTraderId = async () => {
     setSaving(true);
     try {
@@ -110,7 +128,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
   return (
     <section className="status-upgrade-page">
       <button className="status-page-back" type="button" onClick={onClose}>
-        Назад
+        Вернуться
       </button>
 
       <div className="status-upgrade-head status-page-head">
@@ -123,8 +141,14 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
         <div className="status-upgrade-empty status-page-empty">Загружаем статусы...</div>
       ) : activeItem ? (
         <>
-          <div className="status-page-slider" aria-live="polite">
-            <article className={`status-upgrade-card status-page-card tone-${getStatusTone(activeCode)} ${isCurrent ? "current" : ""}`}>
+          <div
+            className="status-page-slider"
+            aria-live="polite"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+            onTouchCancel={() => setTouchStartX(null)}
+          >
+            <article className={`status-upgrade-card status-page-card tone-${getStatusTone(activeCode)} ${isCurrent ? "current" : ""}`} key={activeCode}>
               <div className="status-upgrade-card-top status-page-card-top">
                 <span>{activeItem.badge_text || activeItem.name}</span>
                 <strong>{activeItem.name}</strong>
@@ -149,7 +173,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
 
           <div className="status-page-controls">
             <button type="button" onClick={goPrev} disabled={activeIndex <= 0}>
-              Назад
+              Предыдущий
             </button>
             <div className="status-page-dots" aria-label="Навигация по статусам">
               {visibleItems.map((item, index) => (

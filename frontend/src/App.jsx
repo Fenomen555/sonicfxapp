@@ -4,7 +4,7 @@ import AppLoader from "./components/AppLoader";
 import AppToasts from "./components/AppToasts";
 import BottomNav from "./components/BottomNav";
 import OnboardingScreen from "./components/OnboardingScreen";
-import StatusUpgradePage from "./components/StatusUpgradeModal";
+import StatusUpgradePage from "./components/StatusUpgradePage";
 import { apiAdminFetchJson, apiFetchJson, isAdminRoute, isTelegramWebAppAvailable } from "./lib/api";
 import { getDeviceProfile } from "./lib/device";
 import { initTelegramApp } from "./lib/tgSetup";
@@ -423,7 +423,7 @@ export default function App() {
         )}
       </main>
 
-      {!showOnboarding && <BottomNav tabs={tabs} activeTab={tab} onChange={setTab} />}
+      {!showOnboarding && <BottomNav tabs={tabs} activeTab={tab === "status" ? statusBackTab : tab} onChange={setTab} />}
       <AppToasts items={toastItems} onDismiss={dismissToast} />
     </div>
   );

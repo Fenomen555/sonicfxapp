@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import AppLoader from "../components/AppLoader";
 import { apiAdminFetchJson } from "../lib/api";
 import { getDeviceProfile } from "../lib/device";
 import { getIndicatorMeta } from "../lib/indicatorMeta";
@@ -312,6 +311,7 @@ export default function AdminApp({ authError }) {
   const [users, setUsers] = useState([]);
   const [accountStatuses, setAccountStatuses] = useState([]);
   const [statusEditor, setStatusEditor] = useState(STATUS_EDITOR_DEFAULT);
+  const [statusEditorOpen, setStatusEditorOpen] = useState(false);
   const [statusSavingCode, setStatusSavingCode] = useState("");
   const [flags, setFlags] = useState([]);
   const [marketSettings, setMarketSettings] = useState(EMPTY_MARKET_SETTINGS);
@@ -708,10 +708,12 @@ export default function AdminApp({ authError }) {
 
   const startCreateStatus = () => {
     setStatusEditor({ ...STATUS_EDITOR_DEFAULT, code: "", name: "", badge_text: "NEW" });
+    setStatusEditorOpen(true);
   };
 
   const editStatus = (item) => {
     setStatusEditor({ ...STATUS_EDITOR_DEFAULT, ...(item || {}) });
+    setStatusEditorOpen(true);
   };
 
   const updateStatusField = (key, value) => {
@@ -771,6 +773,7 @@ export default function AdminApp({ authError }) {
       });
       setAccountStatuses(data?.items || []);
       setStatusEditor(STATUS_EDITOR_DEFAULT);
+      setStatusEditorOpen(false);
       pushToast("success", "Статус сохранён", `${payload.name} обновлён в системе доступов.`);
     } catch (error) {
       pushToast("error", "Не удалось сохранить статус", error.message || "Проверь поля и повтори.");
@@ -1040,6 +1043,7 @@ export default function AdminApp({ authError }) {
           <p>Пользователи, режимы, рынок и индикаторы в одном месте.</p>
         </div>
         <div className="admin-toolbar-actions">
+          {loading && <span className="admin-sync-pill">Обновляем...</span>}
           <button className="admin-ghost-button" type="button" onClick={() => setMenuExpanded((prev) => !prev)}>
             {menuExpanded ? "Свернуть разделы" : "Развернуть разделы"}
           </button>
@@ -1050,7 +1054,7 @@ export default function AdminApp({ authError }) {
       </section>
 
       {menuExpanded && (
-        <nav className="admin-section-grid">
+        <nav className="admin-section-grid admin-nav-grid" aria-label="Разделы админки">
           {tabCards.map((item) => (
             <button
               className={`admin-section-card ${tab === item.id ? "active" : ""}`}
@@ -1075,13 +1079,7 @@ export default function AdminApp({ authError }) {
       )}
 
       <main className="admin-page-stack">
-        {loading && (
-          <div className="admin-card admin-empty-state">
-            <AppLoader label="Собираем актуальные данные..." compact />
-          </div>
-        )}
-
-        {!loading && tab === "stats" && (
+        {tab === "stats" && (
           <>
             <section className="admin-highlight-grid">
               {statsHighlights.map((item) => (
@@ -1104,7 +1102,7 @@ export default function AdminApp({ authError }) {
             </section>
           </>
         )}
-        {!loading && tab === "users" && (
+        {tab === "users" && (
           <>
             <section className="admin-card admin-filter-card">
               <div className="admin-filter-head">
@@ -1214,7 +1212,7 @@ export default function AdminApp({ authError }) {
           </>
         )}
 
-        {!loading && tab === "statuses" && (
+        {tab === "statuses" && (
           <>
             <section className="admin-card admin-status-hero">
               <div>
@@ -1279,14 +1277,18 @@ export default function AdminApp({ authError }) {
               })}
             </section>
 
+            {statusEditorOpen && (
             <section className="admin-card admin-status-editor-card">
               <div className="admin-filter-head">
                 <div>
                   <div className="admin-section-title">{statusEditor.code ? `Редактируем ${statusEditor.name || statusEditor.code}` : "Новый статус"}</div>
                   <div className="admin-muted-text">Код нужен латиницей, если название на русском. Лимит -1 означает безлимит.</div>
                 </div>
-                <button className="admin-ghost-button" type="button" onClick={() => setStatusEditor(STATUS_EDITOR_DEFAULT)}>
-                  Очистить
+                <button className="admin-ghost-button" type="button" onClick={() => {
+                  setStatusEditor(STATUS_EDITOR_DEFAULT);
+                  setStatusEditorOpen(false);
+                }}>
+                  Закрыть
                 </button>
               </div>
 
@@ -1375,11 +1377,20 @@ export default function AdminApp({ authError }) {
                 </button>
               </div>
             </section>
+            )}
           </>
         )}
 
-        {!loading && tab === "flags" && (
+        {tab === "flags" && (
           <>
+            <section className="admin-card admin-tab-intro">
+              <div>
+                <span className="admin-kicker">Функции</span>
+                <strong>Что доступно в mini app</strong>
+                <p>Здесь включаются режимы анализа, настраивается GPT для Scanner и ссылка регистрации для Trader ID.</p>
+              </div>
+            </section>
+
             <section className="admin-control-grid admin-mode-control-grid">
               {modeFlags.map((item) => {
                 const meta = getFlagMeta(item.key);
@@ -1556,7 +1567,7 @@ export default function AdminApp({ authError }) {
             </section>
           </>
         )}
-        {!loading && tab === "indicators" && (
+        {tab === "indicators" && (
           <>
             <section className="admin-kpi-grid admin-indicator-summary-grid">
               {indicatorSummaryCards.map((item) => (
@@ -1637,7 +1648,7 @@ export default function AdminApp({ authError }) {
             </section>
           </>
         )}
-        {!loading && tab === "market" && (
+        {tab === "market" && (
           <>
             <section className="admin-card admin-market-hero">
               <div className="admin-market-hero-copy">
@@ -1736,7 +1747,7 @@ export default function AdminApp({ authError }) {
             </section>
           </>
         )}
-        {!loading && tab === "support" && (
+        {tab === "support" && (
           <>
             <section className="admin-card admin-support-hero">
               <div className="admin-support-hero-copy">

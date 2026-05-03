@@ -117,6 +117,10 @@ const EMPTY_SUPPORT_SETTINGS = {
   support_url: "https://t.me/WaySonic"
 };
 
+const EMPTY_REGISTRATION_SETTINGS = {
+  registration_url: ""
+};
+
 const EMPTY_SCANNER_SETTINGS = {
   analysis_mode: "adaptive",
   analysis_mode_label: "АДАПТИВНЫЙ",
@@ -314,6 +318,8 @@ export default function AdminApp({ authError }) {
   const [indicatorSettings, setIndicatorSettings] = useState(EMPTY_INDICATOR_SETTINGS);
   const [supportSettings, setSupportSettings] = useState(EMPTY_SUPPORT_SETTINGS);
   const [supportEditor, setSupportEditor] = useState(EMPTY_SUPPORT_SETTINGS);
+  const [registrationSettings, setRegistrationSettings] = useState(EMPTY_REGISTRATION_SETTINGS);
+  const [registrationEditor, setRegistrationEditor] = useState(EMPTY_REGISTRATION_SETTINGS);
   const [scannerSettings, setScannerSettings] = useState(EMPTY_SCANNER_SETTINGS);
   const [scannerEditor, setScannerEditor] = useState({ analysis_mode: "adaptive", api_key: "", active_signals_limit: 3 });
   const [scannerSettingsOpen, setScannerSettingsOpen] = useState(false);
@@ -321,6 +327,7 @@ export default function AdminApp({ authError }) {
   const [marketSaving, setMarketSaving] = useState(false);
   const [marketSavingKey, setMarketSavingKey] = useState("");
   const [supportSaving, setSupportSaving] = useState(false);
+  const [registrationSaving, setRegistrationSaving] = useState(false);
   const [scannerSaving, setScannerSaving] = useState(false);
   const [indicatorSearch, setIndicatorSearch] = useState("");
   const [indicatorSavingCode, setIndicatorSavingCode] = useState("");
@@ -444,13 +451,17 @@ export default function AdminApp({ authError }) {
         setAccountStatuses(data?.items || []);
       }
       if (targetTab === "flags") {
-        const [flagsData, scannerData] = await Promise.all([
+        const [flagsData, scannerData, registrationData] = await Promise.all([
           apiAdminFetchJson("/api/admin/feature-flags"),
-          apiAdminFetchJson("/api/admin/scanner-settings")
+          apiAdminFetchJson("/api/admin/scanner-settings"),
+          apiAdminFetchJson("/api/admin/registration-settings")
         ]);
         setFlags(flagsData?.items || []);
         const nextScanner = { ...EMPTY_SCANNER_SETTINGS, ...(scannerData || {}) };
+        const nextRegistration = { ...EMPTY_REGISTRATION_SETTINGS, ...(registrationData || {}) };
         setScannerSettings(nextScanner);
+        setRegistrationSettings(nextRegistration);
+        setRegistrationEditor(nextRegistration);
         setScannerEditor({
           analysis_mode: nextScanner.analysis_mode || "adaptive",
           api_key: "",
@@ -876,6 +887,27 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось сохранить поддержку", error.message || "Проверьте Telegram-ссылки и повторите попытку.");
     } finally {
       setSupportSaving(false);
+    }
+  };
+
+  const saveRegistrationSettings = async () => {
+    setRegistrationSaving(true);
+    try {
+      const payload = {
+        registration_url: registrationEditor.registration_url.trim()
+      };
+      const data = await apiAdminFetchJson("/api/admin/registration-settings", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      const next = { ...EMPTY_REGISTRATION_SETTINGS, ...(data || payload) };
+      setRegistrationSettings(next);
+      setRegistrationEditor(next);
+      pushToast("success", "Регистрация обновлена", "Кнопка регистрации на странице статусов получила актуальную ссылку.");
+    } catch (error) {
+      pushToast("error", "Не удалось сохранить регистрацию", error.message || "Проверьте ссылку и повторите попытку.");
+    } finally {
+      setRegistrationSaving(false);
     }
   };
 
@@ -1494,6 +1526,34 @@ export default function AdminApp({ authError }) {
                 </div>
               </section>
             )}
+
+            <section className="admin-card admin-registration-settings-panel">
+              <div className="admin-scanner-panel-head">
+                <div className="admin-scanner-panel-title">
+                  <span>Регистрация</span>
+                  <strong>Кнопка получения Trader ID</strong>
+                  <p>Эта ссылка используется на странице статусов, если пользователь ещё не указал Trader ID.</p>
+                </div>
+                <span className={`admin-badge ${registrationSettings.registration_url ? "tone-success" : "tone-neutral"}`}>
+                  {registrationSettings.registration_url ? "Ссылка активна" : "Ссылка не задана"}
+                </span>
+              </div>
+              <div className="admin-registration-row">
+                <label className="admin-field">
+                  <span>Ссылка регистрации</span>
+                  <input
+                    className="admin-input"
+                    type="url"
+                    value={registrationEditor.registration_url}
+                    onChange={(event) => setRegistrationEditor((prev) => ({ ...prev, registration_url: event.target.value }))}
+                    placeholder="https://..."
+                  />
+                </label>
+                <button className="admin-primary-button" type="button" disabled={registrationSaving} onClick={saveRegistrationSettings}>
+                  {registrationSaving ? "Сохраняем..." : "Сохранить регистрацию"}
+                </button>
+              </div>
+            </section>
           </>
         )}
         {!loading && tab === "indicators" && (

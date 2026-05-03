@@ -95,6 +95,7 @@ DEFAULT_SUPPORT_CHANNEL_URL = (
 DEFAULT_SUPPORT_CONTACT_URL = (
     os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"
 ).strip()
+DEFAULT_REGISTRATION_URL = (os.getenv("REGISTRATION_URL") or "").strip()
 DEFAULT_SCANNER_ANALYSIS_MODE = "adaptive"
 DEFAULT_SCANNER_OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip() or "gpt-4.1-mini"
 DEFAULT_SCANNER_OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
@@ -443,6 +444,10 @@ class AdminIndicatorUpdateRequest(BaseModel):
 class AdminSupportSettingsUpdateRequest(BaseModel):
     channel_url: str = Field(min_length=8, max_length=500)
     support_url: str = Field(min_length=8, max_length=500)
+
+
+class AdminRegistrationSettingsUpdateRequest(BaseModel):
+    registration_url: str = Field(default="", max_length=500)
 
 
 class AdminScannerSettingsUpdateRequest(BaseModel):
@@ -3201,12 +3206,35 @@ def _normalize_telegram_support_url(value: Any, fallback: str) -> str:
     return url
 
 
+def _normalize_external_url(value: Any, fallback: str = "") -> str:
+    url = str(value or "").strip() or fallback
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail="Registration link must start with https://")
+    if not parsed.netloc:
+        raise HTTPException(status_code=400, detail="Registration link host is missing")
+    if parsed.scheme == "http":
+        url = f"https://{parsed.netloc}{parsed.path}"
+        if parsed.query:
+            url = f"{url}?{parsed.query}"
+    return url
+
+
 async def get_support_settings_payload() -> Dict[str, str]:
     channel_url = await get_app_setting("support_channel_url", DEFAULT_SUPPORT_CHANNEL_URL)
     support_url = await get_app_setting("support_contact_url", DEFAULT_SUPPORT_CONTACT_URL)
     return {
         "channel_url": _normalize_telegram_support_url(channel_url, DEFAULT_SUPPORT_CHANNEL_URL),
         "support_url": _normalize_telegram_support_url(support_url, DEFAULT_SUPPORT_CONTACT_URL),
+    }
+
+
+async def get_registration_settings_payload() -> Dict[str, str]:
+    registration_url = await get_app_setting("registration_url", DEFAULT_REGISTRATION_URL)
+    return {
+        "registration_url": _normalize_external_url(registration_url, DEFAULT_REGISTRATION_URL),
     }
 
 
@@ -3894,6 +3922,7 @@ async def get_public_statuses(user: Dict[str, Any] = Depends(get_telegram_user))
     await upsert_user_from_telegram(user)
     profile = await fetch_user_profile(int(user["user_id"]))
     statuses = await list_account_statuses(include_disabled=False)
+    registration_settings = await get_registration_settings_payload()
     current_status = profile.get("account_status") or {}
     current_code = _normalize_status_code(profile.get("account_tier") or current_status.get("code") or "trader")
     if current_status and current_code not in {_normalize_status_code(item.get("code")) for item in statuses}:
@@ -3913,6 +3942,7 @@ async def get_public_statuses(user: Dict[str, Any] = Depends(get_telegram_user))
             for item in statuses
         ],
         "trader_id": profile.get("trader_id") or "",
+        "registration_url": registration_settings.get("registration_url") or "",
     }
 
 
@@ -6033,6 +6063,26 @@ async def admin_update_support_settings(
         {"channel_url": channel_url, "support_url": support_url},
     )
     return {"channel_url": channel_url, "support_url": support_url}
+
+
+@app.get("/api/admin/registration-settings")
+async def admin_get_registration_settings(admin: Dict[str, Any] = Depends(get_admin_user)):
+    return await get_registration_settings_payload()
+
+
+@app.post("/api/admin/registration-settings")
+async def admin_update_registration_settings(
+    payload: AdminRegistrationSettingsUpdateRequest,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    registration_url = _normalize_external_url(payload.registration_url, DEFAULT_REGISTRATION_URL)
+    await set_app_setting("registration_url", registration_url)
+    await add_admin_audit(
+        int(admin["user_id"]),
+        "admin_update_registration_settings",
+        {"registration_url": registration_url},
+    )
+    return {"registration_url": registration_url}
 
 
 @app.get("/api/admin/market-settings")

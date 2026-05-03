@@ -1084,7 +1084,7 @@ textarea {
   margin: 0 auto;
   padding: 0 14px 108px;
   display: grid;
-  gap: 16px;
+  gap: 13px;
   animation: pageRise 0.34s ease both;
 }
 
@@ -1092,11 +1092,11 @@ textarea {
   display: grid;
   gap: 7px;
   text-align: center;
-  margin-bottom: 14px;
+  margin-bottom: 2px;
 }
 
 .status-page-head {
-  margin: 0 auto 2px;
+  margin: 0 auto;
   max-width: 430px;
 }
 
@@ -1291,13 +1291,27 @@ textarea {
 }
 
 .status-upgrade-form button,
-.status-upgrade-close {
+.status-upgrade-close,
+.status-register-link {
   min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 16px;
   font-weight: 900;
+  text-decoration: none;
   color: #061121;
   background: linear-gradient(135deg, #dce9ff, #f4d98d);
+}
+
+.status-register-link {
+  color: #f5fbff;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(98, 210, 255, 0.26), transparent 42%),
+    linear-gradient(135deg, #174b82, #102942);
+  border: 1px solid rgba(113, 185, 255, 0.32);
+  box-shadow: 0 14px 28px rgba(34, 119, 193, 0.18);
 }
 
 .status-upgrade-close {
@@ -1323,6 +1337,16 @@ textarea {
   border: 1px dashed rgba(135, 166, 221, 0.32);
 }
 
+.status-page-disclaimer {
+  width: min(100%, 430px);
+  justify-self: center;
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
 [data-theme="light"] .status-upgrade-card,
 [data-theme="light"] .status-upgrade-form {
   background: rgba(255, 255, 255, 0.72);
@@ -1330,6 +1354,11 @@ textarea {
 
 [data-theme="light"] .status-upgrade-form input {
   background: rgba(255, 255, 255, 0.86);
+}
+
+[data-theme="light"] .status-register-link {
+  color: #12325a;
+  background: linear-gradient(135deg, #e4f2ff, #c9dfff);
 }
 
 [data-theme="light"] .status-page-controls button {

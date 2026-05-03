@@ -307,6 +307,7 @@ async def _seed_app_settings(conn) -> None:
         ("active_signals_limit", "3"),
         ("support_channel_url", os.getenv("SUPPORT_CHANNEL_URL") or os.getenv("CHANNEL_URL") or "https://t.me/+TthmjdpAkv5hNjdi"),
         ("support_contact_url", os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"),
+        ("registration_url", os.getenv("REGISTRATION_URL") or ""),
     )
     async with conn.cursor() as cur:
         for key, value in defaults:

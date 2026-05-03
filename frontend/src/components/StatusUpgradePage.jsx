@@ -37,6 +37,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
   const [activeIndex, setActiveIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState(null);
   const [traderId, setTraderId] = useState(user?.trader_id || "");
+  const [registrationUrl, setRegistrationUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -49,6 +50,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
         setItems(Array.isArray(data?.available_items) ? data.available_items : data?.items || []);
         setCurrentStatus(data?.current_status || null);
         setTraderId(data?.trader_id || user?.trader_id || "");
+        setRegistrationUrl(data?.registration_url || "");
       })
       .catch((error) => {
         if (!isActive) return;
@@ -80,6 +82,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
   const activeCode = normalizeCode(activeItem?.code);
   const isCurrent = activeCode === normalizeCode(user?.account_tier);
   const isUnlocked = Number(activeItem?.sort_order || 0) <= currentOrder;
+  const hasStoredTraderId = Boolean(String(user?.trader_id || "").trim());
 
   const goPrev = () => setActiveIndex((prev) => Math.max(prev - 1, 0));
   const goNext = () => setActiveIndex((prev) => Math.min(prev + 1, Math.max(visibleItems.length - 1, 0)));
@@ -129,7 +132,6 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
     <section className="status-upgrade-page">
       <div className="status-upgrade-head status-page-head">
         <h1>Открой следующий уровень</h1>
-        <p>Выбери доступ под свой стиль торговли. Текущий уровень и следующие статусы собраны в одном разделе.</p>
       </div>
 
       {loading ? (
@@ -204,7 +206,16 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
         <button type="button" onClick={saveTraderId} disabled={saving}>
           {saving ? "Сохраняем..." : traderId.trim() ? "Повысить" : "Сохранить Trader ID"}
         </button>
+        {!hasStoredTraderId && registrationUrl ? (
+          <a className="status-register-link" href={registrationUrl} target="_blank" rel="noreferrer">
+            Зарегистрироваться
+          </a>
+        ) : null}
       </div>
+
+      <p className="status-page-disclaimer">
+        Выбери доступ под свой стиль торговли. Текущий уровень и следующие статусы собраны в одном разделе.
+      </p>
     </section>
   );
 }

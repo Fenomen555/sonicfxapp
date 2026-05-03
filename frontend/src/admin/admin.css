@@ -1206,6 +1206,23 @@
     linear-gradient(145deg, rgba(18, 29, 48, 0.98), rgba(8, 14, 24, 0.98));
 }
 
+.admin-registration-settings-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-registration-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.admin-registration-row .admin-primary-button {
+  min-height: 48px;
+  white-space: nowrap;
+}
+
 .admin-scanner-panel-head {
   display: flex;
   align-items: flex-start;
@@ -1616,6 +1633,14 @@
   }
 
   .admin-scanner-save-row .admin-primary-button {
+    width: 100%;
+  }
+
+  .admin-registration-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-registration-row .admin-primary-button {
     width: 100%;
   }
 

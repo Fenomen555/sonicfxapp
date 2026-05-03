@@ -8,6 +8,7 @@ import "./admin.css";
 const TABS = [
   { id: "stats", label: "Обзор", subtitle: "Статистика и активность" },
   { id: "users", label: "Пользователи", subtitle: "Карточки, поиск и фильтры" },
+  { id: "statuses", label: "Статусы", subtitle: "Доступы и лимиты" },
   { id: "flags", label: "Функции", subtitle: "Управление режимами" },
   { id: "market", label: "Рынок", subtitle: "Пары и синхронизация" },
   { id: "indicators", label: "Индикаторы", subtitle: "Каталог и доступность" },
@@ -54,8 +55,31 @@ const MODE_FLAG_KEYS = ["mode_scanner_enabled", "mode_ai_enabled", "mode_indicat
 
 const ACCOUNT_TIER_META = {
   trader: { label: "Trader", tone: "accent" },
-  pro: { label: "PRO", tone: "success" },
-  vip: { label: "VIP", tone: "warning" }
+  premium: { label: "Premium", tone: "success" },
+  pro: { label: "Premium", tone: "success" },
+  vip: { label: "VIP", tone: "warning" },
+  unlimited: { label: "Unlimited", tone: "success" }
+};
+
+const STATUS_EDITOR_DEFAULT = {
+  code: "",
+  name: "",
+  description: "",
+  is_enabled: 1,
+  sort_order: 100,
+  access_required: 0,
+  min_deposit: 0,
+  scanner_enabled: 0,
+  scanner_limit: 0,
+  scanner_window_hours: 3,
+  live_enabled: 0,
+  live_limit: 0,
+  live_window_hours: 3,
+  indicators_enabled: 0,
+  indicators_limit: 0,
+  indicators_window_hours: 3,
+  badge_text: "",
+  marketing_text: ""
 };
 
 const FILTER_DEFAULTS = {
@@ -224,8 +248,16 @@ function compactSecretPreview(value, isConfigured) {
   return `${normalized.slice(0, 7)}...${normalized.slice(-4)}`;
 }
 
-function getAccountTierMeta(tier) {
-  return ACCOUNT_TIER_META[tier] || ACCOUNT_TIER_META.trader;
+function getAccountTierMeta(tier, statuses = []) {
+  const code = String(tier || "trader").toLowerCase();
+  const status = statuses.find((item) => String(item.code || "").toLowerCase() === code);
+  if (status) {
+    return {
+      label: status.name || ACCOUNT_TIER_META[code]?.label || code,
+      tone: ACCOUNT_TIER_META[code]?.tone || (Number(status.is_enabled || 0) === 1 ? "success" : "neutral")
+    };
+  }
+  return ACCOUNT_TIER_META[code] || ACCOUNT_TIER_META.trader;
 }
 
 function isWithinRegistrationRange(value, filter) {
@@ -266,6 +298,9 @@ export default function AdminApp({ authError }) {
   const [contentAreaTop, setContentAreaTop] = useState(56);
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
+  const [accountStatuses, setAccountStatuses] = useState([]);
+  const [statusEditor, setStatusEditor] = useState(STATUS_EDITOR_DEFAULT);
+  const [statusSavingCode, setStatusSavingCode] = useState("");
   const [flags, setFlags] = useState([]);
   const [marketSettings, setMarketSettings] = useState(EMPTY_MARKET_SETTINGS);
   const [indicatorSettings, setIndicatorSettings] = useState(EMPTY_INDICATOR_SETTINGS);
@@ -303,6 +338,15 @@ export default function AdminApp({ authError }) {
     () => users.find((item) => item.user_id === selectedUserId) || null,
     [users, selectedUserId]
   );
+  const accountStatusOptions = useMemo(() => {
+    if (accountStatuses.length > 0) return accountStatuses;
+    return [
+      { code: "trader", name: "Trader", is_enabled: 1 },
+      { code: "premium", name: "Premium", is_enabled: 1 },
+      { code: "vip", name: "VIP", is_enabled: 1 },
+      { code: "unlimited", name: "Unlimited", is_enabled: 1 }
+    ];
+  }, [accountStatuses]);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
@@ -380,8 +424,16 @@ export default function AdminApp({ authError }) {
         setStats(data);
       }
       if (targetTab === "users") {
-        const data = await apiAdminFetchJson("/api/admin/users?limit=200");
+        const [data, statusesData] = await Promise.all([
+          apiAdminFetchJson("/api/admin/users?limit=200"),
+          apiAdminFetchJson("/api/admin/statuses")
+        ]);
         setUsers(data?.items || []);
+        setAccountStatuses(statusesData?.items || []);
+      }
+      if (targetTab === "statuses") {
+        const data = await apiAdminFetchJson("/api/admin/statuses");
+        setAccountStatuses(data?.items || []);
       }
       if (targetTab === "flags") {
         const [flagsData, scannerData] = await Promise.all([
@@ -505,6 +557,10 @@ export default function AdminApp({ authError }) {
       if (item.id === "users") {
         return { ...item, metric: `${formatNumber(users.length)} карточек` };
       }
+      if (item.id === "statuses") {
+        const activeStatuses = accountStatuses.filter((status) => Number(status.is_enabled || 0) === 1).length;
+        return { ...item, metric: `${formatNumber(activeStatuses)} активных` };
+      }
       if (item.id === "flags") {
         return {
           ...item,
@@ -525,6 +581,7 @@ export default function AdminApp({ authError }) {
     });
   }, [
     flags,
+    accountStatuses,
     indicatorSettings.summary?.enabled,
     marketSettings.items,
     stats?.users_total,
@@ -622,6 +679,78 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось изменить функцию", error.message || "Попробуйте ещё раз.");
     } finally {
       setFlagSavingKey("");
+    }
+  };
+
+  const refreshStatuses = async () => {
+    const data = await apiAdminFetchJson("/api/admin/statuses");
+    setAccountStatuses(data?.items || []);
+  };
+
+  const startCreateStatus = () => {
+    setStatusEditor({ ...STATUS_EDITOR_DEFAULT, code: "", name: "Новый статус", badge_text: "NEW" });
+  };
+
+  const editStatus = (item) => {
+    setStatusEditor({ ...STATUS_EDITOR_DEFAULT, ...(item || {}) });
+  };
+
+  const updateStatusField = (key, value) => {
+    setStatusEditor((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateStatusNumberField = (key, value) => {
+    const nextValue = value === "" ? "" : Number(value);
+    updateStatusField(key, Number.isNaN(nextValue) ? "" : nextValue);
+  };
+
+  const toggleStatusInline = (item) => {
+    saveStatus({ ...item, is_enabled: Number(item?.is_enabled || 0) === 1 ? 0 : 1 });
+  };
+
+  const formatStatusLimit = (enabled, limit, windowHours) => {
+    if (Number(enabled || 0) !== 1) return "Нет доступа";
+    const numericLimit = Number(limit || 0);
+    if (numericLimit < 0) return "Безлимит";
+    if (numericLimit === 0) return "0 запросов";
+    return `${numericLimit} / ${Number(windowHours || 1)} ч`;
+  };
+
+  const saveStatus = async (item = statusEditor) => {
+    const payload = { ...STATUS_EDITOR_DEFAULT, ...(item || {}) };
+    if (!String(payload.name || "").trim()) {
+      pushToast("error", "Название обязательно", "Укажи имя статуса перед сохранением.");
+      return;
+    }
+    setStatusSavingCode(payload.code || "new");
+    try {
+      const data = await apiAdminFetchJson("/api/admin/statuses", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      setAccountStatuses(data?.items || []);
+      setStatusEditor(STATUS_EDITOR_DEFAULT);
+      pushToast("success", "Статус сохранён", `${payload.name} обновлён в системе доступов.`);
+    } catch (error) {
+      pushToast("error", "Не удалось сохранить статус", error.message || "Проверь поля и повтори.");
+    } finally {
+      setStatusSavingCode("");
+    }
+  };
+
+  const deleteStatus = async (item) => {
+    if (!item?.code) return;
+    const confirmed = window.confirm(`Удалить статус ${item.name}? Пользователи с этим статусом останутся с ним.`);
+    if (!confirmed) return;
+    setStatusSavingCode(item.code);
+    try {
+      const data = await apiAdminFetchJson(`/api/admin/statuses/${encodeURIComponent(item.code)}`, { method: "DELETE" });
+      setAccountStatuses(data?.items || []);
+      pushToast("success", "Статус удалён", `${item.name} больше не показывается как доступный.`);
+    } catch (error) {
+      pushToast("error", "Не удалось удалить статус", error.message || "Попробуй ещё раз.");
+    } finally {
+      setStatusSavingCode("");
     }
   };
 
@@ -940,9 +1069,9 @@ export default function AdminApp({ authError }) {
                   <span>Статус</span>
                   <select className="admin-select" value={userFilters.status} onChange={(e) => handleFilterChange("status", e.target.value)}>
                     <option value="all">Все статусы</option>
-                    <option value="trader">Trader</option>
-                    <option value="pro">PRO</option>
-                    <option value="vip">VIP</option>
+                    {accountStatusOptions.map((item) => (
+                      <option key={item.code} value={item.code}>{item.name}</option>
+                    ))}
                   </select>
                 </label>
 
@@ -989,7 +1118,7 @@ export default function AdminApp({ authError }) {
 
             <section className="admin-user-grid">
               {filteredUsers.map((item) => {
-                const tierMeta = getAccountTierMeta(item.account_tier);
+                const tierMeta = getAccountTierMeta(item.account_tier, accountStatusOptions);
                 return (
                   <button
                     className={`admin-user-card ${selectedUserId === item.user_id ? "active" : ""}`}
@@ -1019,6 +1148,170 @@ export default function AdminApp({ authError }) {
                   </button>
                 );
               })}
+            </section>
+          </>
+        )}
+
+        {!loading && tab === "statuses" && (
+          <>
+            <section className="admin-card admin-status-hero">
+              <div>
+                <div className="admin-section-title">Статусы и доступы</div>
+                <p>Настраиваем витрину статусов, депозитный порог и лимиты запросов по каждому режиму анализа.</p>
+              </div>
+              <button className="admin-primary-button" type="button" onClick={startCreateStatus}>
+                Новый статус
+              </button>
+            </section>
+
+            <section className="admin-status-list-grid">
+              {accountStatusOptions.map((item) => {
+                const enabled = Number(item.is_enabled || 0) === 1;
+                return (
+                  <article className={`admin-card admin-status-card ${enabled ? "is-enabled" : "is-disabled"}`} key={item.code}>
+                    <div className="admin-status-card-head">
+                      <div>
+                        <span className="admin-status-code">{item.badge_text || item.code}</span>
+                        <strong>{item.name}</strong>
+                      </div>
+                      <button
+                        className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
+                        type="button"
+                        disabled={statusSavingCode === item.code}
+                        onClick={() => toggleStatusInline(item)}
+                        aria-pressed={enabled}
+                      >
+                        <span>{statusSavingCode === item.code ? "..." : enabled ? "Включён" : "Выключен"}</span>
+                        <i aria-hidden="true" />
+                      </button>
+                    </div>
+
+                    <p>{item.description || "Статус без описания."}</p>
+
+                    <div className="admin-status-limit-grid">
+                      <span><b>Scanner</b>{formatStatusLimit(item.scanner_enabled, item.scanner_limit, item.scanner_window_hours)}</span>
+                      <span><b>Live</b>{formatStatusLimit(item.live_enabled, item.live_limit, item.live_window_hours)}</span>
+                      <span><b>Indicators</b>{formatStatusLimit(item.indicators_enabled, item.indicators_limit, item.indicators_window_hours)}</span>
+                    </div>
+
+                    <div className="admin-status-card-meta">
+                      <span>Доступ: {Number(item.access_required || 0) === 1 ? "требуется" : "не требуется"}</span>
+                      <span>Депозит: ${Number(item.min_deposit || 0)}</span>
+                    </div>
+
+                    <div className="admin-status-actions">
+                      <button className="admin-ghost-button" type="button" onClick={() => editStatus(item)}>
+                        Редактировать
+                      </button>
+                      <button
+                        className="admin-danger-button"
+                        type="button"
+                        disabled={item.code === "trader" || statusSavingCode === item.code}
+                        onClick={() => deleteStatus(item)}
+                      >
+                        Удалить
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </section>
+
+            <section className="admin-card admin-status-editor-card">
+              <div className="admin-filter-head">
+                <div>
+                  <div className="admin-section-title">{statusEditor.code ? `Редактируем ${statusEditor.name || statusEditor.code}` : "Новый статус"}</div>
+                  <div className="admin-muted-text">Код можно оставить пустым для автогенерации. Лимит -1 означает безлимит.</div>
+                </div>
+                <button className="admin-ghost-button" type="button" onClick={() => setStatusEditor(STATUS_EDITOR_DEFAULT)}>
+                  Очистить
+                </button>
+              </div>
+
+              <div className="admin-status-editor-grid">
+                <label className="admin-field">
+                  <span>Код</span>
+                  <input className="admin-input" value={statusEditor.code} onChange={(e) => updateStatusField("code", e.target.value)} placeholder="premium" />
+                </label>
+                <label className="admin-field">
+                  <span>Название</span>
+                  <input className="admin-input" value={statusEditor.name} onChange={(e) => updateStatusField("name", e.target.value)} placeholder="Premium" />
+                </label>
+                <label className="admin-field">
+                  <span>Бейдж</span>
+                  <input className="admin-input" value={statusEditor.badge_text || ""} onChange={(e) => updateStatusField("badge_text", e.target.value)} placeholder="PRO" />
+                </label>
+                <label className="admin-field">
+                  <span>Порядок</span>
+                  <input className="admin-input" type="number" value={statusEditor.sort_order} onChange={(e) => updateStatusNumberField("sort_order", e.target.value)} />
+                </label>
+                <label className="admin-field">
+                  <span>Доступ по регистрации</span>
+                  <select className="admin-select" value={Number(statusEditor.access_required || 0)} onChange={(e) => updateStatusNumberField("access_required", e.target.value)}>
+                    <option value={0}>Не требуется</option>
+                    <option value={1}>Требуется</option>
+                  </select>
+                </label>
+                <label className="admin-field">
+                  <span>Депозит от, $</span>
+                  <input className="admin-input" type="number" min="0" step="0.01" value={statusEditor.min_deposit} onChange={(e) => updateStatusNumberField("min_deposit", e.target.value)} />
+                </label>
+                <label className="admin-field admin-field-wide">
+                  <span>Описание</span>
+                  <input className="admin-input" value={statusEditor.description || ""} onChange={(e) => updateStatusField("description", e.target.value)} placeholder="Коротко: кому подходит статус" />
+                </label>
+                <label className="admin-field admin-field-wide">
+                  <span>Текст для mini app</span>
+                  <textarea className="admin-textarea" value={statusEditor.marketing_text || ""} onChange={(e) => updateStatusField("marketing_text", e.target.value)} placeholder="Каждая строка станет пунктом в карточке статуса." />
+                </label>
+              </div>
+
+              <div className="admin-status-mode-grid">
+                {[
+                  { key: "scanner", label: "Scanner" },
+                  { key: "live", label: "Live" },
+                  { key: "indicators", label: "Indicators" }
+                ].map((mode) => {
+                  const enabledKey = `${mode.key}_enabled`;
+                  const limitKey = `${mode.key}_limit`;
+                  const windowKey = `${mode.key}_window_hours`;
+                  const enabled = Number(statusEditor[enabledKey] || 0) === 1;
+                  return (
+                    <article className={`admin-status-mode-card ${enabled ? "is-enabled" : "is-disabled"}`} key={mode.key}>
+                      <div className="admin-status-mode-head">
+                        <strong>{mode.label}</strong>
+                        <button
+                          className={`admin-mode-switch ${enabled ? "is-on" : ""}`}
+                          type="button"
+                          onClick={() => updateStatusNumberField(enabledKey, enabled ? 0 : 1)}
+                          aria-pressed={enabled}
+                        >
+                          <span>{enabled ? "Есть" : "Нет"}</span>
+                          <i aria-hidden="true" />
+                        </button>
+                      </div>
+                      <label className="admin-field">
+                        <span>Лимит запросов</span>
+                        <input className="admin-input" type="number" value={statusEditor[limitKey]} onChange={(e) => updateStatusNumberField(limitKey, e.target.value)} placeholder="-1" />
+                      </label>
+                      <label className="admin-field">
+                        <span>Окно восстановления</span>
+                        <select className="admin-select" value={Number(statusEditor[windowKey] || 3)} onChange={(e) => updateStatusNumberField(windowKey, e.target.value)} disabled={Number(statusEditor[limitKey] || 0) < 0}>
+                          {[1, 3, 8, 12, 24].map((hours) => (
+                            <option key={hours} value={hours}>{hours} ч</option>
+                          ))}
+                        </select>
+                      </label>
+                    </article>
+                  );
+                })}
+              </div>
+
+              <div className="admin-status-editor-actions">
+                <button className="admin-primary-button" type="button" disabled={Boolean(statusSavingCode)} onClick={() => saveStatus()}>
+                  {statusSavingCode ? "Сохраняем..." : "Сохранить статус"}
+                </button>
+              </div>
             </section>
           </>
         )}
@@ -1441,15 +1734,15 @@ export default function AdminApp({ authError }) {
               <article className="admin-card admin-user-detail-card">
                 <div className="admin-user-detail-head">
                   <strong>Управление пользователем</strong>
-                  <span className={`admin-badge tone-${getAccountTierMeta(selectedUser.account_tier).tone}`}>
-                    {getAccountTierMeta(selectedUser.account_tier).label}
+                  <span className={`admin-badge tone-${getAccountTierMeta(selectedUser.account_tier, accountStatusOptions).tone}`}>
+                    {getAccountTierMeta(selectedUser.account_tier, accountStatusOptions).label}
                   </span>
                 </div>
                 <div className="admin-info-list">
                   <div><span>User ID</span><strong>{selectedUser.user_id}</strong></div>
                   <div><span>Trader ID</span><strong>{selectedUser.trader_id || "-"}</strong></div>
                   <div><span>Username</span><strong>@{selectedUser.tg_username || "-"}</strong></div>
-                  <div><span>Статус</span><strong>{getAccountTierMeta(selectedUser.account_tier).label}</strong></div>
+                  <div><span>Статус</span><strong>{getAccountTierMeta(selectedUser.account_tier, accountStatusOptions).label}</strong></div>
                   <div><span>Сканер</span><strong>{selectedUser.scanner_access ? "Есть доступ" : "Нет доступа"}</strong></div>
                   <div><span>Блокировка</span><strong>{selectedUser.is_blocked ? "Заблокирован" : "Не заблокирован"}</strong></div>
                   <div><span>Язык</span><strong>{selectedUser.lang || "-"}</strong></div>
@@ -1466,9 +1759,9 @@ export default function AdminApp({ authError }) {
                       value={userEditor.account_tier}
                       onChange={(e) => setUserEditor((prev) => ({ ...prev, account_tier: e.target.value }))}
                     >
-                      <option value="trader">Trader</option>
-                      <option value="pro">PRO</option>
-                      <option value="vip">VIP</option>
+                      {accountStatusOptions.map((item) => (
+                        <option key={item.code} value={item.code}>{item.name}</option>
+                      ))}
                     </select>
                   </label>
 

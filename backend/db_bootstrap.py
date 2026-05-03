@@ -76,9 +76,116 @@ def _normalize_lang(value: str) -> str:
 
 def _normalize_account_tier(value: str) -> str:
     tier = (value or "").strip().lower()
-    if tier in {"trader", "pro", "vip"}:
+    if tier == "pro":
+        return "premium"
+    if tier in {"trader", "premium", "vip", "unlimited"}:
         return tier
     return "trader"
+
+
+DEFAULT_ACCOUNT_STATUSES: Tuple[Tuple[str, str, str, int, int, int, float, int, int, int, int, int, int, int, int, int, str, str], ...] = (
+    (
+        "trader",
+        "Trader",
+        "Базовый статус для каждого пользователя SonicFX.",
+        1,
+        10,
+        0,
+        0.0,
+        1,
+        1,
+        0,
+        1,
+        1,
+        3,
+        1,
+        1,
+        3,
+        "TRADER",
+        "🎯 1 Live или Indicator анализ\n🎁 1 пробный Scanner\nОткрой Premium для полного доступа",
+    ),
+    (
+        "premium",
+        "Premium",
+        "Полный старт для активной торговли с Live и индикаторами.",
+        1,
+        20,
+        1,
+        10.0,
+        0,
+        0,
+        3,
+        1,
+        3,
+        3,
+        1,
+        3,
+        3,
+        "PREMIUM",
+        "⚡ Live сигналы\n📊 Индикаторы\nЛимит: 3 сигнала / 3 часа",
+    ),
+    (
+        "vip",
+        "VIP",
+        "Расширенный доступ для частых сигналов и Scanner анализа.",
+        1,
+        30,
+        1,
+        50.0,
+        1,
+        10,
+        3,
+        1,
+        10,
+        3,
+        1,
+        10,
+        3,
+        "VIP",
+        "🔥 Scanner\n⚡ Live + Индикаторы\nЛимит: 10 сигналов / 3 часа",
+    ),
+    (
+        "unlimited",
+        "Unlimited",
+        "Максимальный статус без лимитов по сигналам.",
+        1,
+        40,
+        1,
+        250.0,
+        1,
+        -1,
+        1,
+        1,
+        -1,
+        1,
+        1,
+        -1,
+        1,
+        "UNLIMITED",
+        "🚀 Полный доступ\n♾ Без лимитов\n⚡ Максимальная скорость сигналов",
+    ),
+)
+
+
+async def _seed_account_statuses(conn) -> None:
+    async with conn.cursor() as cur:
+        for item in DEFAULT_ACCOUNT_STATUSES:
+            await cur.execute(
+                """
+                INSERT INTO account_statuses (
+                    `code`, name, description, is_enabled, sort_order,
+                    access_required, min_deposit,
+                    scanner_enabled, scanner_limit, scanner_window_hours,
+                    live_enabled, live_limit, live_window_hours,
+                    indicators_enabled, indicators_limit, indicators_window_hours,
+                    badge_text, marketing_text
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    `code` = VALUES(`code`)
+                """,
+                item,
+            )
 
 
 async def _seed_feature_flags(conn) -> None:
@@ -356,6 +463,35 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
 
             await cur.execute(
                 """
+                CREATE TABLE IF NOT EXISTS account_statuses (
+                    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    `code` VARCHAR(32) NOT NULL,
+                    name VARCHAR(64) NOT NULL,
+                    description TEXT NULL,
+                    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+                    sort_order INT NOT NULL DEFAULT 100,
+                    access_required TINYINT(1) NOT NULL DEFAULT 0,
+                    min_deposit DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    scanner_enabled TINYINT(1) NOT NULL DEFAULT 0,
+                    scanner_limit INT NOT NULL DEFAULT 0,
+                    scanner_window_hours INT NOT NULL DEFAULT 3,
+                    live_enabled TINYINT(1) NOT NULL DEFAULT 0,
+                    live_limit INT NOT NULL DEFAULT 0,
+                    live_window_hours INT NOT NULL DEFAULT 3,
+                    indicators_enabled TINYINT(1) NOT NULL DEFAULT 0,
+                    indicators_limit INT NOT NULL DEFAULT 0,
+                    indicators_window_hours INT NOT NULL DEFAULT 3,
+                    badge_text VARCHAR(64) NULL,
+                    marketing_text TEXT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uq_account_statuses_code (`code`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+                """
+            )
+
+            await cur.execute(
+                """
                 CREATE TABLE IF NOT EXISTS admin_audit_log (
                     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
                     admin_user_id BIGINT NOT NULL,
@@ -466,7 +602,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "users", "timezone", "ALTER TABLE users ADD COLUMN timezone VARCHAR(64) NOT NULL DEFAULT 'Europe/Kiev'")
         await _ensure_column(conn, db_name, "users", "mini_username", "ALTER TABLE users ADD COLUMN mini_username VARCHAR(64) NULL")
         await _ensure_column(conn, db_name, "users", "photo_url", "ALTER TABLE users ADD COLUMN photo_url TEXT NULL")
-        await _ensure_column(conn, db_name, "users", "account_tier", "ALTER TABLE users ADD COLUMN account_tier VARCHAR(16) NOT NULL DEFAULT 'trader'")
+        await _ensure_column(conn, db_name, "users", "account_tier", "ALTER TABLE users ADD COLUMN account_tier VARCHAR(32) NOT NULL DEFAULT 'trader'")
         await _ensure_column(conn, db_name, "users", "trader_id", "ALTER TABLE users ADD COLUMN trader_id VARCHAR(128) NULL")
         await _ensure_column(conn, db_name, "users", "activation_status", "ALTER TABLE users ADD COLUMN activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive'")
         await _ensure_column(conn, db_name, "users", "deposit_amount", "ALTER TABLE users ADD COLUMN deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0")
@@ -474,6 +610,11 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "users", "onboarding_seen", "ALTER TABLE users ADD COLUMN onboarding_seen TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "is_blocked", "ALTER TABLE users ADD COLUMN is_blocked TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "last_active_at", "ALTER TABLE users ADD COLUMN last_active_at TIMESTAMP NULL DEFAULT NULL")
+        async with conn.cursor() as cur:
+            try:
+                await cur.execute("ALTER TABLE users MODIFY COLUMN account_tier VARCHAR(32) NOT NULL DEFAULT 'trader'")
+            except Exception:
+                pass
 
         await _ensure_column(conn, db_name, "signals", "status", "ALTER TABLE signals ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'pending'")
         await _ensure_column(conn, db_name, "signals", "result", "ALTER TABLE signals ADD COLUMN result VARCHAR(32) NULL")
@@ -506,6 +647,22 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "signal_indicators", "description", "ALTER TABLE signal_indicators ADD COLUMN description VARCHAR(255) NULL")
         await _ensure_column(conn, db_name, "signal_indicators", "is_enabled", "ALTER TABLE signal_indicators ADD COLUMN is_enabled TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "signal_indicators", "sort_order", "ALTER TABLE signal_indicators ADD COLUMN sort_order INT NOT NULL DEFAULT 100")
+        await _ensure_column(conn, db_name, "account_statuses", "description", "ALTER TABLE account_statuses ADD COLUMN description TEXT NULL")
+        await _ensure_column(conn, db_name, "account_statuses", "is_enabled", "ALTER TABLE account_statuses ADD COLUMN is_enabled TINYINT(1) NOT NULL DEFAULT 1")
+        await _ensure_column(conn, db_name, "account_statuses", "sort_order", "ALTER TABLE account_statuses ADD COLUMN sort_order INT NOT NULL DEFAULT 100")
+        await _ensure_column(conn, db_name, "account_statuses", "access_required", "ALTER TABLE account_statuses ADD COLUMN access_required TINYINT(1) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "min_deposit", "ALTER TABLE account_statuses ADD COLUMN min_deposit DECIMAL(12,2) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "scanner_enabled", "ALTER TABLE account_statuses ADD COLUMN scanner_enabled TINYINT(1) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "scanner_limit", "ALTER TABLE account_statuses ADD COLUMN scanner_limit INT NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "scanner_window_hours", "ALTER TABLE account_statuses ADD COLUMN scanner_window_hours INT NOT NULL DEFAULT 3")
+        await _ensure_column(conn, db_name, "account_statuses", "live_enabled", "ALTER TABLE account_statuses ADD COLUMN live_enabled TINYINT(1) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "live_limit", "ALTER TABLE account_statuses ADD COLUMN live_limit INT NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "live_window_hours", "ALTER TABLE account_statuses ADD COLUMN live_window_hours INT NOT NULL DEFAULT 3")
+        await _ensure_column(conn, db_name, "account_statuses", "indicators_enabled", "ALTER TABLE account_statuses ADD COLUMN indicators_enabled TINYINT(1) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "indicators_limit", "ALTER TABLE account_statuses ADD COLUMN indicators_limit INT NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "account_statuses", "indicators_window_hours", "ALTER TABLE account_statuses ADD COLUMN indicators_window_hours INT NOT NULL DEFAULT 3")
+        await _ensure_column(conn, db_name, "account_statuses", "badge_text", "ALTER TABLE account_statuses ADD COLUMN badge_text VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "account_statuses", "marketing_text", "ALTER TABLE account_statuses ADD COLUMN marketing_text TEXT NULL")
         await _ensure_column(conn, db_name, "scan_uploads", "source_url", "ALTER TABLE scan_uploads ADD COLUMN source_url TEXT NULL")
         await _ensure_column(conn, db_name, "scan_uploads", "is_current", "ALTER TABLE scan_uploads ADD COLUMN is_current TINYINT(1) NOT NULL DEFAULT 1")
         await _ensure_column(conn, db_name, "scan_uploads", "upload_date", "ALTER TABLE scan_uploads ADD COLUMN upload_date DATE NULL")
@@ -544,6 +701,7 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_index(conn, db_name, "users", "idx_users_activation_status", "CREATE INDEX idx_users_activation_status ON users (activation_status)")
         await _ensure_index(conn, db_name, "users", "idx_users_account_tier", "CREATE INDEX idx_users_account_tier ON users (account_tier)")
         await _ensure_index(conn, db_name, "users", "idx_users_trader_id", "CREATE INDEX idx_users_trader_id ON users (trader_id)")
+        await _ensure_index(conn, db_name, "account_statuses", "idx_account_statuses_enabled_order", "CREATE INDEX idx_account_statuses_enabled_order ON account_statuses (is_enabled, sort_order)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_kind_active", "CREATE INDEX idx_market_pairs_kind_active ON market_pairs (pair_kind, is_active)")
         await _ensure_index(conn, db_name, "market_pairs", "idx_market_pairs_last_seen", "CREATE INDEX idx_market_pairs_last_seen ON market_pairs (last_seen_at)")
         await _ensure_index(conn, db_name, "signal_indicators", "idx_signal_indicators_enabled_order", "CREATE INDEX idx_signal_indicators_enabled_order ON signal_indicators (is_enabled, sort_order)")
@@ -558,14 +716,22 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
 
         await _seed_feature_flags(conn)
         await _seed_signal_indicators(conn)
+        await _seed_account_statuses(conn)
         await _seed_app_settings(conn)
         await _seed_default_admin(conn)
         async with conn.cursor() as cur:
             await cur.execute(
                 """
                 UPDATE users
+                SET account_tier = 'premium'
+                WHERE account_tier = 'pro'
+                """
+            )
+            await cur.execute(
+                """
+                UPDATE users
                 SET account_tier = 'trader'
-                WHERE account_tier IS NULL OR account_tier = '' OR account_tier NOT IN ('trader', 'pro', 'vip')
+                WHERE account_tier IS NULL OR account_tier = ''
                 """
             )
             await cur.execute(

@@ -338,7 +338,7 @@ function normalizeSignalMode(value) {
   return ["scanner", "automatic", "indicators"].includes(value) ? value : "scanner";
 }
 
-export default function HomePage({ t, notify, featureFlags = {}, preferredSignalMode = "scanner", onPreferredSignalModeChange }) {
+export default function HomePage({ t, notify, featureFlags = {}, preferredSignalMode = "scanner", onPreferredSignalModeChange, onOpenUpgrade }) {
   const [signalMode, setSignalMode] = useState(() => normalizeSignalMode(preferredSignalMode));
   const [isSignalModeExpanded, setIsSignalModeExpanded] = useState(false);
   const [marketKind, setMarketKind] = useState("otc");
@@ -1724,7 +1724,7 @@ export default function HomePage({ t, notify, featureFlags = {}, preferredSignal
           <SparkIcon className="quota-left-icon" aria-hidden="true" />
           <span>{t.home.quota || "Analyses: 3 / 3"}</span>
         </div>
-        <button className="quota-btn quota-btn-upgrade" type="button" aria-label={t.home.pro || "Get PRO"}>
+        <button className="quota-btn quota-btn-upgrade" type="button" aria-label={t.home.pro || "Get PRO"} onClick={onOpenUpgrade}>
           <span className="quota-upgrade-animation" aria-hidden="true">
             <Lottie animationData={upgradeAnimation} loop autoplay />
           </span>

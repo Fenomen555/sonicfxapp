@@ -30,7 +30,6 @@ from pydantic import BaseModel, Field
 
 from db_bootstrap import (
     ensure_database_schema,
-    normalize_account_tier,
     normalize_activation_status,
     normalize_user_lang,
     scanner_access_from_deposit,
@@ -385,6 +384,10 @@ class UserSignalModeUpdate(BaseModel):
     mode: str = Field(min_length=3, max_length=16)
 
 
+class UserTraderIdUpdate(BaseModel):
+    trader_id: str = Field(default="", max_length=128)
+
+
 class ScanLinkUploadRequest(BaseModel):
     url: str = Field(min_length=8, max_length=2000)
 
@@ -392,9 +395,30 @@ class ScanLinkUploadRequest(BaseModel):
 class AdminSetActivationRequest(BaseModel):
     user_id: int
     activation_status: Optional[str] = None
-    account_tier: Optional[str] = Field(default=None, max_length=16)
+    account_tier: Optional[str] = Field(default=None, max_length=32)
     deposit_amount: Optional[float] = None
     trader_id: Optional[str] = Field(default=None, max_length=128)
+
+
+class AccountStatusUpsertRequest(BaseModel):
+    code: Optional[str] = Field(default=None, max_length=32)
+    name: str = Field(min_length=2, max_length=64)
+    description: Optional[str] = Field(default="", max_length=2000)
+    is_enabled: int = Field(default=1, ge=0, le=1)
+    sort_order: int = Field(default=100, ge=0, le=9999)
+    access_required: int = Field(default=0, ge=0, le=1)
+    min_deposit: float = Field(default=0, ge=0)
+    scanner_enabled: int = Field(default=0, ge=0, le=1)
+    scanner_limit: int = Field(default=0, ge=-1, le=100000)
+    scanner_window_hours: int = Field(default=3, ge=1, le=24)
+    live_enabled: int = Field(default=0, ge=0, le=1)
+    live_limit: int = Field(default=0, ge=-1, le=100000)
+    live_window_hours: int = Field(default=3, ge=1, le=24)
+    indicators_enabled: int = Field(default=0, ge=0, le=1)
+    indicators_limit: int = Field(default=0, ge=-1, le=100000)
+    indicators_window_hours: int = Field(default=3, ge=1, le=24)
+    badge_text: Optional[str] = Field(default="", max_length=64)
+    marketing_text: Optional[str] = Field(default="", max_length=2000)
 
 
 class AdminFlagUpdateRequest(BaseModel):
@@ -965,6 +989,254 @@ async def get_feature_flags_payload() -> Dict[str, int]:
     return flags
 
 
+STATUS_MODE_MAP = {
+    "scanner": ("scanner", "Scanner"),
+    "automatic": ("live", "Live"),
+    "auto": ("live", "Live"),
+    "live": ("live", "Live"),
+    "indicators": ("indicators", "Indicators"),
+}
+
+
+def _normalize_status_code(value: str, fallback: str = "trader") -> str:
+    code = re.sub(r"[^a-z0-9_]+", "_", str(value or "").strip().lower()).strip("_")
+    if code == "pro":
+        return "premium"
+    return code or fallback
+
+
+def _sanitize_status_limit(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        numeric = 0
+    return max(-1, min(numeric, 100000))
+
+
+def _sanitize_status_window(value: Any) -> int:
+    try:
+        numeric = int(value)
+    except (TypeError, ValueError):
+        numeric = 3
+    return min(max(numeric, 1), 24)
+
+
+def _serialize_account_status(row: Dict[str, Any]) -> Dict[str, Any]:
+    code = _normalize_status_code(row.get("code") or "trader")
+    return {
+        "id": int(row.get("id") or 0),
+        "code": code,
+        "name": row.get("name") or code.title(),
+        "description": row.get("description") or "",
+        "is_enabled": int(row.get("is_enabled") or 0),
+        "sort_order": int(row.get("sort_order") or 100),
+        "access_required": int(row.get("access_required") or 0),
+        "min_deposit": float(row.get("min_deposit") or 0),
+        "scanner_enabled": int(row.get("scanner_enabled") or 0),
+        "scanner_limit": _sanitize_status_limit(row.get("scanner_limit")),
+        "scanner_window_hours": _sanitize_status_window(row.get("scanner_window_hours")),
+        "live_enabled": int(row.get("live_enabled") or 0),
+        "live_limit": _sanitize_status_limit(row.get("live_limit")),
+        "live_window_hours": _sanitize_status_window(row.get("live_window_hours")),
+        "indicators_enabled": int(row.get("indicators_enabled") or 0),
+        "indicators_limit": _sanitize_status_limit(row.get("indicators_limit")),
+        "indicators_window_hours": _sanitize_status_window(row.get("indicators_window_hours")),
+        "badge_text": row.get("badge_text") or (row.get("name") or code.title()).upper(),
+        "marketing_text": row.get("marketing_text") or "",
+        "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
+        "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
+    }
+
+
+def _fallback_status_config(code: str = "trader") -> Dict[str, Any]:
+    defaults = {
+        "trader": {
+            "code": "trader",
+            "name": "Trader",
+            "description": "Базовый статус каждого пользователя.",
+            "is_enabled": 1,
+            "sort_order": 10,
+            "access_required": 0,
+            "min_deposit": 0,
+            "scanner_enabled": 1,
+            "scanner_limit": 1,
+            "scanner_window_hours": 24,
+            "live_enabled": 1,
+            "live_limit": 1,
+            "live_window_hours": 3,
+            "indicators_enabled": 1,
+            "indicators_limit": 1,
+            "indicators_window_hours": 3,
+            "badge_text": "TRADER",
+            "marketing_text": "🎯 1 Live или Indicator анализ\n🎁 1 пробный Scanner\nОткрой Premium для полного доступа",
+        },
+        "premium": {
+            "code": "premium",
+            "name": "Premium",
+            "description": "Live и индикаторы для активного сценария.",
+            "is_enabled": 1,
+            "sort_order": 20,
+            "access_required": 1,
+            "min_deposit": 10,
+            "scanner_enabled": 0,
+            "scanner_limit": 0,
+            "scanner_window_hours": 3,
+            "live_enabled": 1,
+            "live_limit": 3,
+            "live_window_hours": 3,
+            "indicators_enabled": 1,
+            "indicators_limit": 3,
+            "indicators_window_hours": 3,
+            "badge_text": "PREMIUM",
+            "marketing_text": "⚡ Live сигналы\n📊 Индикаторы\nЛимит: 3 сигнала / 3 часа",
+        },
+        "vip": {
+            "code": "vip",
+            "name": "VIP",
+            "description": "Scanner, Live и индикаторы с расширенным лимитом.",
+            "is_enabled": 1,
+            "sort_order": 30,
+            "access_required": 1,
+            "min_deposit": 50,
+            "scanner_enabled": 1,
+            "scanner_limit": 10,
+            "scanner_window_hours": 3,
+            "live_enabled": 1,
+            "live_limit": 10,
+            "live_window_hours": 3,
+            "indicators_enabled": 1,
+            "indicators_limit": 10,
+            "indicators_window_hours": 3,
+            "badge_text": "VIP",
+            "marketing_text": "🔥 Scanner\n⚡ Live + Индикаторы\nЛимит: 10 сигналов / 3 часа",
+        },
+        "unlimited": {
+            "code": "unlimited",
+            "name": "Unlimited",
+            "description": "Полный доступ без лимитов.",
+            "is_enabled": 1,
+            "sort_order": 40,
+            "access_required": 1,
+            "min_deposit": 250,
+            "scanner_enabled": 1,
+            "scanner_limit": -1,
+            "scanner_window_hours": 1,
+            "live_enabled": 1,
+            "live_limit": -1,
+            "live_window_hours": 1,
+            "indicators_enabled": 1,
+            "indicators_limit": -1,
+            "indicators_window_hours": 1,
+            "badge_text": "UNLIMITED",
+            "marketing_text": "🚀 Полный доступ\n♾ Без лимитов\n⚡ Максимальная скорость сигналов",
+        },
+    }
+    return _serialize_account_status(defaults.get(_normalize_status_code(code), defaults["trader"]))
+
+
+async def list_account_statuses(include_disabled: bool = False) -> List[Dict[str, Any]]:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            where_sql = "" if include_disabled else "WHERE is_enabled = 1"
+            await cur.execute(
+                f"""
+                SELECT *
+                FROM account_statuses
+                {where_sql}
+                ORDER BY sort_order ASC, id ASC
+                """
+            )
+            rows = await cur.fetchall()
+    statuses = [_serialize_account_status(row) for row in rows or []]
+    if statuses:
+        return statuses
+    if not include_disabled:
+        return []
+    return [
+        _fallback_status_config("trader"),
+        _fallback_status_config("premium"),
+        _fallback_status_config("vip"),
+        _fallback_status_config("unlimited"),
+    ]
+
+
+async def get_account_status_config(code: str) -> Dict[str, Any]:
+    normalized = _normalize_status_code(code)
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT * FROM account_statuses WHERE `code` = %s LIMIT 1", (normalized,))
+            row = await cur.fetchone()
+    return _serialize_account_status(row) if row else _fallback_status_config(normalized)
+
+
+async def count_user_mode_signals(user_id: int, source_type: str, window_hours: Optional[int] = None) -> int:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            if window_hours:
+                await cur.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM analysis_history
+                    WHERE user_id = %s
+                      AND source_type = %s
+                      AND UPPER(TRIM(COALESCE(`signal`, ''))) IN ('BUY', 'SELL')
+                      AND created_at >= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL %s HOUR)
+                    """,
+                    (int(user_id), source_type, int(window_hours)),
+                )
+            else:
+                await cur.execute(
+                    """
+                    SELECT COUNT(*) AS total
+                    FROM analysis_history
+                    WHERE user_id = %s
+                      AND source_type = %s
+                      AND UPPER(TRIM(COALESCE(`signal`, ''))) IN ('BUY', 'SELL')
+                    """,
+                    (int(user_id), source_type),
+                )
+            row = await cur.fetchone()
+    return int((row or {}).get("total") or 0)
+
+
+async def ensure_status_analysis_access(user_id: int, signal_mode: str) -> Dict[str, Any]:
+    mode_key, mode_label = STATUS_MODE_MAP.get(str(signal_mode or "").strip().lower(), ("scanner", "Scanner"))
+    profile = await fetch_user_profile(int(user_id))
+    status_config = profile.get("account_status") or await get_account_status_config(profile.get("account_tier") or "trader")
+    enabled = int(status_config.get(f"{mode_key}_enabled") or 0) == 1
+    limit = _sanitize_status_limit(status_config.get(f"{mode_key}_limit"))
+    window_hours = _sanitize_status_window(status_config.get(f"{mode_key}_window_hours"))
+
+    if not enabled or limit == 0:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Режим {mode_label} недоступен на статусе {status_config.get('name') or 'Trader'}. Повышение статуса откроет доступ.",
+        )
+    if limit < 0:
+        return {"status": status_config, "mode": mode_key, "remaining": -1}
+
+    if _normalize_status_code(status_config.get("code")) == "trader" and mode_key == "scanner":
+        used_total = await count_user_mode_signals(int(user_id), "scanner", None)
+        if used_total >= limit:
+            raise HTTPException(
+                status_code=403,
+                detail="Пробный Scanner уже использован. Откройте Premium или VIP для продолжения.",
+            )
+        return {"status": status_config, "mode": mode_key, "remaining": max(limit - used_total, 0)}
+
+    source_type = "auto" if mode_key == "live" else mode_key
+    used = await count_user_mode_signals(int(user_id), source_type, window_hours)
+    if used >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Лимит статуса {status_config.get('name')}: {limit} сигналов за {window_hours} ч. Новый слот откроется автоматически.",
+        )
+    return {"status": status_config, "mode": mode_key, "remaining": max(limit - used, 0)}
+
+
 def _build_inline_button(**kwargs: Any) -> InlineKeyboardButton:
     try:
         return InlineKeyboardButton(**kwargs)
@@ -1017,6 +1289,8 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
     feature_flags = await get_feature_flags_payload()
+    account_tier = _normalize_status_code(row.get("account_tier") or "trader")
+    account_status = await get_account_status_config(account_tier)
     return {
         "user_id": int(row["user_id"]),
         "tg_username": row.get("tg_username") or "",
@@ -1028,7 +1302,8 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "timezone": row.get("timezone") or "Europe/Kiev",
         "theme": _coerce_theme(row.get("theme") or "dark"),
         "preferred_signal_mode": _normalize_preferred_signal_mode(row.get("preferred_signal_mode") or "scanner"),
-        "account_tier": normalize_account_tier(row.get("account_tier") or "trader"),
+        "account_tier": account_tier,
+        "account_status": account_status,
         "trader_id": row.get("trader_id") or "",
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
         "deposit_amount": float(row.get("deposit_amount") or 0),
@@ -3531,6 +3806,56 @@ async def get_profile(user: Dict[str, Any] = Depends(get_telegram_user)):
     return await fetch_user_profile(int(user["user_id"]))
 
 
+@app.get("/api/statuses")
+async def get_public_statuses(user: Dict[str, Any] = Depends(get_telegram_user)):
+    await upsert_user_from_telegram(user)
+    profile = await fetch_user_profile(int(user["user_id"]))
+    statuses = await list_account_statuses(include_disabled=False)
+    current_status = profile.get("account_status") or {}
+    current_code = _normalize_status_code(profile.get("account_tier") or current_status.get("code") or "trader")
+    if current_status and current_code not in {_normalize_status_code(item.get("code")) for item in statuses}:
+        statuses = [current_status, *statuses]
+    current_order = int(current_status.get("sort_order") or 0)
+    return {
+        "status": "success",
+        "current_status": current_status,
+        "current_status_code": profile.get("account_tier") or "trader",
+        "items": statuses,
+        "available_items": [
+            {
+                **item,
+                "is_current": int(_normalize_status_code(item.get("code")) == _normalize_status_code(profile.get("account_tier"))),
+                "is_unlocked": int(int(item.get("sort_order") or 0) <= current_order),
+            }
+            for item in statuses
+        ],
+        "trader_id": profile.get("trader_id") or "",
+    }
+
+
+@app.post("/api/user/trader-id")
+async def update_user_trader_id(
+    payload: UserTraderIdUpdate,
+    user: Dict[str, Any] = Depends(get_telegram_user),
+):
+    await upsert_user_from_telegram(user)
+    user_id = int(user["user_id"])
+    trader_id = (payload.trader_id or "").strip() or None
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users
+                SET trader_id = %s,
+                    last_active_at = NOW()
+                WHERE user_id = %s
+                """,
+                (trader_id, user_id),
+            )
+    return {"status": "success", "user": await fetch_user_profile(user_id)}
+
+
 @app.post("/api/user/onboarding/seen")
 async def mark_onboarding_seen(user: Dict[str, Any] = Depends(get_telegram_user)):
     await upsert_user_from_telegram(user)
@@ -3747,6 +4072,7 @@ async def analyze_scanner_chart(
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
+    await ensure_status_analysis_access(user_id, "scanner")
     await _ensure_active_analysis_capacity(user_id)
     result = await run_scanner_analysis_for_upload(user_id=user_id, upload_id=payload.upload_id)
     response = {"status": "success", **result}
@@ -3773,6 +4099,7 @@ async def analyze_auto_chart(
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
+    await ensure_status_analysis_access(user_id, "automatic")
     await _ensure_active_analysis_capacity(user_id)
     content_type, _raw_data_url, image_bytes = _decode_scan_image_data_url(payload.image_data_url)
     upload_row: Optional[Dict[str, Any]] = None
@@ -3819,6 +4146,7 @@ async def analyze_indicator_signal(
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
+    await ensure_status_analysis_access(user_id, "indicators")
     await _ensure_active_analysis_capacity(user_id)
     result = await run_indicator_analysis(
         category=payload.category,
@@ -5348,7 +5676,7 @@ async def admin_users(
                 "mini_username": row.get("mini_username") or "",
                 "lang": normalize_user_lang(row.get("lang") or "ru"),
                 "theme": _coerce_theme(row.get("theme") or "dark"),
-                "account_tier": normalize_account_tier(row.get("account_tier") or "trader"),
+                "account_tier": _normalize_status_code(row.get("account_tier") or "trader"),
                 "trader_id": row.get("trader_id") or "",
                 "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
                 "deposit_amount": float(row.get("deposit_amount") or 0),
@@ -5361,12 +5689,104 @@ async def admin_users(
     return {"items": data}
 
 
+@app.get("/api/admin/statuses")
+async def admin_get_statuses(admin: Dict[str, Any] = Depends(get_admin_user)):
+    return {"items": await list_account_statuses(include_disabled=True)}
+
+
+@app.post("/api/admin/statuses")
+async def admin_upsert_status(
+    payload: AccountStatusUpsertRequest,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    code = _normalize_status_code(payload.code or payload.name)
+    if not code:
+        raise HTTPException(status_code=400, detail="Status code is required")
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO account_statuses (
+                    `code`, name, description, is_enabled, sort_order,
+                    access_required, min_deposit,
+                    scanner_enabled, scanner_limit, scanner_window_hours,
+                    live_enabled, live_limit, live_window_hours,
+                    indicators_enabled, indicators_limit, indicators_window_hours,
+                    badge_text, marketing_text
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    name = VALUES(name),
+                    description = VALUES(description),
+                    is_enabled = VALUES(is_enabled),
+                    sort_order = VALUES(sort_order),
+                    access_required = VALUES(access_required),
+                    min_deposit = VALUES(min_deposit),
+                    scanner_enabled = VALUES(scanner_enabled),
+                    scanner_limit = VALUES(scanner_limit),
+                    scanner_window_hours = VALUES(scanner_window_hours),
+                    live_enabled = VALUES(live_enabled),
+                    live_limit = VALUES(live_limit),
+                    live_window_hours = VALUES(live_window_hours),
+                    indicators_enabled = VALUES(indicators_enabled),
+                    indicators_limit = VALUES(indicators_limit),
+                    indicators_window_hours = VALUES(indicators_window_hours),
+                    badge_text = VALUES(badge_text),
+                    marketing_text = VALUES(marketing_text)
+                """,
+                (
+                    code,
+                    payload.name.strip(),
+                    (payload.description or "").strip(),
+                    int(payload.is_enabled),
+                    int(payload.sort_order),
+                    int(payload.access_required),
+                    float(payload.min_deposit or 0),
+                    int(payload.scanner_enabled),
+                    _sanitize_status_limit(payload.scanner_limit),
+                    _sanitize_status_window(payload.scanner_window_hours),
+                    int(payload.live_enabled),
+                    _sanitize_status_limit(payload.live_limit),
+                    _sanitize_status_window(payload.live_window_hours),
+                    int(payload.indicators_enabled),
+                    _sanitize_status_limit(payload.indicators_limit),
+                    _sanitize_status_window(payload.indicators_window_hours),
+                    (payload.badge_text or payload.name).strip()[:64],
+                    (payload.marketing_text or "").strip(),
+                ),
+            )
+    await add_admin_audit(int(admin["user_id"]), "admin_upsert_status", {"code": code})
+    return {"status": "success", "items": await list_account_statuses(include_disabled=True)}
+
+
+@app.delete("/api/admin/statuses/{code}")
+async def admin_delete_status(
+    code: str,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    normalized = _normalize_status_code(code)
+    if normalized == "trader":
+        raise HTTPException(status_code=400, detail="Trader status cannot be deleted")
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute("UPDATE account_statuses SET is_enabled = 0, updated_at = NOW() WHERE `code` = %s", (normalized,))
+    await add_admin_audit(int(admin["user_id"]), "admin_delete_status", {"code": normalized})
+    return {"status": "success", "items": await list_account_statuses(include_disabled=True)}
+
+
 @app.post("/api/admin/users/set-activation")
 async def admin_set_activation(
     payload: AdminSetActivationRequest,
     admin: Dict[str, Any] = Depends(get_admin_user),
 ):
     trader_id = (payload.trader_id or "").strip() or None
+    requested_account_tier = _normalize_status_code(payload.account_tier) if payload.account_tier else None
+    if requested_account_tier:
+        known_statuses = await list_account_statuses(include_disabled=True)
+        if requested_account_tier not in {_normalize_status_code(item.get("code")) for item in known_statuses}:
+            raise HTTPException(status_code=400, detail="Unknown account status")
     pool = await require_db_pool()
     async with pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
@@ -5379,7 +5799,7 @@ async def admin_set_activation(
                 raise HTTPException(status_code=404, detail="User not found")
 
             status = _coerce_activation(payload.activation_status or existing.get("activation_status") or "inactive")
-            account_tier = normalize_account_tier(payload.account_tier or existing.get("account_tier") or "trader")
+            account_tier = requested_account_tier or _normalize_status_code(existing.get("account_tier") or "trader")
             deposit_amount = float(existing.get("deposit_amount") if payload.deposit_amount is None else payload.deposit_amount or 0)
             scanner_access = scanner_access_from_deposit(deposit_amount, int(existing.get("scanner_access") or 0))
             if status == "active_scanner":

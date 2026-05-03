@@ -443,26 +443,33 @@ function formatTimezoneOffset(timeZone) {
   }
 }
 
-function getStatusMeta(tier, t) {
-  if (tier === "vip") {
+function getStatusMeta(tier, t, accountStatus = null) {
+  const statusName = accountStatus?.name;
+  if (tier === "unlimited") {
     return {
-      label: t.profile.tierVip || "VIP",
+      label: statusName || "Unlimited",
       tone: "vip"
     };
   }
-  if (tier === "pro") {
+  if (tier === "vip") {
     return {
-      label: t.profile.tierPro || "PRO",
+      label: statusName || t.profile.tierVip || "VIP",
+      tone: "vip"
+    };
+  }
+  if (tier === "pro" || tier === "premium") {
+    return {
+      label: statusName || t.profile.tierPro || "Premium",
       tone: "pro"
     };
   }
   return {
-    label: t.profile.tierTrader || "Trader",
+    label: statusName || t.profile.tierTrader || "Trader",
     tone: "trader"
   };
 }
 
-export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePreview, onLangPreview, onOpenOnboarding, onOpenHistory }) {
+export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePreview, onLangPreview, onOpenOnboarding, onOpenHistory, onOpenUpgrade }) {
   const [lang, setLang] = useState(user?.lang || "ru");
   const [theme, setTheme] = useState(user?.theme || "dark");
   const [timezone, setTimezone] = useState(user?.timezone || "Europe/Kiev");
@@ -536,8 +543,8 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   }, [t.profile.nameFallback, user]);
 
   const statusMeta = useMemo(
-    () => getStatusMeta(user?.account_tier || "trader", t),
-    [t, user?.account_tier]
+    () => getStatusMeta(user?.account_tier || "trader", t, user?.account_status),
+    [t, user?.account_status, user?.account_tier]
   );
 
   const summaryCards = useMemo(
@@ -567,11 +574,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
   );
 
   const handleUpgradeStatus = () => {
-    notify?.({
-      type: "info",
-      title: t.profile.upgradeStatus || "Повысить статус",
-      message: t.profile.upgradeStatusSoon || "Скоро здесь появится апгрейд статуса."
-    });
+    onOpenUpgrade?.();
   };
 
   const handleProfileAction = (key) => {

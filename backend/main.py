@@ -35,7 +35,7 @@ from db_bootstrap import (
     scanner_access_from_deposit,
 )
 from quotes_hub import DevsbiteQuotesHub, SUPPORTED_QUOTE_CATEGORIES, normalize_quote_category, normalize_quote_symbol
-from telegram_auth import get_telegram_user, verify_telegram_init_data
+from telegram_auth import TelegramAuthError, get_telegram_user, verify_telegram_init_data
 
 load_dotenv()
 
@@ -904,16 +904,33 @@ async def is_admin_user(user_id: int) -> bool:
 
 
 async def get_admin_user(
-    user: Dict[str, Any] = Depends(get_telegram_user),
     x_admin_token: str = Header(default="", alias="X-Admin-Token"),
+    x_tg_init_data: str = Header(default="", alias="X-TG-Init-Data"),
 ):
     expected = get_admin_panel_token()
     provided = (x_admin_token or "").strip()
     if not provided or not secrets.compare_digest(provided, expected):
         raise HTTPException(status_code=403, detail="Admin token is invalid")
-    if not await is_admin_user(int(user["user_id"])):
-        raise HTTPException(status_code=403, detail="Admin access denied")
-    return user
+
+    # The admin panel is opened by a secret URL token. Telegram init data can be
+    # absent or expired when the panel is opened outside the Mini App shell, so
+    # keep it as an extra identity check instead of making the token unusable.
+    if (x_tg_init_data or "").strip():
+        try:
+            user = verify_telegram_init_data(x_tg_init_data)
+            if not await is_admin_user(int(user["user_id"])):
+                raise HTTPException(status_code=403, detail="Admin access denied")
+            return user
+        except TelegramAuthError:
+            pass
+
+    return {
+        "user_id": 0,
+        "username": "admin-token",
+        "first_name": "Admin",
+        "last_name": "",
+        "language_code": "",
+    }
 
 
 def get_ws_quote_backend_url(websocket: Optional[WebSocket] = None) -> str:

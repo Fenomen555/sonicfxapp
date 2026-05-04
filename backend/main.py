@@ -1335,10 +1335,16 @@ def _build_inline_button(**kwargs: Any) -> InlineKeyboardButton:
 async def build_main_menu_keyboard(current_lang: str, user_id: Optional[int] = None) -> InlineKeyboardMarkup:
     lang = normalize_user_lang(current_lang)
     labels = WELCOME_TEXTS[lang]
+    lang_flags = {"ru": "🇷🇺", "en": "🇬🇧", "uk": "🇺🇦"}
     lang_btns = []
     for item in ("ru", "en", "uk"):
         mark = " " + ("*" if item == lang else "")
-        lang_btns.append(InlineKeyboardButton(text=f"{item.upper()}{mark}", callback_data=f"lang:{item}"))
+        lang_btns.append(
+            InlineKeyboardButton(
+                text=f"{lang_flags[item]} {item.upper()}{mark}",
+                callback_data=f"lang:{item}",
+            )
+        )
     inline_keyboard = [
         [
             _build_inline_button(

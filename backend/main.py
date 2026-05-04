@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import base64
 import hashlib
+import hmac
 import html
 import json
 import mimetypes
@@ -97,6 +98,8 @@ DEFAULT_SUPPORT_CONTACT_URL = (
     os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"
 ).strip()
 DEFAULT_REGISTRATION_URL = (os.getenv("REGISTRATION_URL") or "").strip()
+POCKET_API_BASE_URL = (os.getenv("POCKET_API_BASE_URL") or "https://affiliate.pocketoption.com/api/user-info").strip().rstrip("/")
+POCKET_SETTINGS_SECRET = (os.getenv("POCKET_SETTINGS_SECRET") or "").strip()
 DEFAULT_SCANNER_ANALYSIS_MODE = "adaptive"
 DEFAULT_SCANNER_OPENAI_MODEL = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip() or "gpt-4.1-mini"
 DEFAULT_SCANNER_OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
@@ -449,6 +452,8 @@ class AdminSupportSettingsUpdateRequest(BaseModel):
 
 class AdminRegistrationSettingsUpdateRequest(BaseModel):
     registration_url: str = Field(default="", max_length=500)
+    pocket_partner_id: str = Field(default="", max_length=128)
+    pocket_api_token: Optional[str] = Field(default=None, max_length=512)
 
 
 class AdminScannerSettingsUpdateRequest(BaseModel):
@@ -1466,6 +1471,22 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "trader_id": row.get("trader_id") or "",
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
         "deposit_amount": float(row.get("deposit_amount") or 0),
+        "pocket": {
+            "referral_status": row.get("pocket_referral_status") or "",
+            "balance": float(row.get("pocket_balance") or 0) if row.get("pocket_balance") is not None else None,
+            "sum_ftd": float(row.get("pocket_sum_ftd") or 0) if row.get("pocket_sum_ftd") is not None else None,
+            "date_ftd": row.get("pocket_date_ftd") or "",
+            "count_deposits": int(row.get("pocket_count_deposits") or 0),
+            "sum_deposits": float(row.get("pocket_sum_deposits") or 0) if row.get("pocket_sum_deposits") is not None else None,
+            "reg_date": row.get("pocket_reg_date") or "",
+            "activity_date": row.get("pocket_activity_date") or "",
+            "country": row.get("pocket_country") or "",
+            "is_verified": row.get("pocket_is_verified") or "",
+            "company": row.get("pocket_company") or "",
+            "registration_link": row.get("pocket_registration_link") or "",
+            "checked_at": row.get("pocket_checked_at").isoformat() if row.get("pocket_checked_at") else None,
+            "error": row.get("pocket_error") or "",
+        },
         "scanner_access": int(row.get("scanner_access") or 0),
         "onboarding_seen": int(row.get("onboarding_seen") or 0),
         "is_blocked": int(row.get("is_blocked") or 0),
@@ -1555,6 +1576,85 @@ def _mask_secret(value: str) -> str:
     if len(secret) <= 8:
         return "•" * len(secret)
     return f"{secret[:4]}{'•' * (len(secret) - 8)}{secret[-4:]}"
+
+
+def _pocket_secret_key() -> bytes:
+    seed = POCKET_SETTINGS_SECRET or BOT_TOKEN or get_admin_panel_token()
+    return hashlib.sha256(str(seed or "sonicfx-pocket").encode("utf-8")).digest()
+
+
+def _secret_stream(key: bytes, nonce: bytes, length: int) -> bytes:
+    chunks: List[bytes] = []
+    counter = 0
+    while sum(len(item) for item in chunks) < length:
+        chunks.append(hmac.new(key, nonce + counter.to_bytes(4, "big"), hashlib.sha256).digest())
+        counter += 1
+    return b"".join(chunks)[:length]
+
+
+def _encrypt_pocket_secret(value: str) -> str:
+    secret = str(value or "").strip()
+    if not secret:
+        return ""
+    if secret.startswith("enc:v1:"):
+        return secret
+    nonce = secrets.token_bytes(16)
+    payload = secret.encode("utf-8")
+    stream = _secret_stream(_pocket_secret_key(), nonce, len(payload))
+    cipher = bytes(left ^ right for left, right in zip(payload, stream))
+    encoded = base64.urlsafe_b64encode(nonce + cipher).decode("ascii").rstrip("=")
+    return f"enc:v1:{encoded}"
+
+
+def _decrypt_pocket_secret(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if not raw.startswith("enc:v1:"):
+        return raw
+    payload = raw.split("enc:v1:", 1)[1]
+    try:
+        decoded = base64.urlsafe_b64decode(payload + "=" * ((4 - len(payload) % 4) % 4))
+        nonce, cipher = decoded[:16], decoded[16:]
+        stream = _secret_stream(_pocket_secret_key(), nonce, len(cipher))
+        return bytes(left ^ right for left, right in zip(cipher, stream)).decode("utf-8")
+    except Exception:
+        return ""
+
+
+def _parse_optional_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    raw = str(value).strip().replace(",", ".")
+    if raw == "":
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _normalize_trader_id(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _pocket_user_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
+    data = raw or {}
+    return {
+        "balance": _parse_optional_float(data.get("balance")),
+        "sum_ftd": _parse_optional_float(data.get("sum_ftd")),
+        "date_ftd": data.get("date_ftd"),
+        "count_deposits": int(_parse_optional_float(data.get("count_deposits")) or 0),
+        "sum_deposits": _parse_optional_float(data.get("sum_deposits")),
+        "reg_date": data.get("reg_date"),
+        "activity_date": data.get("activity_date"),
+        "country": data.get("country"),
+        "is_verified": data.get("is_verified"),
+        "company": data.get("company"),
+        "registration_link": data.get("link"),
+    }
 
 
 def _trim_comment_words(value: Any, limit: int = 34) -> str:
@@ -3302,10 +3402,227 @@ async def get_support_settings_payload() -> Dict[str, str]:
     }
 
 
-async def get_registration_settings_payload() -> Dict[str, str]:
+async def get_registration_settings_payload(include_secret: bool = False) -> Dict[str, Any]:
     registration_url = await get_app_setting("registration_url", DEFAULT_REGISTRATION_URL)
-    return {
+    pocket_partner_id = await get_app_setting("pocket_partner_id", os.getenv("POCKET_PARTNER_ID") or "")
+    encrypted_token = await get_app_setting("pocket_api_token_encrypted", "")
+    pocket_token = _decrypt_pocket_secret(encrypted_token)
+    configured = bool(str(pocket_partner_id or "").strip() and str(pocket_token or "").strip())
+    payload: Dict[str, Any] = {
         "registration_url": _normalize_external_url(registration_url, DEFAULT_REGISTRATION_URL),
+        "pocket_partner_id": str(pocket_partner_id or "").strip(),
+        "pocket_api_token_configured": configured,
+        "pocket_api_token_preview": _mask_secret(pocket_token),
+        "pocket_api_base_url": POCKET_API_BASE_URL,
+    }
+    if include_secret:
+        payload["pocket_api_token"] = pocket_token
+    return {
+        **payload,
+    }
+
+
+async def fetch_pocket_referral(trader_id: str) -> Dict[str, Any]:
+    normalized_trader_id = _normalize_trader_id(trader_id)
+    settings = await get_registration_settings_payload(include_secret=True)
+    partner_id = str(settings.get("pocket_partner_id") or "").strip()
+    api_token = str(settings.get("pocket_api_token") or "").strip()
+    if not partner_id or not api_token:
+        return {"ok": False, "code": "not_configured", "raw": None, "payload": None}
+
+    signature_source = f"{normalized_trader_id}:{partner_id}:{api_token}"
+    signature = hashlib.md5(signature_source.encode("utf-8")).hexdigest()
+    url = f"{POCKET_API_BASE_URL}/{normalized_trader_id}/{partner_id}/{signature}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(url)
+    except Exception:
+        return {"ok": False, "code": "pocket_error", "raw": None, "payload": None}
+
+    if response.status_code == 404:
+        return {"ok": False, "code": "user_not_found", "raw": None, "payload": None}
+    if response.status_code != 200:
+        return {"ok": False, "code": "pocket_error", "raw": None, "payload": None}
+
+    try:
+        raw = response.json()
+    except Exception:
+        return {"ok": False, "code": "pocket_error", "raw": None, "payload": None}
+
+    return {"ok": True, "code": "ok", "raw": raw, "payload": _pocket_user_payload(raw)}
+
+
+async def find_trader_id_owner(trader_id: str, exclude_user_id: Optional[int] = None) -> Optional[int]:
+    normalized = _normalize_trader_id(trader_id)
+    if not normalized:
+        return None
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            if exclude_user_id is None:
+                await cur.execute("SELECT user_id FROM users WHERE trader_id = %s LIMIT 1", (normalized,))
+            else:
+                await cur.execute(
+                    "SELECT user_id FROM users WHERE trader_id = %s AND user_id <> %s LIMIT 1",
+                    (normalized, int(exclude_user_id)),
+                )
+            row = await cur.fetchone()
+    return int(row["user_id"]) if row else None
+
+
+async def save_user_pocket_snapshot(user_id: int, trader_id: str, pocket_result: Dict[str, Any]) -> None:
+    payload = pocket_result.get("payload") or {}
+    raw = pocket_result.get("raw") or {}
+    deposits_sum = _parse_optional_float(payload.get("sum_deposits"))
+    if deposits_sum is None:
+        deposits_sum = _parse_optional_float(payload.get("sum_ftd")) or 0.0
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users
+                SET trader_id = %s,
+                    deposit_amount = %s,
+                    pocket_referral_status = %s,
+                    pocket_balance = %s,
+                    pocket_sum_ftd = %s,
+                    pocket_date_ftd = %s,
+                    pocket_count_deposits = %s,
+                    pocket_sum_deposits = %s,
+                    pocket_reg_date = %s,
+                    pocket_activity_date = %s,
+                    pocket_country = %s,
+                    pocket_is_verified = %s,
+                    pocket_company = %s,
+                    pocket_registration_link = %s,
+                    pocket_raw_json = %s,
+                    pocket_checked_at = NOW(),
+                    pocket_error = NULL,
+                    last_active_at = NOW()
+                WHERE user_id = %s
+                """,
+                (
+                    _normalize_trader_id(trader_id),
+                    float(deposits_sum or 0),
+                    "ok",
+                    payload.get("balance"),
+                    payload.get("sum_ftd"),
+                    str(payload.get("date_ftd") or "") or None,
+                    int(payload.get("count_deposits") or 0),
+                    payload.get("sum_deposits"),
+                    str(payload.get("reg_date") or "") or None,
+                    str(payload.get("activity_date") or "") or None,
+                    str(payload.get("country") or "") or None,
+                    str(payload.get("is_verified") if payload.get("is_verified") is not None else "") or None,
+                    str(payload.get("company") or "") or None,
+                    str(payload.get("registration_link") or "") or None,
+                    json.dumps(raw, ensure_ascii=False),
+                    int(user_id),
+                ),
+            )
+
+
+async def mark_user_pocket_error(user_id: int, code: str) -> None:
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                UPDATE users
+                SET pocket_checked_at = NOW(),
+                    pocket_error = %s,
+                    last_active_at = NOW()
+                WHERE user_id = %s
+                """,
+                (str(code or "pocket_error")[:64], int(user_id)),
+            )
+
+
+async def resolve_status_for_deposit(deposit_amount: float) -> Dict[str, Any]:
+    statuses = await list_account_statuses(include_disabled=False)
+    if not statuses:
+        return _fallback_status_config("trader")
+    best = statuses[0]
+    deposit = float(deposit_amount or 0)
+    for item in statuses:
+        if int(item.get("access_required") or 0) == 1 and deposit < float(item.get("min_deposit") or 0):
+            continue
+        if int(item.get("sort_order") or 0) >= int(best.get("sort_order") or 0):
+            best = item
+    return best
+
+
+async def apply_deposit_status_upgrade(user_id: int, deposit_amount: float) -> Dict[str, Any]:
+    profile = await fetch_user_profile(int(user_id))
+    current_status = profile.get("account_status") or await get_account_status_config(profile.get("account_tier") or "trader")
+    target_status = await resolve_status_for_deposit(float(deposit_amount or 0))
+    current_order = int(current_status.get("sort_order") or 0)
+    target_order = int(target_status.get("sort_order") or 0)
+    upgraded = target_order > current_order
+    if upgraded:
+        scanner_access = 1 if int(target_status.get("scanner_enabled") or 0) == 1 else int(profile.get("scanner_access") or 0)
+        pool = await require_db_pool()
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    UPDATE users
+                    SET account_tier = %s,
+                        activation_status = 'active',
+                        scanner_access = %s,
+                        updated_at = NOW()
+                    WHERE user_id = %s
+                    """,
+                    (_normalize_status_code(target_status.get("code") or "trader"), int(scanner_access), int(user_id)),
+                )
+    return {
+        "upgraded": upgraded,
+        "current_status": current_status,
+        "target_status": target_status,
+        "deposit_amount": float(deposit_amount or 0),
+    }
+
+
+async def verify_and_upgrade_user_by_pocket(user_id: int, trader_id: str) -> Dict[str, Any]:
+    normalized_trader_id = _normalize_trader_id(trader_id)
+    if not re.match(r"^[A-Za-z0-9._-]{3,64}$", normalized_trader_id):
+        return {"ok": False, "code": "bad_trader_id", "user": await fetch_user_profile(user_id)}
+
+    owner_id = await find_trader_id_owner(normalized_trader_id, exclude_user_id=user_id)
+    if owner_id:
+        return {"ok": False, "code": "trader_id_taken", "owner_user_id": owner_id, "user": await fetch_user_profile(user_id)}
+
+    pocket_result = await fetch_pocket_referral(normalized_trader_id)
+    if not pocket_result.get("ok"):
+        code = str(pocket_result.get("code") or "pocket_error")
+        await mark_user_pocket_error(user_id, code)
+        return {"ok": False, "code": code, "user": await fetch_user_profile(user_id)}
+
+    await save_user_pocket_snapshot(user_id, normalized_trader_id, pocket_result)
+    payload = pocket_result.get("payload") or {}
+    deposit = _parse_optional_float(payload.get("sum_deposits"))
+    if deposit is None:
+        deposit = _parse_optional_float(payload.get("sum_ftd")) or 0.0
+    upgrade = await apply_deposit_status_upgrade(user_id, float(deposit or 0))
+    profile = await fetch_user_profile(user_id)
+    next_status = profile.get("next_account_status")
+    if upgrade.get("upgraded"):
+        code = "upgraded"
+    elif next_status and float(deposit or 0) < float(next_status.get("min_deposit") or 0):
+        code = "deposit_too_low"
+    elif not next_status:
+        code = "already_max"
+    else:
+        code = "no_change"
+    return {
+        "ok": True,
+        "code": code,
+        "deposit_amount": float(deposit or 0),
+        "target_status": upgrade.get("target_status"),
+        "next_status": next_status,
+        "pocket": payload,
+        "user": profile,
     }
 
 
@@ -4024,20 +4341,20 @@ async def update_user_trader_id(
 ):
     await upsert_user_from_telegram(user)
     user_id = int(user["user_id"])
-    trader_id = (payload.trader_id or "").strip() or None
-    pool = await require_db_pool()
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute(
-                """
-                UPDATE users
-                SET trader_id = %s,
-                    last_active_at = NOW()
-                WHERE user_id = %s
-                """,
-                (trader_id, user_id),
-            )
-    return {"status": "success", "user": await fetch_user_profile(user_id)}
+    profile = await fetch_user_profile(user_id)
+    trader_id = _normalize_trader_id(profile.get("trader_id") or payload.trader_id)
+    if not trader_id:
+        return {
+            "status": "success",
+            "verification": {"ok": False, "code": "trader_id_required"},
+            "user": profile,
+        }
+    verification = await verify_and_upgrade_user_by_pocket(user_id, trader_id)
+    return {
+        "status": "success",
+        "verification": {key: value for key, value in verification.items() if key != "user"},
+        "user": verification.get("user") or await fetch_user_profile(user_id),
+    }
 
 
 @app.post("/api/user/onboarding/seen")
@@ -5842,6 +6159,10 @@ async def admin_users(
                 SELECT
                     user_id, tg_username, first_name, mini_username, lang, theme,
                     activation_status, account_tier, trader_id, deposit_amount, scanner_access, is_blocked,
+                    pocket_referral_status, pocket_balance, pocket_sum_ftd, pocket_date_ftd,
+                    pocket_count_deposits, pocket_sum_deposits, pocket_reg_date, pocket_activity_date,
+                    pocket_country, pocket_is_verified, pocket_company, pocket_registration_link,
+                    pocket_checked_at, pocket_error,
                     created_at, last_active_at
                 FROM users
                 ORDER BY created_at DESC
@@ -5864,6 +6185,22 @@ async def admin_users(
                 "trader_id": row.get("trader_id") or "",
                 "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),
                 "deposit_amount": float(row.get("deposit_amount") or 0),
+                "pocket": {
+                    "referral_status": row.get("pocket_referral_status") or "",
+                    "balance": float(row.get("pocket_balance") or 0) if row.get("pocket_balance") is not None else None,
+                    "sum_ftd": float(row.get("pocket_sum_ftd") or 0) if row.get("pocket_sum_ftd") is not None else None,
+                    "date_ftd": row.get("pocket_date_ftd") or "",
+                    "count_deposits": int(row.get("pocket_count_deposits") or 0),
+                    "sum_deposits": float(row.get("pocket_sum_deposits") or 0) if row.get("pocket_sum_deposits") is not None else None,
+                    "reg_date": row.get("pocket_reg_date") or "",
+                    "activity_date": row.get("pocket_activity_date") or "",
+                    "country": row.get("pocket_country") or "",
+                    "is_verified": row.get("pocket_is_verified") or "",
+                    "company": row.get("pocket_company") or "",
+                    "registration_link": row.get("pocket_registration_link") or "",
+                    "checked_at": row.get("pocket_checked_at").isoformat() if row.get("pocket_checked_at") else None,
+                    "error": row.get("pocket_error") or "",
+                },
                 "scanner_access": int(row.get("scanner_access") or 0),
                 "is_blocked": int(row.get("is_blocked") or 0),
                 "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
@@ -6004,6 +6341,36 @@ async def admin_set_activation(
             )
     await add_admin_audit(int(admin["user_id"]), "admin_set_activation", payload.model_dump())
     return {"status": "success"}
+
+
+@app.post("/api/admin/users/{user_id}/refresh-pocket")
+async def admin_refresh_user_pocket(
+    user_id: int,
+    admin: Dict[str, Any] = Depends(get_admin_user),
+):
+    target_user_id = int(user_id)
+    pool = await require_db_pool()
+    async with pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("SELECT trader_id FROM users WHERE user_id = %s LIMIT 1", (target_user_id,))
+            row = await cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+    trader_id = _normalize_trader_id(row.get("trader_id"))
+    if not trader_id:
+        raise HTTPException(status_code=400, detail="Trader ID is not linked")
+
+    verification = await verify_and_upgrade_user_by_pocket(target_user_id, trader_id)
+    await add_admin_audit(
+        int(admin["user_id"]),
+        "admin_refresh_user_pocket",
+        {"user_id": target_user_id, "code": verification.get("code")},
+    )
+    return {
+        "status": "success",
+        "verification": {key: value for key, value in verification.items() if key != "user"},
+        "user": verification.get("user") or await fetch_user_profile(target_user_id),
+    }
 
 
 @app.delete("/api/admin/users/{user_id}")
@@ -6147,13 +6514,22 @@ async def admin_update_registration_settings(
     admin: Dict[str, Any] = Depends(get_admin_user),
 ):
     registration_url = _normalize_external_url(payload.registration_url, DEFAULT_REGISTRATION_URL)
+    pocket_partner_id = str(payload.pocket_partner_id or "").strip()
+    pocket_token = str(payload.pocket_api_token or "").strip()
     await set_app_setting("registration_url", registration_url)
+    await set_app_setting("pocket_partner_id", pocket_partner_id)
+    if pocket_token:
+        await set_app_setting("pocket_api_token_encrypted", _encrypt_pocket_secret(pocket_token))
     await add_admin_audit(
         int(admin["user_id"]),
         "admin_update_registration_settings",
-        {"registration_url": registration_url},
+        {
+            "registration_url": registration_url,
+            "pocket_partner_id": pocket_partner_id,
+            "pocket_api_token_updated": bool(pocket_token),
+        },
     )
-    return {"registration_url": registration_url}
+    return await get_registration_settings_payload()
 
 
 @app.get("/api/admin/market-settings")

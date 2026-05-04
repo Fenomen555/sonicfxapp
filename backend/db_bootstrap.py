@@ -308,6 +308,8 @@ async def _seed_app_settings(conn) -> None:
         ("support_channel_url", os.getenv("SUPPORT_CHANNEL_URL") or os.getenv("CHANNEL_URL") or "https://t.me/+TthmjdpAkv5hNjdi"),
         ("support_contact_url", os.getenv("SUPPORT_CONTACT_URL") or os.getenv("SUPPORT_URL") or "https://t.me/WaySonic"),
         ("registration_url", os.getenv("REGISTRATION_URL") or ""),
+        ("pocket_partner_id", os.getenv("POCKET_PARTNER_ID") or ""),
+        ("pocket_api_token_encrypted", ""),
     )
     async with conn.cursor() as cur:
         for key, value in defaults:
@@ -349,6 +351,21 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                     trader_id VARCHAR(128) NULL,
                     activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive',
                     deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+                    pocket_referral_status VARCHAR(32) NULL,
+                    pocket_balance DECIMAL(14,4) NULL,
+                    pocket_sum_ftd DECIMAL(14,4) NULL,
+                    pocket_date_ftd VARCHAR(64) NULL,
+                    pocket_count_deposits INT NULL,
+                    pocket_sum_deposits DECIMAL(14,4) NULL,
+                    pocket_reg_date VARCHAR(64) NULL,
+                    pocket_activity_date VARCHAR(64) NULL,
+                    pocket_country VARCHAR(64) NULL,
+                    pocket_is_verified VARCHAR(64) NULL,
+                    pocket_company VARCHAR(128) NULL,
+                    pocket_registration_link TEXT NULL,
+                    pocket_raw_json LONGTEXT NULL,
+                    pocket_checked_at TIMESTAMP NULL DEFAULT NULL,
+                    pocket_error VARCHAR(64) NULL,
                     scanner_access TINYINT(1) NOT NULL DEFAULT 0,
                     onboarding_seen TINYINT(1) NOT NULL DEFAULT 0,
                     is_blocked TINYINT(1) NOT NULL DEFAULT 0,
@@ -507,11 +524,15 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
                 """
                 CREATE TABLE IF NOT EXISTS app_settings (
                     `key` VARCHAR(128) NOT NULL PRIMARY KEY,
-                    value_text VARCHAR(255) NOT NULL,
+                    value_text TEXT NOT NULL,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
                 """
             )
+            try:
+                await cur.execute("ALTER TABLE app_settings MODIFY COLUMN value_text TEXT NOT NULL")
+            except Exception:
+                pass
 
             await cur.execute(
                 """
@@ -607,6 +628,21 @@ async def ensure_database_schema(db_pool: aiomysql.Pool) -> None:
         await _ensure_column(conn, db_name, "users", "trader_id", "ALTER TABLE users ADD COLUMN trader_id VARCHAR(128) NULL")
         await _ensure_column(conn, db_name, "users", "activation_status", "ALTER TABLE users ADD COLUMN activation_status VARCHAR(32) NOT NULL DEFAULT 'inactive'")
         await _ensure_column(conn, db_name, "users", "deposit_amount", "ALTER TABLE users ADD COLUMN deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0")
+        await _ensure_column(conn, db_name, "users", "pocket_referral_status", "ALTER TABLE users ADD COLUMN pocket_referral_status VARCHAR(32) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_balance", "ALTER TABLE users ADD COLUMN pocket_balance DECIMAL(14,4) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_sum_ftd", "ALTER TABLE users ADD COLUMN pocket_sum_ftd DECIMAL(14,4) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_date_ftd", "ALTER TABLE users ADD COLUMN pocket_date_ftd VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_count_deposits", "ALTER TABLE users ADD COLUMN pocket_count_deposits INT NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_sum_deposits", "ALTER TABLE users ADD COLUMN pocket_sum_deposits DECIMAL(14,4) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_reg_date", "ALTER TABLE users ADD COLUMN pocket_reg_date VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_activity_date", "ALTER TABLE users ADD COLUMN pocket_activity_date VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_country", "ALTER TABLE users ADD COLUMN pocket_country VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_is_verified", "ALTER TABLE users ADD COLUMN pocket_is_verified VARCHAR(64) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_company", "ALTER TABLE users ADD COLUMN pocket_company VARCHAR(128) NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_registration_link", "ALTER TABLE users ADD COLUMN pocket_registration_link TEXT NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_raw_json", "ALTER TABLE users ADD COLUMN pocket_raw_json LONGTEXT NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_checked_at", "ALTER TABLE users ADD COLUMN pocket_checked_at TIMESTAMP NULL DEFAULT NULL")
+        await _ensure_column(conn, db_name, "users", "pocket_error", "ALTER TABLE users ADD COLUMN pocket_error VARCHAR(64) NULL")
         await _ensure_column(conn, db_name, "users", "scanner_access", "ALTER TABLE users ADD COLUMN scanner_access TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "onboarding_seen", "ALTER TABLE users ADD COLUMN onboarding_seen TINYINT(1) NOT NULL DEFAULT 0")
         await _ensure_column(conn, db_name, "users", "is_blocked", "ALTER TABLE users ADD COLUMN is_blocked TINYINT(1) NOT NULL DEFAULT 0")

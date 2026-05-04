@@ -51,9 +51,11 @@ export default function StatusUpgradePage({ user, t = {}, onClose, onUserUpdate,
   const [activeIndex, setActiveIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState(null);
   const [traderId, setTraderId] = useState(user?.trader_id || "");
+  const [linkedTraderId, setLinkedTraderId] = useState(user?.trader_id || "");
   const [registrationUrl, setRegistrationUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [verification, setVerification] = useState(null);
   const copy = t.statusUpgrade || {};
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export default function StatusUpgradePage({ user, t = {}, onClose, onUserUpdate,
         setItems(Array.isArray(data?.available_items) ? data.available_items : data?.items || []);
         setCurrentStatus(data?.current_status || null);
         setTraderId(data?.trader_id || user?.trader_id || "");
+        setLinkedTraderId(data?.trader_id || user?.trader_id || "");
         setRegistrationUrl(data?.registration_url || "");
       })
       .catch((error) => {
@@ -98,7 +101,8 @@ export default function StatusUpgradePage({ user, t = {}, onClose, onUserUpdate,
   const activeCode = normalizeCode(activeItem?.code);
   const isCurrent = activeCode === normalizeCode(user?.account_tier);
   const isUnlocked = Number(activeItem?.sort_order || 0) <= currentOrder;
-  const hasStoredTraderId = Boolean(String(user?.trader_id || "").trim());
+  const storedTraderId = String(linkedTraderId || user?.trader_id || "").trim();
+  const hasStoredTraderId = Boolean(storedTraderId);
 
   const goPrev = () => setActiveIndex((prev) => Math.max(prev - 1, 0));
   const goNext = () => setActiveIndex((prev) => Math.min(prev + 1, Math.max(visibleItems.length - 1, 0)));
@@ -120,25 +124,87 @@ export default function StatusUpgradePage({ user, t = {}, onClose, onUserUpdate,
     }
   };
 
+  const buildVerificationMessage = (result, nextUser) => {
+    const code = result?.code || "";
+    const nextStatus = result?.next_status || nextUser?.next_account_status || null;
+    const deposit = Number(result?.deposit_amount ?? nextUser?.deposit_amount ?? 0);
+    const required = Number(nextStatus?.min_deposit || 0);
+    if (code === "upgraded") {
+      return {
+        type: "success",
+        title: copy.verifyUpgradedTitle || "Status upgraded",
+        message: copy.verifyUpgradedMessage || "Pocket confirmed your deposit. New access is active."
+      };
+    }
+    if (code === "deposit_too_low") {
+      const missing = Math.max(required - deposit, 0);
+      return {
+        type: "warning",
+        title: copy.verifyDepositLowTitle || "Deposit is not enough yet",
+        message: (copy.verifyDepositLowMessage || "Current deposit: {deposit}. Need {required}. Missing {missing}.")
+          .replace("{deposit}", `$${deposit.toFixed(2)}`)
+          .replace("{required}", `$${required.toFixed(2)}`)
+          .replace("{missing}", `$${missing.toFixed(2)}`)
+      };
+    }
+    if (code === "user_not_found") {
+      return {
+        type: "error",
+        title: copy.verifyNotFoundTitle || "Referral not found",
+        message: copy.verifyNotFoundMessage || "You are not fixed in our team yet. Start with registration."
+      };
+    }
+    if (code === "trader_id_taken") {
+      return { type: "error", title: copy.verifyTaken || "Trader ID is already linked", message: copy.verifyTakenMessage || "This Trader ID is already attached to another profile." };
+    }
+    if (code === "bad_trader_id" || code === "trader_id_required") {
+      return { type: "error", title: copy.verifyBadId || "Check Trader ID", message: copy.verifyBadIdMessage || "Use 3-64 letters, digits, dots, dashes or underscores." };
+    }
+    if (code === "not_configured") {
+      return { type: "error", title: copy.verifyNotConfigured || "Pocket is not configured", message: copy.verifyNotConfiguredMessage || "Admin needs to add Cabinet ID and API token." };
+    }
+    if (code === "pocket_error") {
+      return { type: "error", title: copy.verifyPocketError || "Pocket request failed", message: copy.verifyPocketErrorMessage || "Please try again a little later." };
+    }
+    if (code === "already_max") {
+      return { type: "success", title: copy.verifyAlreadyMaxTitle || "Maximum status", message: copy.verifyAlreadyMaxMessage || "You already have the highest available access." };
+    }
+    return { type: "info", title: copy.verifyNoChangeTitle || "Status checked", message: copy.verifyNoChangeMessage || "Pocket data was refreshed, status remains unchanged." };
+  };
+
   const saveTraderId = async () => {
+    const valueToSend = hasStoredTraderId ? "" : traderId.trim();
+    if (!hasStoredTraderId && !valueToSend) {
+      const notice = {
+        type: "error",
+        title: copy.verifyBadId || "Check Trader ID",
+        message: copy.verifyRequired || "Enter Trader ID or register first."
+      };
+      setVerification(notice);
+      notify?.(notice);
+      return;
+    }
     setSaving(true);
     try {
       const data = await apiFetchJson("/api/user/trader-id", {
         method: "POST",
-        body: JSON.stringify({ trader_id: traderId.trim() })
+        body: JSON.stringify({ trader_id: valueToSend })
       });
-      onUserUpdate?.(data?.user || {});
-      notify?.({
-        type: "success",
-        title: copy.traderSavedTitle || "Trader ID saved",
-        message: copy.traderSavedMessage || "The admin will be able to assign the right status faster."
-      });
+      const nextUser = data?.user || {};
+      setTraderId(nextUser.trader_id || traderId);
+      setLinkedTraderId(nextUser.trader_id || linkedTraderId);
+      onUserUpdate?.(nextUser);
+      const notice = buildVerificationMessage(data?.verification || {}, nextUser);
+      setVerification({ ...notice, code: data?.verification?.code || "" });
+      notify?.(notice);
     } catch (error) {
-      notify?.({
+      const notice = {
         type: "error",
         title: copy.traderErrorTitle || "Unable to save Trader ID",
         message: error.message || copy.traderErrorMessage || "Check the value and try again."
-      });
+      };
+      setVerification(notice);
+      notify?.(notice);
     } finally {
       setSaving(false);
     }
@@ -209,18 +275,35 @@ export default function StatusUpgradePage({ user, t = {}, onClose, onUserUpdate,
       )}
 
       <div className="status-upgrade-form status-page-form">
-        <label>
-          <span>{copy.traderLabel || "Trader ID for access"}</span>
-          <input
-            type="text"
-            maxLength="128"
-            value={traderId}
-            onChange={(event) => setTraderId(event.target.value)}
-            placeholder={copy.traderPlaceholder || "Enter Trader ID"}
-          />
-        </label>
+        {hasStoredTraderId ? (
+          <div className="status-trader-linked">
+            <span>{copy.linkedTraderLabel || "Linked Trader ID"}</span>
+            <strong>{storedTraderId}</strong>
+            <small>{copy.linkedTraderHint || "We will refresh Pocket data and upgrade the status if deposit requirements are met."}</small>
+          </div>
+        ) : (
+          <label>
+            <span>{copy.traderLabel || "Trader ID for access"}</span>
+            <input
+              type="text"
+              maxLength="128"
+              value={traderId}
+              onChange={(event) => {
+                setTraderId(event.target.value);
+                setVerification(null);
+              }}
+              placeholder={copy.traderPlaceholder || "Enter Trader ID"}
+            />
+          </label>
+        )}
+        {verification ? (
+          <div className={`status-verification-message tone-${verification.type || "info"}`}>
+            <strong>{verification.title}</strong>
+            <span>{verification.message}</span>
+          </div>
+        ) : null}
         <button type="button" onClick={saveTraderId} disabled={saving}>
-          {saving ? (copy.saving || "Saving...") : traderId.trim() ? (copy.upgrade || "Upgrade") : (copy.saveTrader || "Save Trader ID")}
+          {saving ? (copy.checking || copy.saving || "Checking...") : hasStoredTraderId ? (copy.checkAndUpgrade || copy.upgrade || "Check and upgrade") : (copy.saveTrader || "Save Trader ID")}
         </button>
         {!hasStoredTraderId && registrationUrl ? (
           <a className="status-register-link" href={registrationUrl} target="_blank" rel="noreferrer">

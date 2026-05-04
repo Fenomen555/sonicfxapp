@@ -145,7 +145,12 @@ const EMPTY_SUPPORT_SETTINGS = {
 };
 
 const EMPTY_REGISTRATION_SETTINGS = {
-  registration_url: ""
+  registration_url: "",
+  pocket_partner_id: "",
+  pocket_api_token: "",
+  pocket_api_token_configured: false,
+  pocket_api_token_preview: "",
+  pocket_api_base_url: "https://affiliate.pocketoption.com/api/user-info"
 };
 
 const EMPTY_SCANNER_SETTINGS = {
@@ -367,6 +372,7 @@ export default function AdminApp({ authError }) {
   const [userEditor, setUserEditor] = useState({ account_tier: "trader", trader_id: "" });
   const [userSaving, setUserSaving] = useState(false);
   const [userDeleting, setUserDeleting] = useState(false);
+  const [userPocketRefreshing, setUserPocketRefreshing] = useState(false);
   const [flagSavingKey, setFlagSavingKey] = useState("");
 
   const pushToast = (type, title, message) => {
@@ -493,7 +499,7 @@ export default function AdminApp({ authError }) {
         ]);
         setFlags(flagsData?.items || []);
         const nextScanner = { ...EMPTY_SCANNER_SETTINGS, ...(scannerData || {}) };
-        const nextRegistration = { ...EMPTY_REGISTRATION_SETTINGS, ...(registrationData || {}) };
+        const nextRegistration = { ...EMPTY_REGISTRATION_SETTINGS, ...(registrationData || {}), pocket_api_token: "" };
         setScannerSettings(nextScanner);
         setRegistrationSettings(nextRegistration);
         setRegistrationEditor(nextRegistration);
@@ -954,18 +960,20 @@ export default function AdminApp({ authError }) {
     setRegistrationSaving(true);
     try {
       const payload = {
-        registration_url: registrationEditor.registration_url.trim()
+        registration_url: registrationEditor.registration_url.trim(),
+        pocket_partner_id: registrationEditor.pocket_partner_id.trim(),
+        pocket_api_token: registrationEditor.pocket_api_token.trim()
       };
       const data = await apiAdminFetchJson("/api/admin/registration-settings", {
         method: "POST",
         body: JSON.stringify(payload)
       });
-      const next = { ...EMPTY_REGISTRATION_SETTINGS, ...(data || payload) };
+      const next = { ...EMPTY_REGISTRATION_SETTINGS, ...(data || payload), pocket_api_token: "" };
       setRegistrationSettings(next);
       setRegistrationEditor(next);
-      pushToast("success", "Регистрация обновлена", "Кнопка регистрации на странице статусов получила актуальную ссылку.");
+      pushToast("success", "Регистрация и Pocket обновлены", "Проверка Trader ID будет использовать актуальные параметры кабинета.");
     } catch (error) {
-      pushToast("error", "Не удалось сохранить регистрацию", error.message || "Проверьте ссылку и повторите попытку.");
+      pushToast("error", "Не удалось сохранить регистрацию", error.message || "Проверьте ссылку, ID кабинета и токен.");
     } finally {
       setRegistrationSaving(false);
     }
@@ -1039,6 +1047,36 @@ export default function AdminApp({ authError }) {
       pushToast("error", "Не удалось удалить пользователя", error.message || "Попробуйте повторить действие позже.");
     } finally {
       setUserDeleting(false);
+    }
+  };
+
+  const refreshSelectedUserPocket = async () => {
+    if (!selectedUser) return;
+    setUserPocketRefreshing(true);
+    try {
+      const data = await apiAdminFetchJson(`/api/admin/users/${selectedUser.user_id}/refresh-pocket`, {
+        method: "POST"
+      });
+      const refreshedUsers = await apiAdminFetchJson("/api/admin/users?limit=200");
+      setUsers(refreshedUsers?.items || []);
+      const nextStats = await apiAdminFetchJson("/api/admin/stats");
+      setStats(nextStats);
+      const code = data?.verification?.code || "ok";
+      const messages = {
+        upgraded: "Депозит подтвержден, статус пользователя повышен.",
+        deposit_too_low: "Pocket обновлён, но депозита пока не хватает для следующего статуса.",
+        already_max: "Pocket обновлён. У пользователя уже максимальный доступ.",
+        no_change: "Pocket обновлён, статус остался без изменений.",
+        user_not_found: "Pocket не нашёл такого реферала в кабинете.",
+        trader_id_taken: "Trader ID закреплён за другим пользователем.",
+        not_configured: "Pocket не настроен в разделе регистрации.",
+        pocket_error: "Pocket вернул ошибку или недоступен."
+      };
+      pushToast(code === "upgraded" ? "success" : data?.verification?.ok ? "success" : "error", "Pocket обновлён", messages[code] || "Свежие данные сохранены в карточке пользователя.");
+    } catch (error) {
+      pushToast("error", "Не удалось обновить Pocket", error.message || "Проверьте Trader ID и настройки кабинета.");
+    } finally {
+      setUserPocketRefreshing(false);
     }
   };
   if (authError) {
@@ -1606,14 +1644,19 @@ export default function AdminApp({ authError }) {
               <div className="admin-scanner-panel-head">
                 <div className="admin-scanner-panel-title">
                   <span>Регистрация</span>
-                  <strong>Кнопка получения Trader ID</strong>
-                  <p>Эта ссылка используется на странице статусов, если пользователь ещё не указал Trader ID.</p>
+                  <strong>Trader ID и Pocket</strong>
+                  <p>Ссылка ведёт пользователя на регистрацию, а Pocket-параметры проверяют реферала и депозит при повышении статуса.</p>
                 </div>
-                <span className={`admin-badge ${registrationSettings.registration_url ? "tone-success" : "tone-neutral"}`}>
-                  {registrationSettings.registration_url ? "Ссылка активна" : "Ссылка не задана"}
-                </span>
+                <div className="admin-scanner-panel-badges">
+                  <span className={`admin-badge ${registrationSettings.registration_url ? "tone-success" : "tone-neutral"}`}>
+                    {registrationSettings.registration_url ? "Ссылка активна" : "Ссылка не задана"}
+                  </span>
+                  <span className={`admin-badge ${registrationSettings.pocket_api_token_configured ? "tone-success" : "tone-neutral"}`}>
+                    {registrationSettings.pocket_api_token_configured ? "Pocket подключён" : "Pocket не настроен"}
+                  </span>
+                </div>
               </div>
-              <div className="admin-registration-row">
+              <div className="admin-registration-grid">
                 <label className="admin-field">
                   <span>Ссылка регистрации</span>
                   <input
@@ -1624,8 +1667,36 @@ export default function AdminApp({ authError }) {
                     placeholder="https://..."
                   />
                 </label>
+                <label className="admin-field">
+                  <span>ID кабинета Pocket</span>
+                  <input
+                    className="admin-input"
+                    type="text"
+                    value={registrationEditor.pocket_partner_id}
+                    onChange={(event) => setRegistrationEditor((prev) => ({ ...prev, pocket_partner_id: event.target.value }))}
+                    placeholder="Например: 18010"
+                  />
+                </label>
+                <label className="admin-field">
+                  <span>Токен кабинета Pocket</span>
+                  <input
+                    className="admin-input"
+                    type="password"
+                    value={registrationEditor.pocket_api_token}
+                    onChange={(event) => setRegistrationEditor((prev) => ({ ...prev, pocket_api_token: event.target.value }))}
+                    placeholder={registrationSettings.pocket_api_token_configured ? "Оставьте пустым, чтобы не менять" : "Вставьте API token"}
+                  />
+                </label>
+                <div className="admin-registration-secret">
+                  <span>Текущий токен</span>
+                  <strong>{compactSecretPreview(registrationSettings.pocket_api_token_preview, registrationSettings.pocket_api_token_configured)}</strong>
+                  <small>API: {registrationSettings.pocket_api_base_url || "https://affiliate.pocketoption.com/api/user-info"}</small>
+                </div>
+              </div>
+              <div className="admin-registration-actions">
+                <span className="admin-muted-text">Токен хранится скрыто. В поле можно вставить новый токен, пустое значение оставит текущий.</span>
                 <button className="admin-primary-button" type="button" disabled={registrationSaving} onClick={saveRegistrationSettings}>
-                  {registrationSaving ? "Сохраняем..." : "Сохранить регистрацию"}
+                  {registrationSaving ? "Сохраняем..." : "Сохранить регистрацию и Pocket"}
                 </button>
               </div>
             </section>
@@ -1915,6 +1986,38 @@ export default function AdminApp({ authError }) {
                   <div><span>Регистрация</span><strong>{formatDateTime(selectedUser.created_at)}</strong></div>
                   <div><span>Последняя активность</span><strong>{formatDateTime(selectedUser.last_active_at)}</strong></div>
                 </div>
+
+                <section className="admin-pocket-panel">
+                  <div className="admin-pocket-head">
+                    <div>
+                      <span className="admin-kicker">Pocket</span>
+                      <strong>Реферал и депозит</strong>
+                      <p>Свежая проверка закрепления Trader ID, суммы депозитов и данных из кабинета.</p>
+                    </div>
+                    <button
+                      className="admin-ghost-button"
+                      type="button"
+                      disabled={userPocketRefreshing || !selectedUser.trader_id}
+                      onClick={refreshSelectedUserPocket}
+                    >
+                      {userPocketRefreshing ? "Обновляем..." : "Обновить Pocket"}
+                    </button>
+                  </div>
+                  <div className="admin-pocket-grid">
+                    <div><span>Статус проверки</span><strong>{selectedUser.pocket?.referral_status || selectedUser.pocket?.error || "-"}</strong></div>
+                    <div><span>Проверено</span><strong>{formatDateTime(selectedUser.pocket?.checked_at)}</strong></div>
+                    <div><span>Баланс</span><strong>{selectedUser.pocket?.balance ?? "-"}</strong></div>
+                    <div><span>Сумма депозитов</span><strong>{selectedUser.pocket?.sum_deposits ?? "-"}</strong></div>
+                    <div><span>FTD</span><strong>{selectedUser.pocket?.sum_ftd ?? "-"}</strong></div>
+                    <div><span>Кол-во депозитов</span><strong>{selectedUser.pocket?.count_deposits ?? 0}</strong></div>
+                    <div><span>Регистрация Pocket</span><strong>{selectedUser.pocket?.reg_date || "-"}</strong></div>
+                    <div><span>Активность Pocket</span><strong>{selectedUser.pocket?.activity_date || "-"}</strong></div>
+                    <div><span>Страна</span><strong>{selectedUser.pocket?.country || "-"}</strong></div>
+                    <div><span>Верификация</span><strong>{selectedUser.pocket?.is_verified || "-"}</strong></div>
+                    <div><span>Компания</span><strong>{selectedUser.pocket?.company || "-"}</strong></div>
+                    <div><span>Ссылка</span><strong>{selectedUser.pocket?.registration_link || "-"}</strong></div>
+                  </div>
+                </section>
 
                 <div className="admin-editor-grid">
                   <label className="admin-field">

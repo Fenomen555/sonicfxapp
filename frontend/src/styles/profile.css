@@ -167,6 +167,76 @@
   word-break: break-word;
 }
 
+.profile-limits-row {
+  width: min(100%, 300px);
+  justify-self: center;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(92, 118, 158, 0.24);
+  background:
+    radial-gradient(circle at top, rgba(114, 166, 255, 0.12), transparent 64%),
+    rgba(8, 14, 23, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 12px 24px rgba(5, 10, 18, 0.16);
+}
+
+.profile-limits-title {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.profile-limits-pills {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.profile-limit-pill {
+  min-width: 58px;
+  height: 40px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 157, 214, 0.32);
+  background:
+    radial-gradient(circle at 35% 20%, rgba(132, 183, 255, 0.2), transparent 62%),
+    rgba(15, 24, 38, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.profile-limit-pill img,
+.profile-limit-pill svg {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+}
+
+.profile-limit-pill b {
+  color: #dbe8ff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.profile-limit-pill.is-unlimited b {
+  color: #8ff5bd;
+  font-size: 15px;
+}
+
+.profile-limit-pill.is-disabled {
+  opacity: 0.45;
+  filter: grayscale(0.35);
+}
+
 .profile-upgrade-btn {
   width: min(100%, 280px);
   justify-self: center;
@@ -1405,6 +1475,31 @@
   background: rgba(250, 244, 234, 0.94);
 }
 
+:root[data-theme="light"] .profile-limits-row {
+  border-color: rgba(119, 102, 78, 0.16);
+  background:
+    radial-gradient(circle at top, rgba(56, 104, 246, 0.1), transparent 62%),
+    rgba(250, 244, 234, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.76),
+    0 12px 22px rgba(108, 132, 176, 0.12);
+}
+
+:root[data-theme="light"] .profile-limit-pill {
+  border-color: rgba(80, 109, 172, 0.22);
+  background:
+    radial-gradient(circle at 35% 20%, rgba(56, 104, 246, 0.14), transparent 62%),
+    rgba(255, 250, 240, 0.9);
+}
+
+:root[data-theme="light"] .profile-limit-pill b {
+  color: #1d355f;
+}
+
+:root[data-theme="light"] .profile-limit-pill.is-unlimited b {
+  color: #178352;
+}
+
 :root[data-theme="light"] .profile-action-tile {
   background:
     radial-gradient(circle at top right, rgba(56, 104, 246, 0.08), transparent 42%),
@@ -1779,6 +1874,23 @@
   .profile-summary-card strong {
     font-size: 13px;
     line-height: 1.18;
+  }
+
+  .profile-limits-row {
+    width: min(100%, 270px);
+    padding: 9px 10px;
+  }
+
+  .profile-limit-pill {
+    min-width: 54px;
+    height: 38px;
+    padding: 0 8px;
+  }
+
+  .profile-limit-pill img,
+  .profile-limit-pill svg {
+    width: 23px;
+    height: 23px;
   }
 
   .profile-theme-switch-track {

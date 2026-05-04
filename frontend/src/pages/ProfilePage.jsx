@@ -4,6 +4,7 @@ import profileFaqIcon from "../assets/profile-faq.png";
 import profileHistoryIcon from "../assets/profile-history.png";
 import profileNotificationsIcon from "../assets/profile-notifications.png";
 import profileSupportIcon from "../assets/profile-support.png";
+import { AutoModeIcon, IndicatorModeIcon, ScannerModeIcon } from "../components/AppIcons";
 import { apiFetchJson } from "../lib/api";
 import { getIndicatorMeta } from "../lib/indicatorMeta";
 
@@ -24,6 +25,12 @@ const PROFILE_TOP_ACTIONS = [
 const PROFILE_BOTTOM_ACTIONS = [
   { key: "support", fallback: "Поддержка", image: profileSupportIcon },
   { key: "notifications", fallback: "Уведомления", image: profileNotificationsIcon }
+];
+
+const PROFILE_LIMIT_MODES = [
+  { key: "scanner", icon: ScannerModeIcon, label: "Scanner" },
+  { key: "live", icon: AutoModeIcon, label: "Live" },
+  { key: "indicators", icon: IndicatorModeIcon, label: "Indicators" }
 ];
 
 const SUPPORT_LINK_DEFAULTS = {
@@ -573,6 +580,22 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     [lang, t, user]
   );
 
+  const limitItems = useMemo(() => {
+    const usage = user?.account_usage || {};
+    return PROFILE_LIMIT_MODES.map((item) => {
+      const quota = usage?.[item.key] || {};
+      const limit = Number(quota.limit ?? 0);
+      const remaining = Number(quota.remaining ?? 0);
+      const enabled = Number(quota.enabled ?? 0) === 1;
+      return {
+        ...item,
+        enabled,
+        isUnlimited: enabled && limit < 0,
+        value: !enabled ? "0" : limit < 0 ? "∞" : `${Math.max(remaining, 0)}/${Math.max(limit, 0)}`
+      };
+    });
+  }, [user?.account_usage]);
+
   const handleUpgradeStatus = () => {
     onOpenUpgrade?.();
   };
@@ -850,6 +873,25 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
               <strong>{item.value}</strong>
             </article>
           ))}
+        </div>
+
+        <div className="profile-limits-row" aria-label={t.profile.limits || "Лимиты"}>
+          <span className="profile-limits-title">{t.profile.limits || "Лимиты"}</span>
+          <div className="profile-limits-pills">
+            {limitItems.map((item) => {
+              const LimitIcon = item.icon;
+              return (
+                <span
+                  className={`profile-limit-pill ${item.enabled ? "" : "is-disabled"} ${item.isUnlimited ? "is-unlimited" : ""}`}
+                  key={item.key}
+                  title={`${item.label}: ${item.value}`}
+                >
+                  <LimitIcon aria-hidden="true" />
+                  <b>{item.value}</b>
+                </span>
+              );
+            })}
+          </div>
         </div>
 
         <button type="button" className="profile-upgrade-btn" onClick={handleUpgradeStatus}>

@@ -168,12 +168,12 @@
 }
 
 .profile-limits-row {
-  width: min(100%, 300px);
+  width: min(100%, 270px);
   justify-self: center;
   display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 20px;
+  gap: 7px;
+  padding: 8px 10px;
+  border-radius: 18px;
   border: 1px solid rgba(92, 118, 158, 0.24);
   background:
     radial-gradient(circle at top, rgba(114, 166, 255, 0.12), transparent 64%),
@@ -185,7 +185,7 @@
 
 .profile-limits-title {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-align: center;
@@ -195,13 +195,13 @@
 .profile-limits-pills {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 7px;
 }
 
 .profile-limit-pill {
-  min-width: 58px;
-  height: 40px;
-  padding: 0 9px;
+  min-width: 51px;
+  height: 34px;
+  padding: 0 7px;
   border-radius: 999px;
   border: 1px solid rgba(125, 157, 214, 0.32);
   background:
@@ -215,21 +215,21 @@
 
 .profile-limit-pill img,
 .profile-limit-pill svg {
-  width: 25px;
-  height: 25px;
+  width: 21px;
+  height: 21px;
   object-fit: contain;
 }
 
 .profile-limit-pill b {
   color: #dbe8ff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 900;
   line-height: 1;
 }
 
 .profile-limit-pill.is-unlimited b {
   color: #8ff5bd;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .profile-limit-pill.is-disabled {
@@ -1877,20 +1877,20 @@
   }
 
   .profile-limits-row {
-    width: min(100%, 270px);
-    padding: 9px 10px;
+    width: min(100%, 245px);
+    padding: 8px 9px;
   }
 
   .profile-limit-pill {
-    min-width: 54px;
-    height: 38px;
-    padding: 0 8px;
+    min-width: 49px;
+    height: 33px;
+    padding: 0 7px;
   }
 
   .profile-limit-pill img,
   .profile-limit-pill svg {
-    width: 23px;
-    height: 23px;
+    width: 20px;
+    height: 20px;
   }
 
   .profile-theme-switch-track {

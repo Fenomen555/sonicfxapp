@@ -219,6 +219,68 @@ export const texts = {
         notifications: "Уведомления"
       }
     },
+    statusUpgrade: {
+      title: "Открой следующий уровень",
+      loading: "Загружаем статусы...",
+      empty: "Статусы пока не настроены.",
+      current: "Текущий",
+      unlocked: "Есть доступ",
+      from: "от",
+      prev: "Предыдущий",
+      next: "Далее",
+      dotsLabel: "Навигация по статусам",
+      openStatus: "Открыть статус",
+      traderLabel: "Trader ID для получения доступа",
+      traderPlaceholder: "Введите Trader ID",
+      saving: "Сохраняем...",
+      upgrade: "Повысить",
+      saveTrader: "Сохранить Trader ID",
+      register: "Зарегистрироваться",
+      disclaimer: "Выбери доступ под свой стиль торговли. Текущий уровень и следующие статусы собраны в одном разделе.",
+      defaultDescription: "Статус SonicFX с индивидуальными лимитами.",
+      noAccess: "Нет доступа",
+      trialScanner: "1 пробный",
+      sharedSignal: "1 общий",
+      unlimited: "Безлимит",
+      hourShort: "ч",
+      loadErrorTitle: "Не удалось загрузить статусы",
+      loadErrorMessage: "Попробуйте открыть раздел ещё раз.",
+      traderSavedTitle: "Trader ID сохранён",
+      traderSavedMessage: "Теперь админ сможет быстрее выдать нужный статус.",
+      traderErrorTitle: "Не удалось сохранить Trader ID",
+      traderErrorMessage: "Проверьте значение и попробуйте ещё раз.",
+      modes: {
+        scanner: "Сканер",
+        live: "Live",
+        indicators: "Индикаторы"
+      },
+      statuses: {
+        trader: {
+          name: "Trader",
+          badge: "TRADER",
+          description: "Базовый статус для каждого пользователя SonicFX.",
+          lines: ["🎯 1 Live или Indicator анализ", "🎁 1 пробный Scanner", "Открой Premium для полного доступа"]
+        },
+        premium: {
+          name: "Premium",
+          badge: "PREMIUM",
+          description: "Полный старт для активной торговли с Live и индикаторами.",
+          lines: ["⚡ Live сигналы", "📊 Индикаторы", "Лимит: 3 сигнала / 3 часа"]
+        },
+        vip: {
+          name: "VIP",
+          badge: "VIP",
+          description: "Расширенный доступ для частых сигналов и Scanner анализа.",
+          lines: ["🔥 Scanner анализ", "⚡ Live + Индикаторы", "Лимит: 10 сигналов / 3 часа"]
+        },
+        unlimited: {
+          name: "Unlimited",
+          badge: "UNLIMITED",
+          description: "Максимальный статус без лимитов по сигналам.",
+          lines: ["🚀 Полный доступ", "♾ Без лимитов", "⚡ Максимальная скорость сигналов"]
+        }
+      }
+    },
     news: {
       title: "Новости",
       empty: "Новостей пока нет",
@@ -486,6 +548,68 @@ export const texts = {
         notifications: "Notifications"
       }
     },
+    statusUpgrade: {
+      title: "Unlock the next level",
+      loading: "Loading statuses...",
+      empty: "No statuses configured yet.",
+      current: "Current",
+      unlocked: "Unlocked",
+      from: "from",
+      prev: "Previous",
+      next: "Next",
+      dotsLabel: "Status navigation",
+      openStatus: "Open status",
+      traderLabel: "Trader ID for access",
+      traderPlaceholder: "Enter Trader ID",
+      saving: "Saving...",
+      upgrade: "Upgrade",
+      saveTrader: "Save Trader ID",
+      register: "Register",
+      disclaimer: "Choose access for your trading style. Your current level and next statuses are collected in one section.",
+      defaultDescription: "SonicFX status with custom limits.",
+      noAccess: "No access",
+      trialScanner: "1 trial",
+      sharedSignal: "1 shared",
+      unlimited: "Unlimited",
+      hourShort: "h",
+      loadErrorTitle: "Unable to load statuses",
+      loadErrorMessage: "Try opening this section again.",
+      traderSavedTitle: "Trader ID saved",
+      traderSavedMessage: "The admin will be able to assign the right status faster.",
+      traderErrorTitle: "Unable to save Trader ID",
+      traderErrorMessage: "Check the value and try again.",
+      modes: {
+        scanner: "Scanner",
+        live: "Live",
+        indicators: "Indicators"
+      },
+      statuses: {
+        trader: {
+          name: "Trader",
+          badge: "TRADER",
+          description: "Base status for every SonicFX user.",
+          lines: ["🎯 1 Live or Indicator analysis", "🎁 1 trial Scanner", "Unlock Premium for full access"]
+        },
+        premium: {
+          name: "Premium",
+          badge: "PREMIUM",
+          description: "A full start for active trading with Live and indicators.",
+          lines: ["⚡ Live signals", "📊 Indicators", "Limit: 3 signals / 3 hours"]
+        },
+        vip: {
+          name: "VIP",
+          badge: "VIP",
+          description: "Expanded access for frequent signals and Scanner analysis.",
+          lines: ["🔥 Scanner analysis", "⚡ Live + Indicators", "Limit: 10 signals / 3 hours"]
+        },
+        unlimited: {
+          name: "Unlimited",
+          badge: "UNLIMITED",
+          description: "Maximum status with no signal limits.",
+          lines: ["🚀 Full access", "♾ No limits", "⚡ Maximum signal speed"]
+        }
+      }
+    },
     news: {
       title: "News",
       empty: "No news yet",
@@ -751,6 +875,68 @@ export const texts = {
         faq: "FAQ",
         support: "Підтримка",
         notifications: "Сповіщення"
+      }
+    },
+    statusUpgrade: {
+      title: "Відкрий наступний рівень",
+      loading: "Завантажуємо статуси...",
+      empty: "Статуси поки не налаштовані.",
+      current: "Поточний",
+      unlocked: "Є доступ",
+      from: "від",
+      prev: "Попередній",
+      next: "Далі",
+      dotsLabel: "Навігація статусами",
+      openStatus: "Відкрити статус",
+      traderLabel: "Trader ID для отримання доступу",
+      traderPlaceholder: "Введіть Trader ID",
+      saving: "Зберігаємо...",
+      upgrade: "Підвищити",
+      saveTrader: "Зберегти Trader ID",
+      register: "Зареєструватися",
+      disclaimer: "Оберіть доступ під свій стиль торгівлі. Поточний рівень і наступні статуси зібрані в одному розділі.",
+      defaultDescription: "Статус SonicFX з індивідуальними лімітами.",
+      noAccess: "Немає доступу",
+      trialScanner: "1 пробний",
+      sharedSignal: "1 спільний",
+      unlimited: "Безліміт",
+      hourShort: "год",
+      loadErrorTitle: "Не вдалося завантажити статуси",
+      loadErrorMessage: "Спробуйте відкрити розділ ще раз.",
+      traderSavedTitle: "Trader ID збережено",
+      traderSavedMessage: "Тепер адміністратор зможе швидше видати потрібний статус.",
+      traderErrorTitle: "Не вдалося зберегти Trader ID",
+      traderErrorMessage: "Перевірте значення і спробуйте ще раз.",
+      modes: {
+        scanner: "Сканер",
+        live: "Live",
+        indicators: "Індикатори"
+      },
+      statuses: {
+        trader: {
+          name: "Trader",
+          badge: "TRADER",
+          description: "Базовий статус для кожного користувача SonicFX.",
+          lines: ["🎯 1 Live або Indicator аналіз", "🎁 1 пробний Scanner", "Відкрий Premium для повного доступу"]
+        },
+        premium: {
+          name: "Premium",
+          badge: "PREMIUM",
+          description: "Повний старт для активної торгівлі з Live та індикаторами.",
+          lines: ["⚡ Live сигнали", "📊 Індикатори", "Ліміт: 3 сигнали / 3 години"]
+        },
+        vip: {
+          name: "VIP",
+          badge: "VIP",
+          description: "Розширений доступ для частих сигналів і Scanner аналізу.",
+          lines: ["🔥 Scanner аналіз", "⚡ Live + Індикатори", "Ліміт: 10 сигналів / 3 години"]
+        },
+        unlimited: {
+          name: "Unlimited",
+          badge: "UNLIMITED",
+          description: "Максимальний статус без лімітів за сигналами.",
+          lines: ["🚀 Повний доступ", "♾ Без лімітів", "⚡ Максимальна швидкість сигналів"]
+        }
       }
     },
     news: {

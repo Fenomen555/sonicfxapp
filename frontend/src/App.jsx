@@ -403,6 +403,7 @@ export default function App() {
             {tab === "history" && <HistoryPage lang={lang} />}
             {tab === "status" && (
               <StatusUpgradePage
+                t={t}
                 user={user}
                 notify={notify}
                 onUserUpdate={(next) => setUser((prev) => ({ ...prev, ...(next || {}) }))}

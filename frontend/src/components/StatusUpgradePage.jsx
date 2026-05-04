@@ -5,17 +5,17 @@ function normalizeCode(value) {
   return String(value || "trader").trim().toLowerCase() || "trader";
 }
 
-function getModeLimitText(status, mode) {
+function getModeLimitText(status, mode, copy) {
   const enabled = Number(status?.[`${mode}_enabled`] || 0) === 1;
-  if (!enabled) return "Нет доступа";
+  if (!enabled) return copy.noAccess || "No access";
   const code = normalizeCode(status?.code);
-  if (code === "trader" && mode === "scanner") return "1 пробный";
-  if (code === "trader" && (mode === "live" || mode === "indicators")) return "1 общий";
+  if (code === "trader" && mode === "scanner") return copy.trialScanner || "1 trial";
+  if (code === "trader" && (mode === "live" || mode === "indicators")) return copy.sharedSignal || "1 shared";
   const limit = Number(status?.[`${mode}_limit`] ?? 0);
-  if (limit < 0) return "Безлимит";
+  if (limit < 0) return copy.unlimited || "Unlimited";
   const hours = Number(status?.[`${mode}_window_hours`] || 3);
-  if (limit === 0) return "Нет доступа";
-  return `${limit} / ${hours} ч`;
+  if (limit === 0) return copy.noAccess || "No access";
+  return `${limit} / ${hours} ${copy.hourShort || "h"}`;
 }
 
 function getStatusTone(code) {
@@ -31,7 +31,21 @@ const MODE_ROWS = [
   { key: "indicators", label: "Indicators" }
 ];
 
-export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify }) {
+function getLocalizedStatus(item, copy) {
+  const code = normalizeCode(item?.code);
+  const preset = copy.statuses?.[code] || null;
+  return {
+    ...item,
+    name: preset?.name || item?.name || code,
+    badge_text: preset?.badge || item?.badge_text || item?.name || code,
+    description: preset?.description || item?.description || copy.defaultDescription || "SonicFX status with custom limits.",
+    marketingLines: Array.isArray(preset?.lines)
+      ? preset.lines
+      : String(item?.marketing_text || "").split("\n").filter(Boolean)
+  };
+}
+
+export default function StatusUpgradePage({ user, t = {}, onClose, onUserUpdate, notify }) {
   const [items, setItems] = useState([]);
   const [currentStatus, setCurrentStatus] = useState(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -40,6 +54,7 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
   const [registrationUrl, setRegistrationUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const copy = t.statusUpgrade || {};
 
   useEffect(() => {
     let isActive = true;
@@ -56,8 +71,8 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
         if (!isActive) return;
         notify?.({
           type: "error",
-          title: "Не удалось загрузить статусы",
-          message: error.message || "Попробуйте открыть раздел ещё раз."
+          title: copy.loadErrorTitle || "Unable to load statuses",
+          message: error.message || copy.loadErrorMessage || "Try opening this section again."
         });
       })
       .finally(() => {
@@ -78,7 +93,8 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
     setActiveIndex((prev) => Math.min(Math.max(prev, 0), Math.max(visibleItems.length - 1, 0)));
   }, [visibleItems.length]);
 
-  const activeItem = visibleItems[activeIndex] || visibleItems[0] || null;
+  const rawActiveItem = visibleItems[activeIndex] || visibleItems[0] || null;
+  const activeItem = rawActiveItem ? getLocalizedStatus(rawActiveItem, copy) : null;
   const activeCode = normalizeCode(activeItem?.code);
   const isCurrent = activeCode === normalizeCode(user?.account_tier);
   const isUnlocked = Number(activeItem?.sort_order || 0) <= currentOrder;
@@ -114,14 +130,14 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
       onUserUpdate?.(data?.user || {});
       notify?.({
         type: "success",
-        title: "Trader ID сохранён",
-        message: "Теперь админ сможет быстрее выдать нужный статус."
+        title: copy.traderSavedTitle || "Trader ID saved",
+        message: copy.traderSavedMessage || "The admin will be able to assign the right status faster."
       });
     } catch (error) {
       notify?.({
         type: "error",
-        title: "Не удалось сохранить Trader ID",
-        message: error.message || "Проверьте значение и попробуйте ещё раз."
+        title: copy.traderErrorTitle || "Unable to save Trader ID",
+        message: error.message || copy.traderErrorMessage || "Check the value and try again."
       });
     } finally {
       setSaving(false);
@@ -131,11 +147,11 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
   return (
     <section className="status-upgrade-page">
       <div className="status-upgrade-head status-page-head">
-        <h1>Открой следующий уровень</h1>
+        <h1>{copy.title || "Unlock the next level"}</h1>
       </div>
 
       {loading ? (
-        <div className="status-upgrade-empty status-page-empty">Загружаем статусы...</div>
+        <div className="status-upgrade-empty status-page-empty">{copy.loading || "Loading statuses..."}</div>
       ) : activeItem ? (
         <>
           <div
@@ -149,19 +165,19 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
               <div className="status-upgrade-card-top status-page-card-top">
                 <span>{activeItem.badge_text || activeItem.name}</span>
                 <strong>{activeItem.name}</strong>
-                <i>{isCurrent ? "Текущий" : isUnlocked ? "Есть доступ" : `от $${Number(activeItem.min_deposit || 0)}`}</i>
+                <i>{isCurrent ? (copy.current || "Current") : isUnlocked ? (copy.unlocked || "Unlocked") : `${copy.from || "from"} $${Number(activeItem.min_deposit || 0)}`}</i>
               </div>
-              <p>{activeItem.description || "Статус SonicFX с индивидуальными лимитами."}</p>
+              <p>{activeItem.description}</p>
               <div className="status-upgrade-lines">
-                {(activeItem.marketing_text || "").split("\n").filter(Boolean).map((line) => (
+                {activeItem.marketingLines.map((line) => (
                   <span key={line}>{line}</span>
                 ))}
               </div>
               <div className="status-upgrade-limits">
                 {MODE_ROWS.map((mode) => (
                   <span key={mode.key}>
-                    {mode.label}
-                    <b>{getModeLimitText(activeItem, mode.key)}</b>
+                    {copy.modes?.[mode.key] || mode.label}
+                    <b>{getModeLimitText(activeItem, mode.key, copy)}</b>
                   </span>
                 ))}
               </div>
@@ -170,51 +186,51 @@ export default function StatusUpgradePage({ user, onClose, onUserUpdate, notify 
 
           <div className="status-page-controls">
             <button type="button" onClick={goPrev} disabled={activeIndex <= 0}>
-              Предыдущий
+              {copy.prev || "Previous"}
             </button>
-            <div className="status-page-dots" aria-label="Навигация по статусам">
+            <div className="status-page-dots" aria-label={copy.dotsLabel || "Status navigation"}>
               {visibleItems.map((item, index) => (
                 <button
                   type="button"
                   className={index === activeIndex ? "active" : ""}
                   key={item.code || index}
                   onClick={() => setActiveIndex(index)}
-                  aria-label={`Открыть статус ${item.name || index + 1}`}
+                  aria-label={`${copy.openStatus || "Open status"} ${getLocalizedStatus(item, copy).name || index + 1}`}
                 />
               ))}
             </div>
             <button type="button" onClick={goNext} disabled={activeIndex >= visibleItems.length - 1}>
-              Далее
+              {copy.next || "Next"}
             </button>
           </div>
         </>
       ) : (
-        <div className="status-upgrade-empty status-page-empty">Статусы пока не настроены.</div>
+        <div className="status-upgrade-empty status-page-empty">{copy.empty || "No statuses configured yet."}</div>
       )}
 
       <div className="status-upgrade-form status-page-form">
         <label>
-          <span>Trader ID для получения доступа</span>
+          <span>{copy.traderLabel || "Trader ID for access"}</span>
           <input
             type="text"
             maxLength="128"
             value={traderId}
             onChange={(event) => setTraderId(event.target.value)}
-            placeholder="Введите Trader ID"
+            placeholder={copy.traderPlaceholder || "Enter Trader ID"}
           />
         </label>
         <button type="button" onClick={saveTraderId} disabled={saving}>
-          {saving ? "Сохраняем..." : traderId.trim() ? "Повысить" : "Сохранить Trader ID"}
+          {saving ? (copy.saving || "Saving...") : traderId.trim() ? (copy.upgrade || "Upgrade") : (copy.saveTrader || "Save Trader ID")}
         </button>
         {!hasStoredTraderId && registrationUrl ? (
           <a className="status-register-link" href={registrationUrl} target="_blank" rel="noreferrer">
-            Зарегистрироваться
+            {copy.register || "Register"}
           </a>
         ) : null}
       </div>
 
       <p className="status-page-disclaimer">
-        Выбери доступ под свой стиль торговли. Текущий уровень и следующие статусы собраны в одном разделе.
+        {copy.disclaimer || "Choose access for your trading style. Your current level and next statuses are collected in one section."}
       </p>
     </section>
   );

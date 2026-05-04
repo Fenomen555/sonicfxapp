@@ -1177,6 +1177,15 @@ async def get_account_status_config(code: str) -> Dict[str, Any]:
     return _serialize_account_status(row) if row else _fallback_status_config(normalized)
 
 
+async def get_next_account_status_config(current_status: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    current_order = int((current_status or {}).get("sort_order") or 0)
+    statuses = await list_account_statuses(include_disabled=False)
+    for status in statuses:
+        if int(status.get("sort_order") or 0) > current_order:
+            return status
+    return None
+
+
 async def count_user_source_signals(user_id: int, source_types: List[str], window_hours: Optional[int] = None) -> int:
     sources = [str(item or "").strip() for item in source_types if str(item or "").strip()]
     if not sources:
@@ -1419,6 +1428,7 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
     feature_flags = await get_feature_flags_payload()
     account_tier = _normalize_status_code(row.get("account_tier") or "trader")
     account_status = await get_account_status_config(account_tier)
+    next_account_status = await get_next_account_status_config(account_status)
     account_usage = await get_user_account_usage_payload(int(row["user_id"]), account_status)
     return {
         "user_id": int(row["user_id"]),
@@ -1433,6 +1443,8 @@ async def fetch_user_profile(user_id: int) -> Dict[str, Any]:
         "preferred_signal_mode": _normalize_preferred_signal_mode(row.get("preferred_signal_mode") or "scanner"),
         "account_tier": account_tier,
         "account_status": account_status,
+        "next_account_status": next_account_status,
+        "is_max_status": 1 if next_account_status is None else 0,
         "account_usage": account_usage,
         "trader_id": row.get("trader_id") or "",
         "activation_status": _coerce_activation(row.get("activation_status") or "inactive"),

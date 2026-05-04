@@ -65,6 +65,47 @@ const INDICATOR_MARKETS = [
   { key: "stocks", label: "Stocks" }
 ];
 
+const STATUS_ORDER = ["trader", "premium", "vip", "unlimited"];
+
+function normalizeStatusCode(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "");
+}
+
+function getFallbackNextStatus(user) {
+  const currentCode = normalizeStatusCode(user?.account_status?.code || user?.account_tier || "trader");
+  const currentIndex = STATUS_ORDER.indexOf(currentCode);
+  if (currentIndex < 0 || currentIndex >= STATUS_ORDER.length - 1) return null;
+  const nextCode = STATUS_ORDER[currentIndex + 1];
+  return {
+    code: nextCode,
+    name: nextCode === "vip" ? "VIP" : nextCode.charAt(0).toUpperCase() + nextCode.slice(1)
+  };
+}
+
+function getNextAccountStatus(user) {
+  return user?.next_account_status || user?.next_status || getFallbackNextStatus(user);
+}
+
+function isMaxAccountStatus(user) {
+  if (Number(user?.is_max_status || 0) === 1) return true;
+  const code = normalizeStatusCode(user?.account_status?.code || user?.account_tier);
+  if (code === "unlimited") return true;
+  return !getNextAccountStatus(user);
+}
+
+function formatUpgradeLabel(user, t) {
+  const nextStatus = getNextAccountStatus(user);
+  const target = nextStatus?.name || nextStatus?.badge_text || "PRO";
+  const template = t.home.upgradeToStatus || t.home.pro || "Upgrade to {status}";
+  if (template.includes("{status}")) {
+    return template.replace("{status}", target);
+  }
+  return `${template} ${target}`.trim();
+}
+
 const FALLBACK_INDICATORS = [
   { code: "rsi", title: "RSI", description: "Relative Strength Index" },
   { code: "stochastic_oscillator", title: "Stochastic Oscillator", description: "Momentum oscillator" },
@@ -478,6 +519,8 @@ export default function HomePage({
       };
     });
   }, [baseSignalModes, featureFlags, user?.account_usage]);
+  const hasMaxAccountStatus = useMemo(() => isMaxAccountStatus(user), [user]);
+  const upgradeLabel = useMemo(() => formatUpgradeLabel(user, t), [t, user]);
 
   useEffect(() => {
     const normalized = normalizeSignalMode(preferredSignalMode);
@@ -1756,29 +1799,31 @@ export default function HomePage({
         onChange={(event) => handleScanFileInput(event, "camera")}
       />
 
-      <div className="home-quota">
-        <div className="quota-left quota-mode-list" aria-label={t.home.quota || "Analyses"}>
-          {quotaModeItems.map((item) => {
-            const QuotaIcon = item.icon || SparkIcon;
-            return (
-              <span
-                className={`quota-mode-chip ${item.enabled ? "" : "disabled"} ${item.isUnlimited ? "unlimited" : ""}`}
-                key={item.id}
-                title={`${item.label}: ${item.value}`}
-              >
-                <QuotaIcon aria-hidden="true" />
-                <b>{item.value}</b>
-              </span>
-            );
-          })}
+      {!hasMaxAccountStatus ? (
+        <div className="home-quota">
+          <div className="quota-left quota-mode-list" aria-label={t.home.quota || "Analyses"}>
+            {quotaModeItems.map((item) => {
+              const QuotaIcon = item.icon || SparkIcon;
+              return (
+                <span
+                  className={`quota-mode-chip ${item.enabled ? "" : "disabled"} ${item.isUnlimited ? "unlimited" : ""}`}
+                  key={item.id}
+                  title={`${item.label}: ${item.value}`}
+                >
+                  <QuotaIcon aria-hidden="true" />
+                  <b>{item.value}</b>
+                </span>
+              );
+            })}
+          </div>
+          <button className="quota-btn quota-btn-upgrade" type="button" aria-label={upgradeLabel} onClick={onOpenUpgrade}>
+            <span className="quota-upgrade-animation" aria-hidden="true">
+              <Lottie animationData={upgradeAnimation} loop autoplay />
+            </span>
+            <span className="quota-upgrade-text">{upgradeLabel}</span>
+          </button>
         </div>
-        <button className="quota-btn quota-btn-upgrade" type="button" aria-label={t.home.pro || "Get PRO"} onClick={onOpenUpgrade}>
-          <span className="quota-upgrade-animation" aria-hidden="true">
-            <Lottie animationData={upgradeAnimation} loop autoplay />
-          </span>
-          <span className="quota-upgrade-text">{t.home.pro || "Upgrade to PRO"}</span>
-        </button>
-      </div>
+      ) : null}
 
       {shouldShowActiveAnalysisCard ? (
         <article className={`active-analysis-card signal-${activeAnalysisSignalTone}`}>

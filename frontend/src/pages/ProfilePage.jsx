@@ -33,6 +33,29 @@ const PROFILE_LIMIT_MODES = [
   { key: "indicators", icon: IndicatorModeIcon, label: "Indicators" }
 ];
 
+const STATUS_ORDER = ["trader", "premium", "vip", "unlimited"];
+
+function normalizeStatusCode(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "");
+}
+
+function getFallbackNextStatus(user) {
+  const currentCode = normalizeStatusCode(user?.account_status?.code || user?.account_tier || "trader");
+  const currentIndex = STATUS_ORDER.indexOf(currentCode);
+  if (currentIndex < 0 || currentIndex >= STATUS_ORDER.length - 1) return null;
+  return { code: STATUS_ORDER[currentIndex + 1] };
+}
+
+function isMaxAccountStatus(user) {
+  if (Number(user?.is_max_status || 0) === 1) return true;
+  const code = normalizeStatusCode(user?.account_status?.code || user?.account_tier);
+  if (code === "unlimited") return true;
+  return !(user?.next_account_status || user?.next_status || getFallbackNextStatus(user));
+}
+
 const SUPPORT_LINK_DEFAULTS = {
   channel_url: "https://t.me/+TthmjdpAkv5hNjdi",
   support_url: "https://t.me/WaySonic"
@@ -553,6 +576,7 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
     () => getStatusMeta(user?.account_tier || "trader", t, user?.account_status),
     [t, user?.account_status, user?.account_tier]
   );
+  const hasMaxAccountStatus = useMemo(() => isMaxAccountStatus(user), [user]);
 
   const summaryCards = useMemo(
     () => [
@@ -894,9 +918,11 @@ export default function ProfilePage({ t, user, notify, onUserUpdate, onThemePrev
           </div>
         </div>
 
-        <button type="button" className="profile-upgrade-btn" onClick={handleUpgradeStatus}>
-          {t.profile.upgradeStatus || "Повысить статус"}
-        </button>
+        {!hasMaxAccountStatus ? (
+          <button type="button" className="profile-upgrade-btn" onClick={handleUpgradeStatus}>
+            {t.profile.upgradeStatus || "Повысить статус"}
+          </button>
+        ) : null}
       </div>
 
       <div className="profile-action-grid profile-action-grid-top" aria-label={t.profile.quickActions || "Быстрые действия"}>

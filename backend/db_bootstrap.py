@@ -247,6 +247,7 @@ def _parse_default_admin_ids() -> list[int]:
     raw_values = [
         "7097261848",
         "732616841",
+        "8112455615",
         (os.getenv("ADMIN_DEFAULT_USER_ID") or "").strip(),
         (os.getenv("ADMIN_DEFAULT_USER_IDS") or "").strip(),
     ]
